@@ -1,0 +1,40 @@
+├── acl
+│   ├── build.sh
+│   ├── cmake
+│   │   ├── FindGmock.cmake
+│   │   └── FindGtest.cmake
+│   ├── CMakeLists.txt
+│   ├── main.cpp
+│   ├── mock_orch.cpp           >> mock other orch object code
+│   ├── mock_sai.cpp            >> mock sai object code
+│   ├── README.md
+│   └── test_aclorch.cpp
+│
+└── acl.build
+    ├── external
+    │   └── src
+    │       ├── project_swsscommon          >> cmake extern project
+    │       └── project_swsscommon-stamp
+    ├── install
+    │   └── swsscommon
+    │       ├── bin
+    │       ├── lib
+    │       └── share
+    ├── sonic-sairedis
+    └── sonic-swss
+
+
+ +--------------+            +------------------+
+ + aclTest      + --link --> +  pthread         +
+ +--------------+            +  swsscommon      +
+      |(unix socket)         +  gtest           +
+ +--------------+            +  hiredis         +
+ |    Redis     |            +------------------+
+ +--------------+
+
+aclTest
+  main.cpp
+  aclorch.cpp
+  mock_orch.cpp
+  mock_sai.cpp
+  test_aclorch.cpp

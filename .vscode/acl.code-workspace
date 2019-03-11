@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "E:\\Share\\sonic\\acl"
+		},
+		{
+			"path": "E:\\Share\\sonic\\acl.build\\sonic-swss"
+		},
+		{
+			"path": "E:\\Share\\sonic\\acl.build\\sonic-sairedis"
+		},
+		{
+			"path": "E:\\Share\\sonic\\acl.build\\external\\src\\project_swsscommon"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"vector": "cpp"
+		},
+        "files.exclude": {
+			"**/*.o": true,
+			"**/*.lo": true,
+			"**/*.la": true,
+        }
+	},
+}
