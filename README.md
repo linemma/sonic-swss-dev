@@ -1,4 +1,4 @@
-#1. Redis open UNIX socket
+# Redis open UNIX socket
 // https://www.mf8.biz/apt-get-install-redis-server/
 ```
 apt-get install redis-server
@@ -15,8 +15,8 @@ sudo vim /etc/redis/redis.conf
 service redis-server restart
 ```
 
-#2. Install tools
-##swss-common
+# Install tools
+## swss-common
 ```
 sudo apt-get install make libtool m4 autoconf dh-exec debhelper cmake pkg-config \
                      libhiredis-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev swig3.0 \
@@ -25,20 +25,20 @@ sudo apt-get install make libtool m4 autoconf dh-exec debhelper cmake pkg-config
 cd /usr/src/gtest && sudo cmake . && sudo make
 ```
 
-##SAI
+## SAI
 ```
 sudo apt install -y doxygen
 sudo apt install -y graphviz
 sudo apt install -y aspell
 ```
 
-##sonic-swss
+## sonic-swss
 ```
 sudo apt-get install -y libhiredis0.13 -t trusty
 ```
 
 
-#3. Build the test
+# Build the test
 ```
 cd acl/
 ./build.sh
