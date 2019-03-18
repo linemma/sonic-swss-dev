@@ -8,13 +8,22 @@ mkdir acl.build
 cd acl.build
 
 echo "git clone swss"
-git clone https://github.com/Azure/sonic-swss.git
+git clone --recursive https://github.com/Azure/sonic-swss.git
 echo "git clone sairedis"
-git clone https://github.com/Azure/sonic-sairedis.git
+git clone --recursive https://github.com/Azure/sonic-sairedis.git
 
-cd sonic-sairedis
-git submodule init
-git submodule update
+cd sonic-sairedis/SAI/meta
+export PERL5LIB=${PWD}
+cd ../../
+mkdir -p ${PWD}/../install
+./autogen.sh
+./configure --prefix=$(realpath ${PWD}/../install) --with-sai=vs
+make CXXFLAGS="-I/mnt/g/git/acl.build/install/include \
+               -Wno-error=long-long \
+               -std=c++11 \
+               -L/mnt/g/git/acl.build/install/lib"
+make install
+
 cd ../
 
 cmake ../acl
