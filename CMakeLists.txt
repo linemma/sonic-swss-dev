@@ -26,14 +26,20 @@ message(STATUS "======================================")
 add_definitions(-std=c++11)
 add_definitions(-g -O0)
 
-set(SWSS_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic-swss/")
-set(SWSSCOMM_PATH "${CMAKE_CURRENT_BINARY_DIR}/external/src/project_swsscommon/")
-set(SAIREDIS_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic-sairedis")
+#set(SWSS_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic-swss/")
+#set(SWSSCOMM_PATH "${CMAKE_CURRENT_BINARY_DIR}/external/src/project_swsscommon/")
+#set(SAIREDIS_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic-sairedis")
+set(SRC_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+set(BUILD_PATH ${CMAKE_CURRENT_BINARY_DIR})
+set(SWSS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sonic-swss/")
+set(SWSSCOMM_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sonic-swss-common/")
+set(SAIREDIS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sonic-sairedis/")
+message(STATUS "build path: "${BUILD_PATH})
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}
-                    ${SWSS_PATH}/orchagent/
+include_directories(${SRC_PATH}
+                    ${SWSS_PATH}/orchagent
+                    ${BUILD_PATH}/install/include
                     ${SWSSCOMM_PATH}/common
-                    ${SWSSCOMM_PATH}
                     ${SAIREDIS_PATH}
                     ${SAIREDIS_PATH}/meta
                     ${SAIREDIS_PATH}/SAI/inc
@@ -41,38 +47,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${SAIREDIS_PATH}/SAI/experimental
 )
 
-## libswsscommon ##################################################
-ExternalProject_Add(project_swsscommon
-  GIT_REPOSITORY https://github.com/Azure/sonic-swss-common.git
-  GIT_TAG master
-  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external/
-  INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install/
-  CONFIGURE_COMMAND sh -c "./autogen.sh && ./configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/install/swsscommon"
-  UPDATE_COMMAND ""
-  BUILD_IN_SOURCE 1
-)
-ExternalProject_Get_Property(project_swsscommon install_dir)
-message(STATUS "swsscommon install_dir: " ${install_dir})
-LINK_DIRECTORIES(${install_dir}/swsscommon/lib)
-# copy swsscommon header to ${install_dir}/swss
-file(GLOB SWSSCOMM_HEADER
-    ${CMAKE_CURRENT_BINARY_DIR}/external/src/project_swsscommon/common/*.h
-    ${CMAKE_CURRENT_BINARY_DIR}/external/src/project_swsscommon/common/json.hpp
-)
-message(STATUS "SWSSCOMM_HEADER:" ${SWSSCOMM_HEADER})
-file(INSTALL ${SWSSCOMM_HEADER}
-     DESTINATION ${install_dir}/include/swss
-)
-set(SWSSCOMMON_INSTALL_PATH ${install_dir})
-
-## sairedis ####################################################
-# for libsaimeta / libsaimetadata
-LINK_DIRECTORIES(${SWSSCOMMON_INSTALL_PATH}/sairedis/lib)
-################################################################
+LINK_DIRECTORIES(${BUILD_PATH}/install/lib/)
 
 ## liborchagent #################################################
 file(GLOB ORCH_SRCS
-    ${SWSS_PATH}/orchagent/orchdaemon.cpp
+#    ${SWSS_PATH}/orchagent/orchdaemon.cpp
     ${SWSS_PATH}/orchagent/orch.cpp
     ${SWSS_PATH}/orchagent/notifications.cpp 
     ${SWSS_PATH}/orchagent/routeorch.cpp
@@ -145,9 +124,10 @@ target_include_directories(orchagent PUBLIC
     ${SWSS_PATH}/orchagent/
     ${SAIREDIS_PATH}/SAI/inc/
     ${SAIREDIS_PATH}/lib/inc/
-    ${CMAKE_CURRENT_SOURCE_DIR}/mock/sonic
+    ${SRC_PATH}/mock/sonic
     ${SWSSCOMMON_INSTALL_PATH}/include
 )
+
 
 target_link_libraries(orchagent
     hiredis swsscommon sairedis saimetadata)
@@ -183,16 +163,6 @@ add_executable(${PROJECT_NAME}
    ${INCLS}
    ${TESTS}
 )
-
-add_dependencies(${PROJECT_NAME} project_swsscommon)
-
-#target_include_directories(${PROJECT_NAME}  PRIVATE ${GMOCK_INCLUDE_DIR})
-#target_link_libraries(${PROJECT_NAME}  ${GMOCK_LIBRARIES})
-
-#target_link_libraries(${PROJECT_NAME} ${CMAKE_CURRENT_BINARY_DIR}/install/swsscommon/lib/libswsscommon.a)
-
-LINK_DIRECTORIES(${SWSSCOMMON_INSTALL_PATH}/sairedis/lib)
-#target_link_directories(${PROJECT_NAME} PRIVATE ${SWSSCOMMON_INSTALL_PATH}/sairedis/lib)
 
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent)

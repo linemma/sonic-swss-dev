@@ -1,0 +1,9 @@
+[submodule "sonic-swss-common"]
+	path = sonic-swss-common
+	url = https://github.com/Azure/sonic-swss-common.git
+[submodule "sonic-swss"]
+	path = sonic-swss
+	url = https://github.com/Azure/sonic-swss.git
+[submodule "sonic-sairedis"]
+	path = sonic-sairedis
+	url = https://github.com/Azure/sonic-sairedis.git
