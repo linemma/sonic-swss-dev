@@ -34,7 +34,7 @@ set(BUILD_PATH ${CMAKE_CURRENT_BINARY_DIR})
 set(SWSS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sonic-swss/")
 set(SWSSCOMM_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sonic-swss-common/")
 set(SAIREDIS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sonic-sairedis/")
-message(STATUS "build path: "${BUILD_PATH})
+message(STATUS "build path: " ${BUILD_PATH})
 
 include_directories(${SRC_PATH}
                     ${SWSS_PATH}/orchagent
@@ -123,11 +123,10 @@ add_library(orchagent
 target_include_directories(orchagent PUBLIC
     ${SWSS_PATH}/orchagent/
     ${SAIREDIS_PATH}/SAI/inc/
+    ${SAIREDIS_PATH}/SAI/meta/
     ${SAIREDIS_PATH}/lib/inc/
-    ${SRC_PATH}/mock/sonic
-    ${SWSSCOMMON_INSTALL_PATH}/include
+    ${BUILD_PATH}/install/include/ 
 )
-
 
 target_link_libraries(orchagent
     hiredis swsscommon sairedis saimetadata)
@@ -137,8 +136,6 @@ target_link_libraries(orchagent
 ## aclTest ######################################################
 file(GLOB TESTS
     main.cpp
-#    mock_sai.cpp
-#    mock_orch.cpp
     test_aclorch.cpp
 )
 
