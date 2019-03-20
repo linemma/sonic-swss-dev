@@ -51,7 +51,7 @@ LINK_DIRECTORIES(${BUILD_PATH}/install/lib/)
 
 ## liborchagent #################################################
 file(GLOB ORCH_SRCS
-#    ${SWSS_PATH}/orchagent/orchdaemon.cpp
+    ${SWSS_PATH}/orchagent/orchdaemon.cpp
     ${SWSS_PATH}/orchagent/orch.cpp
     ${SWSS_PATH}/orchagent/notifications.cpp 
     ${SWSS_PATH}/orchagent/routeorch.cpp
@@ -67,8 +67,8 @@ file(GLOB ORCH_SRCS
     ${SWSS_PATH}/orchagent/aclorch.cpp
     ${SWSS_PATH}/orchagent/saihelper.cpp
     ${SWSS_PATH}/orchagent/switchorch.cpp
-#    ${SWSS_PATH}/orchagent/pfcwdorch.cpp
-#    ${SWSS_PATH}/orchagent/pfcactionhandler.cpp
+    ${SWSS_PATH}/orchagent/pfcwdorch.cpp
+    ${SWSS_PATH}/orchagent/pfcactionhandler.cpp
     ${SWSS_PATH}/orchagent/crmorch.cpp
     ${SWSS_PATH}/orchagent/request_parser.cpp
     ${SWSS_PATH}/orchagent/vrforch.cpp
@@ -129,7 +129,8 @@ target_include_directories(orchagent PUBLIC
 )
 
 target_link_libraries(orchagent
-    hiredis swsscommon sairedis saimetadata)
+    swsscommon sairedis saimetadata
+)
 
 #################################################################
 

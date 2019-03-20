@@ -35,7 +35,8 @@ cd ../sonic-swss-acl-dev.build
 make
 ```
 
-# Starting redis-server and open UNIX socket
+# Note
+## Starting redis-server and open UNIX socket
 ```
 sudo apt update
 sudo apt install redis-server
@@ -51,3 +52,8 @@ sudo vim /etc/redis/redis.conf
 sudo service redis-server restart
 ```
 
+## Add patch for swss compile error
+```
+cd sonic-swss-acl-dev/sonic-swss/
+git apply ../patch/swss_pfcwdorch.diff
+```

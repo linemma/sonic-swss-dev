@@ -30,7 +30,7 @@ TEST(aclOrch, initial)
     DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
     DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
 
-//    auto orchDaemon = make_shared<OrchDaemon>(&appl_db, &config_db, &state_db);
+    auto orchDaemon = make_shared<OrchDaemon>(&appl_db, &config_db, &state_db);
 
 #if 0
     PortsOrch *gPortsOrch;
