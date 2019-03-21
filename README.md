@@ -30,6 +30,20 @@ sudo apt-get install -y libhiredis0.13 -t trusty
 ```
 git clone --recurse-submodules --shallow-submodules -j4 https://github.com/ezio-chen/sonic-swss-acl-dev.git
 cd sonic-swss-acl-dev
+
+# patch for swss compile error
+cd sonic-swss/
+git apply ../patch/swss_pfcwdorch.diff
+cd ../
+
+# patch for SAI can't checkout
+cd sonic-sairedis/SAI
+git fetch --depth=2
+cd ..
+git submodule update
+cd ..
+
+# Create build environment and build
 ./build.sh
 cd ../sonic-swss-acl-dev.build
 make
@@ -50,10 +64,4 @@ sudo vim /etc/redis/redis.conf
     unixsocket /var/run/redis/redis.sock
     unixsocketperm 777
 sudo service redis-server restart
-```
-
-## Add patch for swss compile error
-```
-cd sonic-swss-acl-dev/sonic-swss/
-git apply ../patch/swss_pfcwdorch.diff
 ```
