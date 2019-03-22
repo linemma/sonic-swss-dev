@@ -24,6 +24,98 @@ bool gLogRotate = false;
 ofstream gRecordOfs;
 string gRecordFile;
 
+uint32_t expected_attr_count;
+
+extern sai_acl_api_t* sai_acl_api;
+
+struct AclTest : public ::testing::Test {
+
+};
+
+struct AclTestRedis : public ::testing::Test {
+    DBConnector appl_db;
+    DBConnector config_db;
+    DBConnector state_db;
+
+    AclTestRedis() :
+        appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0),
+        config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0),
+        state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0) {
+    }
+
+    void start_server_and_remote_all_data() {
+        //.....
+    }
+
+    // override
+    void SetUp() override {
+        start_server_and_remote_all_data();
+    }
+
+    void InjectData(int instance, void *data) {
+        if (instance == APPL_DB) {
+            ///
+        }
+        else if (instance == CONFIG_DB) {
+            ///
+        }
+        else if (instance == STATE_DB) {
+            ///
+        }
+    }
+
+    int GetData(int instance) {
+        return 0;
+    }
+};
+
+int fake_create_acl_table(sai_object_id_t *acl_table_id,
+        sai_object_id_t switch_id,
+        uint32_t attr_count,
+        const sai_attribute_t *attr_list) {
+            expected_attr_count = attr_count;
+            return SAI_STATUS_FAILURE;
+        }
+
+TEST_F(AclTest, foo) {
+    sai_acl_api = new sai_acl_api_t();
+    // sai_acl_api->create_acl_table = [&](sai_object_id_t *acl_table_id,
+    //     sai_object_id_t switch_id,
+    //     uint32_t attr_count,
+    //     const sai_attribute_t *attr_list) -> int { 
+    //     //return SAI_STATUS_SUCCESS;
+    //     return SAI_STATUS_FAILURE;
+    // };
+
+    sai_acl_api->create_acl_table = fake_create_acl_table;
+
+    AclTable acltable;
+
+    acltable.create();
+
+    // validate ...
+    EXPECT_EQ(expected_attr_count, 11);
+
+    delete sai_acl_api;
+}
+
+extern const sai_acl_api_t redis_acl_api;
+
+TEST_F(AclTestRedis, foo) {
+    const sai_acl_api_t *sai_acl_api;
+    sai_acl_api = &redis_acl_api;
+
+    InjectData(CONFIG_DB, 0);
+
+    AclTable acltable;
+
+    // acltable.create();
+
+    // validate ...
+    auto x = GetData(ASIC_DB);
+    // check x == ??
+}
+
 TEST(aclOrch, initial)
 {
     DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
