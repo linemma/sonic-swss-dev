@@ -1,21 +1,12 @@
 #/bin/bash
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-SRC_PATH=${DIR}
+BUILD_PATH=${PWD}
+SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 echo "SRC path  ="$SRC_PATH
-
-cd $SRC_PATH
-BUILD_DIR_NAME="${PWD##*/}.build"
-BUILD_PATH=$(realpath ${SRC_PATH}/../${BUILD_DIR_NAME})
 echo "Build path="${BUILD_PATH}
 
+cd $SRC_PATH
 mkdir -p ${BUILD_PATH}/install/include/swss
-#cd ${BUILD_DIR}
-
-#echo "git clone swss"
-#git clone --recursive https://github.com/Azure/sonic-swss.git
-#echo "git clone sairedis"
-#git clone --recursive https://github.com/Azure/sonic-sairedis.git
 
 # Build sonic-swss-common
 SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"

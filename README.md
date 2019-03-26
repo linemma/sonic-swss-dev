@@ -4,27 +4,28 @@ ACL unit test environment for SONiC
 # Getting Started
 ## Install requirment tools
 ```
-# sswss-common
-sudo apt-get install make libtool m4 autoconf dh-exec debhelper cmake pkg-config \
-                     libhiredis-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev swig3.0 \
-                     libpython2.7-dev libgtest-dev
+sudo apt update
 
-cd /usr/src/gtest && sudo cmake . && sudo make
+# sswss-common
+sudo apt-get install -y make libtool m4 autoconf dh-exec debhelper cmake pkg-config \
+                        libhiredis-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev swig3.0 \
+                        libpython2.7-dev libgtest-dev
+
+mkdir -p /tmp/gtest && cd /tmp/gtest
+sudo cmake /usr/src/googletest && sudo make && sudo make install
 
 # SAI
-sudo apt install -y doxygen
-sudo apt install -y graphviz
-sudo apt install -y aspell
+sudo apt install -y doxygen graphviz aspell
 
 # sonic-swss
-sudo apt-get install -y libhiredis0.13 -t trusty
+sudo apt-get install -y libhiredis0.13
+
+# tests
+sudo apt install -y redis-server
 ```
 
 ### install perl  module
-```sudo perl -MCPAN -e shell```  
->```cpan[1]> install XML::Simple ```  
->``` ... ```  
->```cpan[2]> exit```  
+```sudo perl -MCPAN -e "install XML::Simple"```  
 
 ## Build the test environment
 ```
@@ -37,24 +38,17 @@ git apply ../patch/swss_pfcwdorch.diff
 cd ../
 
 # Create build environment and build
-./build.sh
+mkdir ../sonic-swss-acl-dev.build
 cd ../sonic-swss-acl-dev.build
+sh ../sonic-swss-acl-dev/build.sh
 make
 ```
 
 # Note
 ## Starting redis-server and open UNIX socket
 ```
-sudo apt update
-sudo apt install redis-server
-sudo service redis-server start
-sudo ps aux | grep redis                     -> check redis-server run on which user
-sudo usermod -g www-data redis               -> change user(redis) to GID(ww-data)
 sudo mkdir -p /var/run/redis/
-sudo chown -R redis:www-data /var/run/redis
-sudo vim /etc/redis/redis.conf
-  // Find following string and remove "#"
-    unixsocket /var/run/redis/redis.sock
-    unixsocketperm 777
+echo "unixsocket /var/run/redis/redis.sock" | sudo tee --append  /etc/redis/redis.conf
+echo "unixsocketperm 777" | sudo tee --append  /etc/redis/redis.conf
 sudo service redis-server restart
 ```
