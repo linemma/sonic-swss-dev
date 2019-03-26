@@ -28,20 +28,13 @@ sudo apt-get install -y libhiredis0.13 -t trusty
 
 ## Build the test environment
 ```
-git clone --recurse-submodules --shallow-submodules -j4 https://github.com/ezio-chen/sonic-swss-acl-dev.git
+git clone --recurse-submodules -j4 https://github.com/ezio-chen/sonic-swss-acl-dev.git
 cd sonic-swss-acl-dev
 
 # patch for swss compile error
 cd sonic-swss/
 git apply ../patch/swss_pfcwdorch.diff
 cd ../
-
-# patch for SAI can't checkout
-cd sonic-sairedis/SAI
-git fetch --depth=2
-cd ..
-git submodule update
-cd ..
 
 # Create build environment and build
 ./build.sh
