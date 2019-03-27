@@ -1,7 +1,7 @@
 #/bin/bash
 
 BUILD_PATH=${PWD}
-SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+SRC_PATH=$(realpath $(dirname "$0"))
 echo "SRC path  ="$SRC_PATH
 echo "Build path="${BUILD_PATH}
 
