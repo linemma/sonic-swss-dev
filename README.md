@@ -44,7 +44,7 @@ git apply ../patch/swss_pfcwdorch.diff
 cd ../
 
 # Create build environment and build
-cd ${BUILD_FOLDER}
-sh ${SOURCE_FOLDER}/build.sh
+mkdir -p <build dir> && cd <build_dir>
+sh <source_dir>/build.sh
 make
 ```
