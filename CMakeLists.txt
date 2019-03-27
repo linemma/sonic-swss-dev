@@ -137,7 +137,7 @@ target_link_libraries(orchagent
 ## aclTest ######################################################
 file(GLOB TESTS
     main.cpp
-    test_aclorch.cpp
+    tests/test_aclorch.cpp
 )
 
 file(GLOB SRCS
