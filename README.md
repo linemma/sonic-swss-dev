@@ -42,9 +42,8 @@ git apply ../patch/swss_pfcwdorch.diff
 cd ../
 
 # Create build environment and build
-mkdir ../sonic-swss-acl-dev.build
-cd ../sonic-swss-acl-dev.build
-sh ../sonic-swss-acl-dev/build.sh
+cd ${BUILD_FOLDER}
+sh ${SOURCE_FOLDER}/build.sh
 make
 ```
 
