@@ -20,15 +20,17 @@ sudo apt install -y doxygen graphviz aspell
 # sonic-swss
 sudo apt-get install -y libhiredis0.13
 
-# Starting redis-server and open UNIX socket
+# install perl  module
+sudo perl -MCPAN -e "install XML::Simple"
+```
+
+## Starting redis-server and open UNIX socket
+```
 sudo apt install -y redis-server
 sudo mkdir -p /var/run/redis/
 echo "unixsocket /var/run/redis/redis.sock" | sudo tee --append  /etc/redis/redis.conf
 echo "unixsocketperm 777" | sudo tee --append  /etc/redis/redis.conf
 sudo service redis-server restart
-
-# install perl  module
-sudo perl -MCPAN -e "install XML::Simple"
 ```
 
 ## Build the test environment
@@ -46,4 +48,3 @@ cd ${BUILD_FOLDER}
 sh ${SOURCE_FOLDER}/build.sh
 make
 ```
-
