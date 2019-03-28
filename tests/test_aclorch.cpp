@@ -216,7 +216,7 @@ TEST_F(AclTest, create_default_acl_table) {
     sai_acl_api->create_acl_table = NULL;
     delete sai_acl_api;
 }
-#if 0
+
 TEST_F(AclTestRedis, create_default_acl_table_on_redis) {
     sai_status_t status;
     AclTable acltable;
@@ -239,7 +239,7 @@ TEST_F(AclTestRedis, create_default_acl_table_on_redis) {
     sleep(1);
 
     acltable.create();
-    sleep(1);
+    sleep(2);
     // validate ...
     //auto x = GetData(ASIC_DB);
     {
@@ -254,17 +254,28 @@ TEST_F(AclTestRedis, create_default_acl_table_on_redis) {
 
         reply = (redisReply *) redisCommand(c,"SELECT %d", ASIC_DB);
         ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
-        printf("SELECT: %s\n", reply->str);
+        //printf("SELECT: %s\n", reply->str);
         freeReplyObject(reply);
 
-        reply = (redisReply *) redisCommand(c,"DUMP %s", "ASIC_STATE_KEY_VALUE_OP_QUEUE");
+        reply = (redisReply *) redisCommand(c," LRANGE %s 0 -1", "ASIC_STATE_KEY_VALUE_OP_QUEUE");
         ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
-        printf("DUMP: %s\n", reply->str);
+        ASSERT_EQ(reply->elements, 6);
+        for (int i = 0; i < reply->elements; ++i) {
+            redisReply *sub_reply = reply->element[i];
+            //printf("(%d)LRANGE: %s\n", i, sub_reply->str);
+
+            if (i == 0) {
+                string op = string("Screate");
+                ASSERT_TRUE(0 == strncmp(op.c_str(), sub_reply->str, op.length()));
+            }
+        }
         freeReplyObject(reply);
 
         reply = (redisReply *) redisCommand(c,"FLUSHALL");
         freeReplyObject(reply);
         redisFree(c);
     }
+
+    delete gCrmOrch;
+    sai_api_uninitialize();
 }
-#endif
