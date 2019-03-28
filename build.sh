@@ -8,6 +8,10 @@ echo "Build path="${BUILD_PATH}
 cd $SRC_PATH
 mkdir -p ${BUILD_PATH}/install/include/swss
 
+cd sonic-swss/
+git apply ../patch/swss_pfcwdorch.diff
+cd ../
+
 # Build sonic-swss-common
 SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"
 cd ${SWSS_COMMON_PATH}

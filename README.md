@@ -38,11 +38,6 @@ sudo service redis-server restart
 git clone --recurse-submodules -j4 https://github.com/ezio-chen/sonic-swss-acl-dev.git
 cd sonic-swss-acl-dev
 
-# patch for swss compile error
-cd sonic-swss/
-git apply ../patch/swss_pfcwdorch.diff
-cd ../
-
 # Create build environment and build
 mkdir -p <build dir> && cd <build_dir>
 sh <source_dir>/build.sh

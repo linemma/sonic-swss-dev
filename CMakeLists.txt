@@ -45,6 +45,7 @@ include_directories(${SRC_PATH}
                     ${SAIREDIS_PATH}/SAI/inc
                     ${SAIREDIS_PATH}/SAI/meta
                     ${SAIREDIS_PATH}/SAI/experimental
+                    /usr/include/hiredis
 )
 
 LINK_DIRECTORIES(${BUILD_PATH}/install/lib/)
