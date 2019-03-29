@@ -9,10 +9,12 @@ sudo apt update
 # sswss-common
 sudo apt-get install -y make libtool m4 autoconf dh-exec debhelper cmake pkg-config \
                         libhiredis-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev swig3.0 \
-                        libpython2.7-dev libgtest-dev
+                        libpython-dev g++
 
+# googletest
 mkdir -p /tmp/gtest && cd /tmp/gtest
-sudo cmake /usr/src/googletest && sudo make && sudo make install
+git clone https://github.com/google/googletest.git
+cd googletest && cmake . && make && sudo make install
 
 # SAI
 sudo apt install -y doxygen graphviz aspell
@@ -35,7 +37,7 @@ sudo service redis-server restart
 
 ## Build the test environment
 ```
-git clone --recurse-submodules -j4 https://github.com/ezio-chen/sonic-swss-acl-dev.git
+git clone --recurse-submodules https://github.com/ezio-chen/sonic-swss-acl-dev.git
 cd sonic-swss-acl-dev
 
 # Create build environment and build
