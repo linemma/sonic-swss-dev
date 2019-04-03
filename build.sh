@@ -1,9 +1,13 @@
 #/bin/bash
 
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
 BUILD_PATH=${PWD}
 SRC_PATH=$(realpath $(dirname "$0"))
 echo "SRC path  ="$SRC_PATH
 echo "Build path="${BUILD_PATH}
+
+$DIR/install-pkg.sh && . $BUILD_PATH/packages/.env
 
 cd $SRC_PATH
 mkdir -p ${BUILD_PATH}/install/include/swss
@@ -47,5 +51,5 @@ fi
 make install
 
 cd ${BUILD_PATH}
-cmake ${SRC_PATH}
+cmake ${SRC_PATH} -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
 
