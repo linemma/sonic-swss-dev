@@ -9,7 +9,7 @@ sudo apt update
 # sswss-common
 sudo apt-get install -y make libtool m4 autoconf dh-exec debhelper cmake pkg-config \
                         libhiredis-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev swig3.0 \
-                        libpython-dev g++
+                        libpython-dev g++ python python-dev
 
 # googletest
 mkdir -p /tmp/gtest && cd /tmp/gtest
@@ -24,6 +24,8 @@ sudo apt-get install -y libhiredis0.13
 
 # install perl  module
 sudo perl -MCPAN -e "install XML::Simple"
+## If meet some problemes, you can try to install by apt-get
+## sudo apt install -y libxml-simple-perl
 ```
 
 ## Starting redis-server and open UNIX socket
