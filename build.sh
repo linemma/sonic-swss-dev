@@ -17,7 +17,7 @@ SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"
 cd ${SWSS_COMMON_PATH}
 ./autogen.sh
 ./configure --prefix=$(realpath ${BUILD_PATH}/install )
-make && make install
+make -j 3 && make install
 if [ "$?" -ne "0" ]; then
   echo "Failed to build swss-common"
   exit 1
@@ -36,10 +36,10 @@ fi
 cd ${SAIREDIS_PATH}
 ./autogen.sh
 ./configure --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs
-make CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
+make -j 3 CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
                -Wno-error=long-long \
                -std=c++11 \
-               -L$(realpath ${BUILD_PATH}/install/lib)"
+               -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
 if [ "$?" -ne "0" ]; then
   echo "Failed to build sairedis"
   exit 1
