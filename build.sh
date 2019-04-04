@@ -18,18 +18,35 @@ mkdir -p ${BUILD_PATH}/install/include/swss
 # git apply ../patch/swss_pfcwdorch.diff
 # cd ../
 
+# : <<'BUILD-SWSSCOMMON'
+
 # Build sonic-swss-common
 SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"
-cd ${SWSS_COMMON_PATH}
-./autogen.sh
-./configure --prefix=$(realpath ${BUILD_PATH}/install )
+
+if [ ! -f "${SRC_PATH}/sonic-swss-common/configure" ]; then
+    cd ${SWSS_COMMON_PATH}
+    ./autogen.sh
+    make distclean
+fi
+
+cd "${SRC_PATH}/sonic-swss-common"
+make distclean
+
+mkdir -p "${BUILD_PATH}/sonic-swss-common"
+cd "${BUILD_PATH}/sonic-swss-common"
+"${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
 make -j 3 && make install
+
 if [ "$?" -ne "0" ]; then
   echo "Failed to build swss-common"
   exit 1
 fi
+
+cd "${SRC_PATH}/sonic-swss-common"
 cp ./common/*.h ${BUILD_PATH}/install/include/swss
 cp ./common/*.hpp ${BUILD_PATH}/install/include/swss
+
+# BUILD-SWSSCOMMON
 
 SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
 cd ${SAIREDIS_PATH}/SAI/meta
