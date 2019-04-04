@@ -48,6 +48,7 @@ cp ./common/*.hpp ${BUILD_PATH}/install/include/swss
 
 # BUILD-SWSSCOMMON
 
+# : <<'BUILD-SAIREDIS'
 SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
 cd ${SAIREDIS_PATH}/SAI/meta
 export PERL5LIB=${PWD}
@@ -69,6 +70,10 @@ if [ "$?" -ne "0" ]; then
 fi
 make install
 
+# BUILD-SAIREDIS
+
+# : <<'BUILD-SWSS'
+
 # TODO: using /usr/bin/patch instead of
 
 sed -i 's|CFLAGS_COMMON+=" -Werror"|#CFLAGS_COMMON+=" -Werror"|g' ${SRC_PATH}/sonic-swss/configure.ac
@@ -78,5 +83,7 @@ sed -i 's|string str = counterIdsToStr(c_portStatIds, &sai_serialize_port_stat);
 sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
 
 cd ${BUILD_PATH}
-cmake ${SRC_PATH} -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
+cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
+make -j 3
 
+# BUILD-SWSS
