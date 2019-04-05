@@ -71,12 +71,12 @@ build_swsscommon()
 # Build sairedis
 
 # : <<'BUILD-SAIREDIS'
-echo Building sairedis ...
+echo Building saimetadata ...
 
 SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
 
-sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
-sed -i '/-Werror \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
+# sed -i '/-Werror \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
+sed -i '/-Wmissing-include-dirs \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
 
 cd ${SAIREDIS_PATH}/SAI/meta
 export PERL5LIB=${PWD}
@@ -85,10 +85,15 @@ if [ "$?" -ne "0" ]; then
     echo "Failed to build saimetadata"
     exit 1
 fi
+
+echo Building sairedis ...
+
 cd ${SAIREDIS_PATH}
 ./autogen.sh
+sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
+
 ./configure --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs
-make -j 3 CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
+make CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
             -Wno-error=long-long \
             -std=c++11 \
             -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
