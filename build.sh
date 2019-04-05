@@ -92,11 +92,12 @@ cd ${SAIREDIS_PATH}
 ./autogen.sh
 sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
 
-./configure --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs
-make CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
-            -Wno-error=long-long \
-            -std=c++11 \
-            -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
+./configure --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
+-Wno-error=long-long \
+-std=c++11 \
+-L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
+
+make
 if [ "$?" -ne "0" ]; then
     echo "Failed to build sairedis"
     exit 1
