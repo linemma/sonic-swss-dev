@@ -70,41 +70,65 @@ build_swsscommon()
 #==============================================================================
 # Build sairedis
 
-# : <<'BUILD-SAIREDIS'
-echo Building saimetadata ...
+build_sairedis()
+{
+    SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
 
-SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
+    # sed -i '/-Werror \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
+    sed -i '/-Wmissing-include-dirs \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
 
-# sed -i '/-Werror \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
-sed -i '/-Wmissing-include-dirs \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
+    # cd ${SAIREDIS_PATH}/SAI/meta
+    # export PERL5LIB=${PWD}
+    # make saimetadata.c saimetadata.h
+    # if [ "$?" -ne "0" ]; then
+    #     echo "Failed to build saimetadata"
+    #     exit 1
+    # fi
 
-cd ${SAIREDIS_PATH}/SAI/meta
-export PERL5LIB=${PWD}
-make saimetadata.c saimetadata.h
-if [ "$?" -ne "0" ]; then
-    echo "Failed to build saimetadata"
-    exit 1
-fi
+    echo Building sairedis ...
 
-echo Building sairedis ...
+    if [ ! -f "${SAIREDIS_PATH}/configure" ]; then
+        cd ${SAIREDIS_PATH}
+        ./autogen.sh
+        # sed -i 's|AM_CPPFLAGS = -I$(top_srcdir)/SAI/inc|AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/SAI/inc|g' ${SAIREDIS_PATH}/configure.ac
+        sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
+        # make distclean
 
-cd ${SAIREDIS_PATH}
-./autogen.sh
-sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
+        # PATCH: remove config.status
+        # [[ -f ${{SAIREDIS_PATH}/config.status ]] && rm config.status
+    fi
 
-./configure --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-I$(realpath ${BUILD_PATH}/install/include) \
--Wno-error=long-long \
--std=c++11 \
--L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
+    # cd ${SAIREDIS_PATH}
+    # make distclean
 
-make
-if [ "$?" -ne "0" ]; then
-    echo "Failed to build sairedis"
-    exit 1
-fi
-make install
+    echo Building saimetadata.c and saimetadata.h ...    
 
-# BUILD-SAIREDIS
+    cd ${SAIREDIS_PATH}/SAI/meta
+    export PERL5LIB=${PWD}
+    make saimetadata.c saimetadata.h
+    if [ "$?" -ne "0" ]; then
+        echo "Failed to build saimetadata"
+        exit 1
+    fi
+
+    mkdir -p "${BUILD_PATH}/sonic-sairedis"
+    cd "${BUILD_PATH}/sonic-sairedis"
+
+    #                                                                                     for #include "meta/sai_meta.h"
+    "${SAIREDIS_PATH}/configure" --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-I${SAIREDIS_PATH} -I$(realpath ${BUILD_PATH}/install/include) \
+    -Wno-error=long-long \
+    -std=c++11 \
+    -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
+
+    make
+    if [ "$?" -ne "0" ]; then
+        echo "Failed to build sairedis"
+        exit 1
+    fi
+    make install
+}
+
+build_sairedis
 
 #==============================================================================
 # Build swss
