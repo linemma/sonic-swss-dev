@@ -47,6 +47,7 @@ download_source_code() {
 }
 
 download_deps() {
+    cd "$BUILD_PATH"
     [ -f "$BUILD_PATH/packages/.env" ] || $DIR/install-pkg.sh
 
     . $BUILD_PATH/packages/.env
