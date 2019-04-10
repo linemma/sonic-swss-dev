@@ -11,11 +11,39 @@ print_help() {
     echo "hello"
 }
 
+apply_patch() {
+    local files, i
+
+    sed -i '/CFLAGS_COMMON+=" -Werror"/d' "${SRC_PATH}/sonic-sairedis/configure.ac"
+    sed -i '/-Wmissing-include-dirs \\/d' "${SRC_PATH}/sonic-sairedis/meta/Makefile.am"
+
+    if ! grep -q tests_DEPENDENCIES "${SRC_PATH}/sonic-sairedis/meta/Makefile.am"; then
+        sed -i '/tests_LDADD = -lhiredis -lswsscommon/atests_DEPENDENCIES = libsaimeta.la libsaimetadata.la' "${SRC_PATH}/sonic-sairedis/meta/Makefile.am"
+    fi
+
+    if ! grep -q tests_DEPENDENCIES "${SRC_PATH}/sonic-sairedis/vslib/src/Makefile.am"; then
+        sed -i '/tests_LDADD = -lhiredis -lswsscommon/atests_DEPENDENCIES = libsaivs.la' "${SRC_PATH}/sonic-sairedis/vslib/src/Makefile.am"
+    fi
+
+    files=("${SRC_PATH}/sonic-sairedis/meta/Makefile.am" "${SRC_PATH}/sonic-sairedis/vslib/src/Makefile.am")
+    files+=("${SRC_PATH}/sonic-sairedis/saidiscovery/Makefile.am")
+    files+=("${SRC_PATH}/sonic-sairedis/saidump/Makefile.am")
+    files+=("${SRC_PATH}/sonic-sairedis/saiplayer/Makefile.am")
+    files+=("${SRC_PATH}/sonic-sairedis/saisdkdump/Makefile.am")
+    files+=("${SRC_PATH}/sonic-sairedis/syncd/Makefile.am")
+    files+=("${SRC_PATH}/sonic-sairedis/tests/Makefile.am")
+    for i in "${files[@]}"
+    do
+	    sed -i 's|-L$(top_srcdir)|-L$(top_builddir)|g' "$i"
+    done
+}
+
 download_source_code() {
     cd "${SRC_PATH}"
     git submodule init
     git submodule update --recursive
-    cd -
+
+    apply_patch
 }
 
 download_deps() {
@@ -70,21 +98,9 @@ build_sairedis() {
 
     SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
 
-    # sed -i '/-Werror \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
-    sed -i '/-Wmissing-include-dirs \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
-
-    # cd ${SAIREDIS_PATH}/SAI/meta
-    # export PERL5LIB=${PWD}
-    # make saimetadata.c saimetadata.h
-    # if [ "$?" -ne "0" ]; then
-    #     echo "Failed to build saimetadata"
-    #     exit 1
-    # fi
-
     if [ ! -e "${BUILD_PATH}/sonic-sairedis/Makefile" ]; then
         cd "${SRC_PATH}/sonic-sairedis"
         ./autogen.sh
-        sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
 
         mkdir -p "${BUILD_PATH}/sonic-sairedis"
         cd "${BUILD_PATH}/sonic-sairedis"
@@ -98,12 +114,8 @@ build_sairedis() {
 
     echo "Generating saimetadata.c and saimetadata.h ..."
 
-    # mkdir -p "${BUILD_PATH}/sonic-sairedis/SAI/meta"
-    # cd "${BUILD_PATH}/sonic-sairedis/SAI/meta"
     cd ${SAIREDIS_PATH}/SAI/meta
     export PERL5LIB=${PWD}
-    # export PERL5LIB="${SAIREDIS_PATH}/SAI/meta"
-    # make -C ${SAIREDIS_PATH}/SAI/meta saimetadata.c saimetadata.h
     make saimetadata.c saimetadata.h
     if [ "$?" -ne "0" ]; then
         echo "Failed to build saimetadata"
@@ -115,7 +127,6 @@ build_sairedis() {
     mkdir -p "${BUILD_PATH}/sonic-sairedis"
     cd "${BUILD_PATH}/sonic-sairedis"
 
-    # make -C "${BUILD_PATH}/sonic-sairedis/meta" && make "-j$(nproc)"
     make "-j$(nproc)"
     if [ "$?" -ne "0" ]; then
         echo "Failed to build sairedis"
@@ -126,8 +137,6 @@ build_sairedis() {
 
 build_swss_orchagent() {
     echo "Build sonic-swss-orchagent ..."
-
-    # TODO: using /usr/bin/patch instead of
 
     sed -i 's|CFLAGS_COMMON+=" -Werror"|#CFLAGS_COMMON+=" -Werror"|g' ${SRC_PATH}/sonic-swss/configure.ac
 
