@@ -7,27 +7,25 @@ SRC_PATH=$(realpath $(dirname "$0"))
 echo "SRC path  ="$SRC_PATH
 echo "Build path="${BUILD_PATH}
 
-cd "${SRC_PATH}"
-git submodule init
-git submodule update --recursive
-cd -
+print_help() {
+    echo "hello"
+}
 
-#==============================================================================
-# Download deps
+download_source_code() {
+    cd "${SRC_PATH}"
+    git submodule init
+    git submodule update --recursive
+    cd -
+}
 
-[ -f "$BUILD_PATH/packages/.env" ] || $DIR/install-pkg.sh
+download_deps() {
+    [ -f "$BUILD_PATH/packages/.env" ] || $DIR/install-pkg.sh
 
-. $BUILD_PATH/packages/.env
+    . $BUILD_PATH/packages/.env
+}
 
-cd $SRC_PATH
-mkdir -p ${BUILD_PATH}/install/include/swss
-
-#==============================================================================
-# Build swsscommon
-
-build_swsscommon()
-{
-    echo Building swsscommon ...
+build_swsscommon() {
+    echo "Building sonic-swss-common ..."
 
     SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"
 
@@ -49,12 +47,14 @@ build_swsscommon()
     mkdir -p "${BUILD_PATH}/sonic-swss-common"
     cd "${BUILD_PATH}/sonic-swss-common"
     "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
-    make -j 3 && make install
+    make "-j$(nproc)"
 
     if [ "$?" -ne "0" ]; then
         echo "Failed to build swss-common"
         exit 1
     fi
+
+    make install
 
     rm -rf ${SWSS_COMMON_PATH}/m4
     rm -rf ${SWSS_COMMON_PATH}/autom4te.cache
@@ -65,13 +65,9 @@ build_swsscommon()
     cp ./common/*.hpp ${BUILD_PATH}/install/include/swss
 }
 
-[[ -f ${BUILD_PATH}/install/lib/libswsscommon.a && -f ${BUILD_PATH}/install/lib/libswsscommon.so ]] || build_swsscommon
+build_sairedis() {
+    echo "Building sonic-sairedis ..."
 
-#==============================================================================
-# Build sairedis
-
-build_sairedis()
-{
     SAIREDIS_PATH="${SRC_PATH}/sonic-sairedis"
 
     # sed -i '/-Werror \\/d' ${SAIREDIS_PATH}/meta/Makefile.am
@@ -85,42 +81,42 @@ build_sairedis()
     #     exit 1
     # fi
 
-    echo Building sairedis ...
-
-    if [ ! -f "${SAIREDIS_PATH}/configure" ]; then
-        cd ${SAIREDIS_PATH}
+    if [ ! -e "${BUILD_PATH}/sonic-sairedis/Makefile" ]; then
+        cd "${SRC_PATH}/sonic-sairedis"
         ./autogen.sh
-        # sed -i 's|AM_CPPFLAGS = -I$(top_srcdir)/SAI/inc|AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/SAI/inc|g' ${SAIREDIS_PATH}/configure.ac
         sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SAIREDIS_PATH}/configure.ac
-        # make distclean
 
-        # PATCH: remove config.status
-        # [[ -f ${{SAIREDIS_PATH}/config.status ]] && rm config.status
+        mkdir -p "${BUILD_PATH}/sonic-sairedis"
+        cd "${BUILD_PATH}/sonic-sairedis"
+
+        #                                                                                     for #include "meta/sai_meta.h"
+        "${SAIREDIS_PATH}/configure" --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-I${SAIREDIS_PATH} -I$(realpath ${BUILD_PATH}/install/include) \
+        -Wno-error=long-long \
+        -std=c++11 \
+        -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
     fi
 
-    # cd ${SAIREDIS_PATH}
-    # make distclean
+    echo "Generating saimetadata.c and saimetadata.h ..."
 
-    echo Building saimetadata.c and saimetadata.h ...    
-
+    # mkdir -p "${BUILD_PATH}/sonic-sairedis/SAI/meta"
+    # cd "${BUILD_PATH}/sonic-sairedis/SAI/meta"
     cd ${SAIREDIS_PATH}/SAI/meta
     export PERL5LIB=${PWD}
+    # export PERL5LIB="${SAIREDIS_PATH}/SAI/meta"
+    # make -C ${SAIREDIS_PATH}/SAI/meta saimetadata.c saimetadata.h
     make saimetadata.c saimetadata.h
     if [ "$?" -ne "0" ]; then
         echo "Failed to build saimetadata"
         exit 1
     fi
 
+    echo "Build sairedis ..."
+
     mkdir -p "${BUILD_PATH}/sonic-sairedis"
     cd "${BUILD_PATH}/sonic-sairedis"
 
-    #                                                                                     for #include "meta/sai_meta.h"
-    "${SAIREDIS_PATH}/configure" --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-I${SAIREDIS_PATH} -I$(realpath ${BUILD_PATH}/install/include) \
-    -Wno-error=long-long \
-    -std=c++11 \
-    -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
-
-    make
+    # make -C "${BUILD_PATH}/sonic-sairedis/meta" && make "-j$(nproc)"
+    make "-j$(nproc)"
     if [ "$?" -ne "0" ]; then
         echo "Failed to build sairedis"
         exit 1
@@ -128,23 +124,55 @@ build_sairedis()
     make install
 }
 
-build_sairedis
+build_swss_orchagent() {
+    echo "Build sonic-swss-orchagent ..."
 
-#==============================================================================
-# Build swss
+    # TODO: using /usr/bin/patch instead of
 
-# : <<'BUILD-SWSS'
-echo Build SWSS ...
+    sed -i 's|CFLAGS_COMMON+=" -Werror"|#CFLAGS_COMMON+=" -Werror"|g' ${SRC_PATH}/sonic-swss/configure.ac
 
-# TODO: using /usr/bin/patch instead of
+    sed -i 's|string str = counterIdsToStr(c_portStatIds, &sai_serialize_port_stat);|string str = counterIdsToStr(c_portStatIds, static_cast<string (*)(const sai_port_stat_t)>(\&sai_serialize_port_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
+    sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
 
-sed -i 's|CFLAGS_COMMON+=" -Werror"|#CFLAGS_COMMON+=" -Werror"|g' ${SRC_PATH}/sonic-swss/configure.ac
+    cd ${BUILD_PATH}
+    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
+    make "-j$(nproc)"
+}
 
-sed -i 's|string str = counterIdsToStr(c_portStatIds, &sai_serialize_port_stat);|string str = counterIdsToStr(c_portStatIds, static_cast<string (*)(const sai_port_stat_t)>(\&sai_serialize_port_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
-sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
+build_all () {
+    [[ -f ${BUILD_PATH}/install/lib/libswsscommon.a && -f ${BUILD_PATH}/install/lib/libswsscommon.so ]] || build_swsscommon
+    build_sairedis
+    build_swss_orchagent
+}
 
-cd ${BUILD_PATH}
-cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
-make -j 3
+main() {
+    while [[ $# -ne 0 ]]
+    do
+        arg="$1"
+        case "$arg" in
+            -h|--help)
+                print_help
+                exit 0
+                ;;
+            -c|--clean)
+                clean_all
+                exit 0
+                ;;
+            *)
+                echo >&2 "Invalid option \"$arg\""
+                print_help
+                exit 1
+        esac
+        shift
+    done
 
-# BUILD-SWSS
+    download_source_code
+    download_deps
+
+    cd $SRC_PATH
+    mkdir -p ${BUILD_PATH}/install/include/swss
+
+    build_all
+}
+
+main "$@"
