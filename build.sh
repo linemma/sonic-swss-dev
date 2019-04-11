@@ -76,18 +76,28 @@ build_swsscommon() {
 
     SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"
 
-    if [ ! -f "${SRC_PATH}/sonic-swss-common/configure" ]; then
-        cd ${SWSS_COMMON_PATH}
-        ./autogen.sh
-        make distclean
-    fi
-
-    cd "${SRC_PATH}/sonic-swss-common"
-    make distclean
-
     mkdir -p "${BUILD_PATH}/sonic-swss-common"
     cd "${BUILD_PATH}/sonic-swss-common"
-    "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
+
+    # if [ ! -f "${SRC_PATH}/sonic-swss-common/configure" ]; then
+    if [ ! -e "${BUILD_PATH}/sonic-swss-common/Makefile" ]; then
+        # cd ${SWSS_COMMON_PATH}
+        cd "${SRC_PATH}/sonic-swss-common"
+        ./autogen.sh
+        # make distclean
+
+        # mkdir -p "${BUILD_PATH}/sonic-swss-common"
+        cd "${BUILD_PATH}/sonic-swss-common"
+
+        "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
+    fi
+
+    # cd "${SRC_PATH}/sonic-swss-common"
+    # make distclean
+
+    # mkdir -p "${BUILD_PATH}/sonic-swss-common"
+    # cd "${BUILD_PATH}/sonic-swss-common"
+    # "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
     make "-j$(nproc)"
 
     if [ "$?" -ne "0" ]; then
@@ -95,12 +105,15 @@ build_swsscommon() {
         exit 1
     fi
 
+    # TODO: No need to do this
     make install
 
-    rm -rf ${SWSS_COMMON_PATH}/m4
-    rm -rf ${SWSS_COMMON_PATH}/autom4te.cache
-    rm -rf ${SWSS_COMMON_PATH}/config.h.in~
+    # TODO: Remove ?
+    rm -rf "${SRC_PATH}/sonic-swss-common/m4"
+    rm -rf "${SRC_PATH}/sonic-swss-common/autom4te.cache"
+    rm -rf "${SRC_PATH}/sonic-swss-common/config.h.in~"
 
+    # TODO: No need to do this
     cd "${SRC_PATH}/sonic-swss-common"
     cp ./common/*.h ${BUILD_PATH}/install/include/swss
     cp ./common/*.hpp ${BUILD_PATH}/install/include/swss
@@ -145,6 +158,8 @@ build_sairedis() {
         echo "Failed to build sairedis"
         exit 1
     fi
+
+    # TODO: No need to do this
     make install
 }
 
@@ -156,11 +171,18 @@ build_swss_orchagent() {
     make "-j$(nproc)"
 }
 
-build_all () {
+build_all() {
     # TODO: check Makefile like sairedis
-    [[ -f ${BUILD_PATH}/install/lib/libswsscommon.a && -f ${BUILD_PATH}/install/lib/libswsscommon.so ]] || build_swsscommon
+    # [[ -f ${BUILD_PATH}/install/lib/libswsscommon.a && -f ${BUILD_PATH}/install/lib/libswsscommon.so ]] || build_swsscommon
+    build_swsscommon
     build_sairedis
     build_swss_orchagent
+}
+
+clean_all() {
+    rm -rf "${SRC_PATH}/sonic-swss-common/m4"
+    rm -rf "${SRC_PATH}/sonic-swss-common/autom4te.cache"
+    rm -rf "${SRC_PATH}/sonic-swss-common/config.h.in~"
 }
 
 main() {
