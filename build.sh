@@ -58,8 +58,7 @@ apply_patch() {
 
 download_source_code() {
     cd "${SRC_PATH}"
-    git submodule init
-    git submodule update --recursive
+    git submodule update --init --recursive
 
     apply_patch
 }
