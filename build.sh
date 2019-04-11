@@ -8,12 +8,24 @@ echo "SRC path  ="$SRC_PATH
 echo "Build path="${BUILD_PATH}
 
 print_help() {
-    echo "hello"
+    usage_text="Usage: $(basename "$0") [option] -- Swss build script
+options:
+    -h, --help                            Show this help text
+    -c, --clean                           Clean all genererated files"
+
+    echo "$usage_text"
 }
 
 apply_patch() {
     local files, i
 
+    # sonic-swss-common
+    sed -i '/CFLAGS_COMMON+=" -Werror"/d' "${SRC_PATH}/sonic-swss-common/configure.ac"
+    sed -i 's|-I../common|-I$(top_srcdir)/common|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
+    sed -i 's|../common/libswsscommon.la|$(top_builddir)/common/libswsscommon.la|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
+    sed -i 's|-L$(top_srcdir)/common|-L$(top_builddir)/common|g' "${SRC_PATH}/sonic-swss-common/tests/Makefile.am"
+    
+    # sonic-sairedis
     sed -i '/CFLAGS_COMMON+=" -Werror"/d' "${SRC_PATH}/sonic-sairedis/configure.ac"
     sed -i '/-Wmissing-include-dirs \\/d' "${SRC_PATH}/sonic-sairedis/meta/Makefile.am"
 
@@ -36,6 +48,12 @@ apply_patch() {
     do
 	    sed -i 's|-L$(top_srcdir)|-L$(top_builddir)|g' "$i"
     done
+
+    # sonic-swss
+    sed -i 's|CFLAGS_COMMON+=" -Werror"|#CFLAGS_COMMON+=" -Werror"|g' "${SRC_PATH}/sonic-swss/configure.ac"
+
+    sed -i 's|string str = counterIdsToStr(c_portStatIds, &sai_serialize_port_stat);|string str = counterIdsToStr(c_portStatIds, static_cast<string (*)(const sai_port_stat_t)>(\&sai_serialize_port_stat));|g' "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp"
+    sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp"
 }
 
 download_source_code() {
@@ -50,19 +68,13 @@ download_deps() {
     cd "$BUILD_PATH"
     [ -f "$BUILD_PATH/packages/.env" ] || $DIR/install-pkg.sh
 
-    . $BUILD_PATH/packages/.env
+    . "$BUILD_PATH/packages/.env"
 }
 
 build_swsscommon() {
     echo "Building sonic-swss-common ..."
 
     SWSS_COMMON_PATH="${SRC_PATH}/sonic-swss-common"
-
-    sed -i '/CFLAGS_COMMON+=" -Werror"/d' ${SWSS_COMMON_PATH}/configure.ac
-    sed -i 's|_swsscommon_la_CPPFLAGS = -std=c++11 -I../common|_swsscommon_la_CPPFLAGS = -std=c++11 -I$(top_srcdir)/common|g' ${SWSS_COMMON_PATH}/pyext/Makefile.am
-    sed -i 's|_swsscommon_la_LIBADD = ../common/libswsscommon.la|_swsscommon_la_LIBADD = $(top_builddir)/common/libswsscommon.la|g' ${SWSS_COMMON_PATH}/pyext/Makefile.am
-    sed -i 's|$(SWIG) -c++ -python -I../common|$(SWIG) -c++ -python -I$(top_srcdir)/common|g' ${SWSS_COMMON_PATH}/pyext/Makefile.am
-    sed -i 's|-L$(top_srcdir)/common|-L$(top_builddir)/common|g' ${SWSS_COMMON_PATH}/tests/Makefile.am
 
     if [ ! -f "${SRC_PATH}/sonic-swss-common/configure" ]; then
         cd ${SWSS_COMMON_PATH}
@@ -139,23 +151,20 @@ build_sairedis() {
 build_swss_orchagent() {
     echo "Build sonic-swss-orchagent ..."
 
-    sed -i 's|CFLAGS_COMMON+=" -Werror"|#CFLAGS_COMMON+=" -Werror"|g' ${SRC_PATH}/sonic-swss/configure.ac
-
-    sed -i 's|string str = counterIdsToStr(c_portStatIds, &sai_serialize_port_stat);|string str = counterIdsToStr(c_portStatIds, static_cast<string (*)(const sai_port_stat_t)>(\&sai_serialize_port_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
-    sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' ${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp
-
     cd ${BUILD_PATH}
     cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
     make "-j$(nproc)"
 }
 
 build_all () {
+    # TODO: check Makefile like sairedis
     [[ -f ${BUILD_PATH}/install/lib/libswsscommon.a && -f ${BUILD_PATH}/install/lib/libswsscommon.so ]] || build_swsscommon
     build_sairedis
     build_swss_orchagent
 }
 
 main() {
+    # TODO: add option to install sys_deps-only. by `sudo build --install-sys-deps` then exit
     while [[ $# -ne 0 ]]
     do
         arg="$1"
