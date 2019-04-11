@@ -17,7 +17,7 @@ options:
 }
 
 apply_patch() {
-    local files, i
+    local files i
 
     # sonic-swss-common
     sed -i '/CFLAGS_COMMON+=" -Werror"/d' "${SRC_PATH}/sonic-swss-common/configure.ac"
@@ -58,8 +58,7 @@ apply_patch() {
 
 download_source_code() {
     cd "${SRC_PATH}"
-    git submodule init
-    git submodule update --recursive
+    git submodule update --init --recursive
 
     apply_patch
 }
