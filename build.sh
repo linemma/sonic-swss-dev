@@ -22,7 +22,7 @@ apply_patch() {
     # sonic-swss-common
     sed -i '/CFLAGS_COMMON+=" -Werror"/d' "${SRC_PATH}/sonic-swss-common/configure.ac"
     sed -i 's|-I../common|-I$(top_srcdir)/common|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
-    sed -i 's|../common/libswsscommon.la|$(top_builddir)/common/libswsscommon.la|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
+    sed -i 's|_swsscommon_la_LIBADD = ../common/libswsscommon.la|_swsscommon_la_LIBADD = $(top_builddir)/common/libswsscommon.la|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
     sed -i 's|-L$(top_srcdir)/common|-L$(top_builddir)/common|g' "${SRC_PATH}/sonic-swss-common/tests/Makefile.am"
     
     # sonic-sairedis
