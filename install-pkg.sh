@@ -1,4 +1,6 @@
-function install_pkg_main
+#/bin/bash
+
+install_pkg_main()
 {
     local _DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
@@ -26,7 +28,8 @@ function install_pkg_main
                     fi
 
                     apt-get install -y $PKG_GLOBAL_DEPENDENCIES
-                    exit 0
+                fi
+                exit 0
                 ;;
             *)
                 echo >&2 "Invalid option \"$arg\""
