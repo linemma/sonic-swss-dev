@@ -10,4 +10,4 @@ _script_home=$_pkg_scripts_home
 # echo package_cfg_path=$_package_cfg_path
 # echo build_home=$_build_home
 
-. $_DIR/package-installer/cli.sh "$_pkg_scripts_home" "$_package_cfg_path" "$_build_home"
+. $_DIR/package-installer/cli.sh --plugins-dir="$_pkg_scripts_home" --destination-dir="$_build_home" "$_package_cfg_path"
