@@ -67,6 +67,8 @@ download_deps() {
     cd "$BUILD_PATH"
     [ -f "$BUILD_PATH/packages/.env" ] || $DIR/install-pkg.sh
 
+    [ -f "$BUILD_PATH/packages/.env" ] || exit 1
+
     . "$BUILD_PATH/packages/.env"
 }
 
