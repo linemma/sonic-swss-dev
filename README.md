@@ -1,27 +1,19 @@
-# Introduction
+## Introduction
 ACL unit test environment for SONiC
 
-# Getting Started
-## Install requirment tools
+## Getting Started
+
 ```
-sudo apt update
+git clone https://github.com/ezio-chen/sonic-swss-acl-dev
+cd sonic-swss-acl-dev/
+git checkout remotes/origin/package_install
 
-# sswss-common
-sudo apt-get install -y make libtool m4 autoconf dh-exec debhelper cmake pkg-config \
-                        libhiredis-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev swig3.0 \
-                        libpython2.7-dev libgtest-dev
+sudo bash -x install-pkg.sh -g
 
-mkdir -p /tmp/gtest && cd /tmp/gtest
-sudo cmake /usr/src/googletest && sudo make && sudo make install
-
-# SAI
-sudo apt install -y doxygen graphviz aspell
-
-# sonic-swss
-sudo apt-get install -y libhiredis0.13
-
-# install perl  module
-sudo perl -MCPAN -e "install XML::Simple"
+cd ..
+mkdir <build-dir> && cd <build-dir>
+bash -x <source-dir>/build.sh
+source packages/.env
 ```
 
 ## Starting redis-server and open UNIX socket
@@ -31,15 +23,4 @@ sudo mkdir -p /var/run/redis/
 echo "unixsocket /var/run/redis/redis.sock" | sudo tee --append  /etc/redis/redis.conf
 echo "unixsocketperm 777" | sudo tee --append  /etc/redis/redis.conf
 sudo service redis-server restart
-```
-
-## Build the test environment
-```
-git clone --recurse-submodules -j4 https://github.com/ezio-chen/sonic-swss-acl-dev.git
-cd sonic-swss-acl-dev
-
-# Create build environment and build
-mkdir -p <build dir> && cd <build_dir>
-sh <source_dir>/build.sh
-make
 ```
