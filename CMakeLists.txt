@@ -163,5 +163,6 @@ add_executable(${PROJECT_NAME}
    ${TESTS}
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests")
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent)

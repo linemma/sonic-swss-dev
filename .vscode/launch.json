@@ -1,0 +1,56 @@
+{
+    // 使用 IntelliSense 以得知可用的屬性。
+    // 暫留以檢視現有屬性的描述。
+    // 如需詳細資訊，請瀏覽: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) WSL Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "/mnt/e/build.swss.wsl/tests",
+            "args": ["test", "--gtest_filter=*.*"],
+            "stopAtEntry": false,
+            "cwd": "/mnt/e/build.swss.wsl",
+            "environment": [],
+            "externalConsole": true,
+            "windows": {
+                "MIMode": "gdb",
+                "environment": [
+                ],
+                "setupCommands": [{
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }],
+                "logging": {
+                    "exceptions": true,
+                    "moduleLoad": true,
+                    "programOutput": true,
+                    "engineLogging": true,
+                    "trace": true
+                }
+            },
+            "pipeTransport": {
+                "debuggerPath": "source /mnt/e/build.swss.wsl/packages/.env; /usr/bin/gdb",
+                "pipeProgram": "C:\\Windows\\sysnative\\bash.exe",
+                "pipeArgs": ["-c"],
+                "pipeCwd": ""
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "sourceFileMap": {
+                "/mnt/c": "c:\\",
+                "/mnt/d": "d:\\",
+                "/mnt/e": "e:\\",
+                "/mnt/f": "f:\\"
+            }
+        }
+    ]
+}
