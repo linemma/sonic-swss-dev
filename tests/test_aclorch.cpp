@@ -40,6 +40,12 @@ int fake_create_acl_table(sai_object_id_t* acl_table_id,
     sai_object_id_t switch_id, uint32_t attr_count,
     const sai_attribute_t* attr_list);
 
+struct CreateAclResult {
+    bool ret_val;
+
+    std::vector<sai_attribute_t> attr_list;
+};
+
 struct TestBase : public ::testing::Test {
     static sai_status_t sai_create_acl_table_(sai_object_id_t* acl_table_id,
         sai_object_id_t switch_id,
@@ -49,6 +55,8 @@ struct TestBase : public ::testing::Test {
         return that->sai_create_acl_table_fn(acl_table_id, switch_id, attr_count,
             attr_list);
     }
+
+    static TestBase* that;
 
     std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t,
         const sai_attribute_t*)>
@@ -77,7 +85,46 @@ struct TestBase : public ::testing::Test {
         return acl->create();
     }
 
-    static TestBase* that;
+    std::shared_ptr<CreateAclResult> createAclTable_4(AclTable& acl)
+    {
+        assert(sai_acl_api == nullptr);
+
+        sai_acl_api = new sai_acl_api_t();
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(sai_acl_api, [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+
+        sai_acl_api->create_acl_table = sai_create_acl_table_;
+        that = this;
+
+        auto ret = std::make_shared<CreateAclResult>();
+
+        sai_create_acl_table_fn =
+            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            // return fake_create_acl_table(acl_table_id, switch_id, attr_count, attr_list);
+
+            // set_attr_count = attr_count;
+            // memcpy(set_attr_list, attr_list, sizeof(sai_attribute_t) * attr_count);
+            // return SAI_STATUS_FAILURE;
+            for (auto i = 0; i < attr_count; ++i) {
+                // const auto& x = attr_list[i];
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_FAILURE;
+        };
+
+        //return acl->create();
+        ret->ret_val = acl.create();
+        return ret;
+    }
+
+    bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, const std::vector<sai_attribute_t>& exp_attr_list)
+    {
+        return true;
+    }
 };
 
 TestBase* TestBase::that = nullptr;
@@ -92,12 +139,6 @@ struct AclTest : public TestBase {
 
     ~AclTest() {}
 };
-
-TEST_F(AclTest, foo)
-{
-    MacAddress xx;
-    std::cout << REDIS_START_CMD << "\n";
-}
 
 struct AclTestRedis : public ::testing::Test {
     AclTestRedis() {}
@@ -335,6 +376,46 @@ TEST_F(AclTest, create_default_acl_table_3)
         auto b_ret = verify_acltable_attr(expected_attr_list, &set_attr_list[i]);
         ASSERT_EQ(b_ret, true);
     }
+
+    // sai_acl_api->create_acl_table = NULL;
+    // delete sai_acl_api;
+}
+
+TEST_F(AclTest, create_default_acl_table_4)
+{
+    // sai_acl_api = new sai_acl_api_t();
+    //
+    // // sai_acl_api->create_acl_table = fake_create_acl_table;
+    // sai_acl_api->create_acl_table = sai_create_acl_table_;
+    // that = this;
+    //
+    // sai_create_acl_table_fn =
+    //     [](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+    //         uint32_t attr_count,
+    //         const sai_attribute_t* attr_list) -> sai_status_t {
+    //     return sai_status_t(0);
+    // };
+
+    AclTable acltable;
+    acltable.type = ACL_TABLE_L3;
+    // acltable.create();
+    auto res = createAclTable_4(acltable);
+
+    EXPECT_TRUE(res->ret_val == true);
+    EXPECT_TRUE(AttrListEq(res->attr_list, {}));
+
+    // // set expected data
+    // uint32_t expected_attr_count = 11;
+    // vector<sai_attribute_t> expected_attr_list;
+    //
+    // assign_default_acltable_attr(expected_attr_list);
+    //
+    // // validate ...
+    // EXPECT_EQ(expected_attr_count, set_attr_count);
+    // for (int i = 0; i < set_attr_count; ++i) {
+    //     auto b_ret = verify_acltable_attr(expected_attr_list, &set_attr_list[i]);
+    //     ASSERT_EQ(b_ret, true);
+    // }
 
     // sai_acl_api->create_acl_table = NULL;
     // delete sai_acl_api;
