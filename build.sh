@@ -113,7 +113,7 @@ build_swsscommon() {
         # mkdir -p "${BUILD_PATH}/sonic-swss-common"
         cd "${BUILD_PATH}/sonic-swss-common"
 
-        "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install ) CXXFLAGS="-g -O0 $CXXFLAGS"
+        "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
     fi
 
     # cd "${SRC_PATH}/sonic-swss-common"
@@ -196,8 +196,8 @@ build_swss_orchagent() {
 }
 
 build_all() {
-    # build_swsscommon
-    # build_sairedis
+    build_swsscommon
+    build_sairedis
     build_swss_orchagent
 }
 
