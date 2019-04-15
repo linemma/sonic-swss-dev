@@ -7,6 +7,8 @@ SRC_PATH=$(realpath $(dirname "$0"))
 echo "SRC path  ="$SRC_PATH
 echo "Build path="${BUILD_PATH}
 
+redis_unix_socket="/tmp/redis.sock"
+
 print_help() {
     usage_text="Usage: $(basename "$0") [option] -- Swss build script
 options:
@@ -24,6 +26,8 @@ apply_patch() {
     sed -i 's|-I../common|-I$(top_srcdir)/common|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
     sed -i 's|_swsscommon_la_LIBADD = ../common/libswsscommon.la|_swsscommon_la_LIBADD = $(top_builddir)/common/libswsscommon.la|g' "${SRC_PATH}/sonic-swss-common/pyext/Makefile.am"
     sed -i 's|-L$(top_srcdir)/common|-L$(top_builddir)/common|g' "${SRC_PATH}/sonic-swss-common/tests/Makefile.am"
+
+    sed -i "s|/var/run/redis/redis.sock|$redis_unix_socket|g" "${SRC_PATH}/sonic-swss-common/common/dbconnector.h"
     
     # sonic-sairedis
     sed -i '/CFLAGS_COMMON+=" -Werror"/d' "${SRC_PATH}/sonic-sairedis/configure.ac"
@@ -72,6 +76,25 @@ download_deps() {
     . "$BUILD_PATH/packages/.env"
 }
 
+generate_redis_config() {
+    mkdir -p "$BUILD_PATH/redis"
+
+    cp "$SRC_PATH/redis.conf" "$BUILD_PATH/redis"
+    
+    sed -i "s|/mnt/e/xx|$BUILD_PATH|g" "$BUILD_PATH/redis/redis.conf"
+    sed -i "s|# unixsocket /var/run/redis/redis-server.sock|unixsocket $redis_unix_socket|g" "$BUILD_PATH/redis/redis.conf"
+
+    cp "$SRC_PATH/start_redis.sh" "$BUILD_PATH/redis"
+    chmod +x "$BUILD_PATH/redis/start_redis.sh"
+
+    sed -i "s|/mnt/e/xx/redis.conf|$BUILD_PATH/redis/redis.conf|g" "$BUILD_PATH/redis/start_redis.sh"
+
+    cp "$SRC_PATH/stop_redis.sh" "$BUILD_PATH/redis"
+    chmod +x "$BUILD_PATH/redis/stop_redis.sh"
+
+    sed -i "s|%redis_unix_socket%|$redis_unix_socket|g" "$BUILD_PATH/redis/stop_redis.sh"
+}
+
 build_swsscommon() {
     echo "Building sonic-swss-common ..."
 
@@ -90,7 +113,7 @@ build_swsscommon() {
         # mkdir -p "${BUILD_PATH}/sonic-swss-common"
         cd "${BUILD_PATH}/sonic-swss-common"
 
-        "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
+        "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install ) CXXFLAGS="-g -O0 $CXXFLAGS"
     fi
 
     # cd "${SRC_PATH}/sonic-swss-common"
@@ -168,15 +191,13 @@ build_swss_orchagent() {
     echo "Build sonic-swss-orchagent ..."
 
     cd ${BUILD_PATH}
-    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest)
+    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
     make "-j$(nproc)"
 }
 
 build_all() {
-    # TODO: check Makefile like sairedis
-    # [[ -f ${BUILD_PATH}/install/lib/libswsscommon.a && -f ${BUILD_PATH}/install/lib/libswsscommon.so ]] || build_swsscommon
-    build_swsscommon
-    build_sairedis
+    # build_swsscommon
+    # build_sairedis
     build_swss_orchagent
 }
 
@@ -187,7 +208,6 @@ clean_all() {
 }
 
 main() {
-    # TODO: add option to install sys_deps-only. by `sudo build --install-sys-deps` then exit
     while [[ $# -ne 0 ]]
     do
         arg="$1"
@@ -210,7 +230,9 @@ main() {
 
     download_source_code
     download_deps
+    generate_redis_config
 
+    # TODO: can remove this ??
     cd $SRC_PATH
     mkdir -p ${BUILD_PATH}/install/include/swss
 

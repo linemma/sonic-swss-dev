@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "/mnt/e/build.swss.wsl/tests",
+            "program": "/mnt/e/build.swss.wsl/tests.out",
             "args": ["test", "--gtest_filter=*.*"],
             "stopAtEntry": false,
             "cwd": "/mnt/e/build.swss.wsl",
@@ -23,14 +23,7 @@
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
-                }],
-                "logging": {
-                    "exceptions": true,
-                    "moduleLoad": true,
-                    "programOutput": true,
-                    "engineLogging": true,
-                    "trace": true
-                }
+                }]
             },
             "pipeTransport": {
                 "debuggerPath": "source /mnt/e/build.swss.wsl/packages/.env; /usr/bin/gdb",
