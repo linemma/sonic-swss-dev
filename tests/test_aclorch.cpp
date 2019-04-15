@@ -37,12 +37,31 @@ extern CrmOrch *gCrmOrch;
 extern sai_acl_api_t* sai_acl_api;
 extern sai_switch_api_t *sai_switch_api;
 
-struct AclTest : public ::testing::Test {
+struct TestBase : public ::testing::Test {
+    static sai_status_t sai_create_acl_table_(sai_object_id_t *acl_table_id,
+        sai_object_id_t switch_id,
+        uint32_t attr_count,
+        const sai_attribute_t *attr_list) {
+        return that->sai_create_acl_table_fn(acl_table_id, switch_id, attr_count, attr_list);
+    }
+
+    std::function<sai_status_t(sai_object_id_t *,
+        sai_object_id_t,
+        uint32_t,
+        const sai_attribute_t *)> sai_create_acl_table_fn;
+
+    static TestBase *that;
+};
+
+TestBase *TestBase::that = nullptr;
+
+struct AclTest : public TestBase {
 
     AclTest() {
         set_attr_count = 0;
         memset(set_attr_list, 0, sizeof(set_attr_list));
     }
+
     ~AclTest() {
 
     }
@@ -201,6 +220,43 @@ TEST_F(AclTest, create_default_acl_table) {
     sai_acl_api = new sai_acl_api_t();
 
     sai_acl_api->create_acl_table = fake_create_acl_table;
+
+    AclTable acltable;
+    acltable.type = ACL_TABLE_L3;
+    acltable.create();
+
+    // set expected data
+    uint32_t expected_attr_count = 11;
+    vector<sai_attribute_t> expected_attr_list;
+
+    assign_default_acltable_attr(expected_attr_list);
+
+    // validate ...
+    EXPECT_EQ(expected_attr_count, set_attr_count);
+    for (int i = 0; i < set_attr_count; ++i) {
+        auto b_ret = verify_acltable_attr(expected_attr_list, &set_attr_list[i]);
+        ASSERT_EQ(b_ret, true);
+    }
+
+    sai_acl_api->create_acl_table = NULL;
+    delete sai_acl_api;
+}
+
+TEST_F(AclTest, create_default_acl_table_2) {
+    sai_acl_api = new sai_acl_api_t();
+
+    //sai_acl_api->create_acl_table = fake_create_acl_table;
+    sai_acl_api->create_acl_table = sai_create_acl_table_;
+    that = this;
+
+    sai_create_acl_table_fn = [](sai_object_id_t *acl_table_id,
+        sai_object_id_t switch_id,
+        uint32_t attr_count,
+        const sai_attribute_t *attr_list) -> sai_status_t {
+
+        return sai_status_t(0);
+
+    };    
 
     AclTable acltable;
     acltable.type = ACL_TABLE_L3;
