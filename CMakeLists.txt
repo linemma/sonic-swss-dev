@@ -141,6 +141,11 @@ file(GLOB TESTS
     tests/test_aclorch.cpp
 )
 
+file(GLOB COPP_TESTS
+    main.cpp    
+    tests/test_copporch.cpp
+)
+
 file(GLOB SRCS
 #    ${SWSS_PATH}/orchagent/aclorch.cpp
 )
@@ -148,6 +153,10 @@ file(GLOB SRCS
 file(GLOB INCLS
     ${SWSS_PATH}/orchagent/aclorch.h
     ${SWSS_PATH}/orchagent/acltable.h
+)
+
+file(GLOB COPP_INCLS
+    ${SWSS_PATH}/orchagent/copporch.h    
 )
 
 source_group(src\\include FILES ${INCLS})
@@ -163,6 +172,15 @@ add_executable(${PROJECT_NAME}
    ${TESTS}
 )
 
+add_executable(coppTest
+   ${SRCS}
+   ${COPP_INCLS}
+   ${COPP_TESTS}
+)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests")
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent)
+
+target_link_libraries(coppTest ${GTEST_LIBRARIES})
+target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimetadata orchagent)
