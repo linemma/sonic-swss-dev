@@ -136,6 +136,12 @@ target_link_libraries(orchagent
 #################################################################
 
 ## aclTest ######################################################
+
+configure_file (
+    tests/spec_auto_config.h.in
+    ${PROJECT_BINARY_DIR}/tests/spec_auto_config.h
+)
+
 file(GLOB TESTS
     main.cpp
     tests/test_aclorch.cpp
@@ -178,7 +184,8 @@ add_executable(coppTest
    ${COPP_TESTS}
 )
 
-set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests")
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests.out")
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_BINARY_DIR}/tests)
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent)
 

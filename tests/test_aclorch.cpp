@@ -4,6 +4,7 @@
 #include "saihelper.h"
 #include "hiredis.h"
 //#include "aclorch.h"
+#include "spec_auto_config.h"
 
 void syncd_apply_view()
 {
@@ -46,6 +47,11 @@ struct AclTest : public ::testing::Test {
 
     }
 };
+
+TEST_F(AclTest, foo) {
+    MacAddress xx;
+    std:cout << REDIS_START_CMD << "\n";
+}
 
 struct AclTestRedis : public ::testing::Test {
     AclTestRedis() {
