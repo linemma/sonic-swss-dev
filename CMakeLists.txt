@@ -152,6 +152,11 @@ file(GLOB COPP_TESTS
     tests/test_copporch.cpp
 )
 
+file(GLOB QOS_TESTS
+    main.cpp    
+    tests/test_qosorch.cpp
+)
+
 file(GLOB SRCS
 #    ${SWSS_PATH}/orchagent/aclorch.cpp
 )
@@ -163,6 +168,10 @@ file(GLOB INCLS
 
 file(GLOB COPP_INCLS
     ${SWSS_PATH}/orchagent/copporch.h    
+)
+
+file(GLOB QOS_INCLS
+    ${SWSS_PATH}/orchagent/qosorch.h    
 )
 
 source_group(src\\include FILES ${INCLS})
@@ -184,6 +193,12 @@ add_executable(coppTest
    ${COPP_TESTS}
 )
 
+add_executable(qosTest
+   ${SRCS}
+   ${QOS_INCLS}
+   ${QOS_TESTS}
+)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests.out")
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_BINARY_DIR}/tests)
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
@@ -191,3 +206,6 @@ target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimet
 
 target_link_libraries(coppTest ${GTEST_LIBRARIES})
 target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimetadata orchagent)
+
+target_link_libraries(qosTest ${GTEST_LIBRARIES})
+target_link_libraries(qosTest pthread hiredis swsscommon sairedis saimetadata orchagent)
