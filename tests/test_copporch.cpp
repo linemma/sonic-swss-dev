@@ -42,13 +42,17 @@ struct CoppTest : public ::testing::Test
 
     CoppTest()
     {
+    }
+    ~CoppTest()
+    {
+    }
+
+    void SetUp() override
+    {
         set_hostif_group_attr_count = 0;
         set_hostif_attr_count = 0;
         memset(set_hostif_group_attr_list, 0, sizeof(set_hostif_group_attr_list));
         memset(set_hostif_attr_list, 0, sizeof(set_hostif_attr_list));
-    }
-    ~CoppTest()
-    {
     }
 };
 
