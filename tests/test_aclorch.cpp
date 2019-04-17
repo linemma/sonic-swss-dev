@@ -34,8 +34,21 @@ vector<int32_t> bpoint_list;
 vector<int32_t> range_types_list;
 
 extern CrmOrch* gCrmOrch;
+extern PortsOrch* gPortsOrch;
+extern RouteOrch* gRouteOrch;
+extern IntfsOrch* gIntfsOrch;
+extern NeighOrch* gNeighOrch;
+extern FdbOrch* gFdbOrch;
+extern AclOrch* gAclOrch;
+MirrorOrch* gMirrorOrch;
+VRFOrch* gVrfOrch;
+
 extern sai_acl_api_t* sai_acl_api;
 extern sai_switch_api_t* sai_switch_api;
+extern sai_port_api_t* sai_port_api;
+extern sai_vlan_api_t* sai_vlan_api;
+extern sai_bridge_api_t* sai_bridge_api;
+extern sai_route_api_t* sai_route_api;
 
 int fake_create_acl_table(sai_object_id_t* acl_table_id,
     sai_object_id_t switch_id, uint32_t attr_count,
@@ -77,11 +90,119 @@ struct TestBase : public ::testing::Test {
             attr_list);
     }
 
+    static sai_status_t sai_create_acl_counter_(_Out_ sai_object_id_t* acl_counter_id,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t* attr_list)
+    {
+        return that->sai_create_acl_counter_fn(acl_counter_id, switch_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_create_acl_entry_(_Out_ sai_object_id_t* acl_entry_id,
+        _In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t* attr_list)
+    {
+        return that->sai_create_acl_entry_fn(acl_entry_id, switch_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_create_switch_(_Out_ sai_object_id_t* switch_id,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t* attr_list)
+    {
+        return that->sai_create_switch_fn(switch_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_get_switch_attribute_(_In_ sai_object_id_t switch_id,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t* attr_list)
+    {
+        return that->sai_get_switch_attribute_fn(switch_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_get_port_attribute_(_In_ sai_object_id_t port_id,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t* attr_list)
+    {
+        return that->sai_get_port_attribute_fn(port_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_get_vlan_attribute_(_In_ sai_object_id_t vlan_id,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t* attr_list)
+    {
+        return that->sai_get_vlan_attribute_fn(vlan_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_remove_vlan_member_(_In_ sai_object_id_t vlan_member_id)
+    {
+        return that->sai_remove_vlan_member_fn(vlan_member_id);
+    }
+
+    static sai_status_t sai_get_bridge_attribute_(_In_ sai_object_id_t bridge_id,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t* attr_list)
+    {
+        return that->sai_get_bridge_attribute_fn(bridge_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_get_bridge_port_attribute_(_In_ sai_object_id_t bridge_port_id,
+        _In_ uint32_t attr_count,
+        _Inout_ sai_attribute_t* attr_list)
+    {
+        return that->sai_get_bridge_port_attribute_fn(bridge_port_id, attr_count, attr_list);
+    }
+
+    static sai_status_t sai_remove_bridge_port_(_In_ sai_object_id_t bridge_port_id)
+    {
+        return that->sai_remove_bridge_port_fn(bridge_port_id);
+    }
+
+    static sai_status_t sai_create_route_entry_(_In_ const sai_route_entry_t* route_entry,
+        _In_ uint32_t attr_count,
+        _In_ const sai_attribute_t* attr_list)
+    {
+        return that->sai_create_route_entry_fn(route_entry, attr_count, attr_list);
+    }
+
     static TestBase* that;
 
     std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t,
         const sai_attribute_t*)>
         sai_create_acl_table_fn;
+
+    std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)>
+        sai_create_acl_counter_fn;
+
+    std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)>
+        sai_create_acl_entry_fn;
+
+    std::function<sai_status_t(sai_object_id_t*, uint32_t, const sai_attribute_t*)>
+        sai_create_switch_fn;
+
+    std::function<sai_status_t(sai_object_id_t, uint32_t, sai_attribute_t*)>
+        sai_get_switch_attribute_fn;
+
+    std::function<sai_status_t(sai_object_id_t, uint32_t, sai_attribute_t*)>
+        sai_get_port_attribute_fn;
+
+    std::function<sai_status_t(sai_object_id_t, uint32_t, sai_attribute_t*)>
+        sai_get_vlan_attribute_fn;
+
+    std::function<sai_status_t(sai_object_id_t)>
+        sai_remove_vlan_member_fn;
+
+    std::function<sai_status_t(sai_object_id_t, uint32_t, sai_attribute_t*)>
+        sai_get_bridge_attribute_fn;
+
+    std::function<sai_status_t(sai_object_id_t, uint32_t, sai_attribute_t*)>
+        sai_get_bridge_port_attribute_fn;
+
+    std::function<sai_status_t(sai_object_id_t)>
+        sai_remove_bridge_port_fn;
+
+    std::function<sai_status_t(const sai_route_entry_t*, uint32_t, const sai_attribute_t*)>
+        sai_create_route_entry_fn;
 
     bool createAclTable_3(AclTable* acl)
     {
@@ -136,6 +257,231 @@ struct TestBase : public ::testing::Test {
         return ret;
     }
 
+    std::shared_ptr<CreateAclResult> createL3AclTableAndRule(AclTable& acl, string& rule_id, std::vector<FieldValueTuple> filedValues)
+    {
+        assert(sai_acl_api == nullptr);
+
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+        auto sai_switch = std::shared_ptr<sai_switch_api_t>(new sai_switch_api_t(), [](sai_switch_api_t* p) {
+            delete p;
+            sai_switch_api = nullptr;
+        });
+        auto sai_port = std::shared_ptr<sai_port_api_t>(new sai_port_api_t(), [](sai_port_api_t* p) {
+            delete p;
+            sai_port_api = nullptr;
+        });
+        auto sai_vlan = std::shared_ptr<sai_vlan_api_t>(new sai_vlan_api_t(), [](sai_vlan_api_t* p) {
+            delete p;
+            sai_vlan_api = nullptr;
+        });
+        auto sai_bridge = std::shared_ptr<sai_bridge_api_t>(new sai_bridge_api_t(), [](sai_bridge_api_t* p) {
+            delete p;
+            sai_bridge_api = nullptr;
+        });
+        auto sai_route = std::shared_ptr<sai_route_api_t>(new sai_route_api_t(), [](sai_route_api_t* p) {
+            delete p;
+            sai_route_api = nullptr;
+        });
+
+        sai_acl_api = sai_acl.get();
+        sai_switch_api = sai_switch.get();
+        sai_port_api = sai_port.get();
+        sai_vlan_api = sai_vlan.get();
+        sai_bridge_api = sai_bridge.get();
+        sai_route_api = sai_route.get();
+
+        sai_acl_api->create_acl_table = sai_create_acl_table_;
+        sai_acl_api->create_acl_counter = sai_create_acl_counter_;
+        sai_acl_api->create_acl_entry = sai_create_acl_entry_;
+        sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
+        sai_port_api->get_port_attribute = sai_get_port_attribute_;
+        sai_vlan_api->get_vlan_attribute = sai_get_vlan_attribute_;
+        sai_vlan_api->remove_vlan_member = sai_remove_vlan_member_;
+        sai_bridge_api->get_bridge_attribute = sai_get_bridge_attribute_;
+        sai_bridge_api->get_bridge_port_attribute = sai_get_bridge_port_attribute_;
+        sai_bridge_api->remove_bridge_port = sai_remove_bridge_port_;
+        sai_route_api->create_route_entry = sai_create_route_entry_;
+        that = this;
+
+        sai_create_acl_counter_fn =
+            [](_Out_ sai_object_id_t* acl_counter_id,
+                _In_ sai_object_id_t switch_id,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_create_switch_fn =
+            [](_Out_ sai_object_id_t* switch_id,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_switch_attribute_fn =
+            [](_In_ sai_object_id_t switch_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_port_attribute_fn =
+            [](_In_ sai_object_id_t port_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_vlan_attribute_fn =
+            [](_In_ sai_object_id_t vlan_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_remove_vlan_member_fn =
+            [](_In_ sai_object_id_t vlan_member_id) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_bridge_attribute_fn =
+            [](_In_ sai_object_id_t bridge_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_bridge_port_attribute_fn =
+            [](_In_ sai_object_id_t bridge_port_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_remove_bridge_port_fn =
+            [](_In_ sai_object_id_t bridge_port_id) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_create_route_entry_fn =
+            [](_In_ const sai_route_entry_t* route_entry,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        /* FIXME: Add ace create result to ret
+         */
+        auto ret = std::make_shared<CreateAclResult>();
+
+        sai_create_acl_table_fn =
+            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            // FIXME:  not hard code for acl_table_id
+            *acl_table_id = 1;
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_create_acl_entry_fn =
+            [](_Out_ sai_object_id_t* acl_entry_id,
+                _In_ sai_object_id_t switch_id,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            // FIXME:  add atttibute to ret
+            return SAI_STATUS_SUCCESS;
+        };
+
+        DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+        DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+        DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+
+        TableConnector confDbAclTable(&config_db, CFG_ACL_TABLE_NAME);
+        TableConnector confDbAclRuleTable(&config_db, CFG_ACL_RULE_TABLE_NAME);
+
+        const int portsorch_base_pri = 40;
+
+        vector<table_name_with_pri_t> ports_tables = {
+            { APP_PORT_TABLE_NAME, portsorch_base_pri + 5 },
+            { APP_VLAN_TABLE_NAME, portsorch_base_pri + 2 },
+            { APP_VLAN_MEMBER_TABLE_NAME, portsorch_base_pri },
+            { APP_LAG_TABLE_NAME, portsorch_base_pri + 4 },
+            { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
+        };
+        gPortsOrch = new PortsOrch(&appl_db, ports_tables);
+
+        //gCrmOrch = new CrmOrch(&config_db, CFG_CRM_TABLE_NAME);
+        gVrfOrch = new VRFOrch(&appl_db, APP_VRF_TABLE_NAME);
+        gIntfsOrch = new IntfsOrch(&appl_db, APP_INTF_TABLE_NAME, gVrfOrch);
+        gNeighOrch = new NeighOrch(&appl_db, APP_NEIGH_TABLE_NAME, gIntfsOrch);
+        gRouteOrch = new RouteOrch(&appl_db, APP_ROUTE_TABLE_NAME, gNeighOrch);
+
+        TableConnector applDbFdb(&appl_db, APP_FDB_TABLE_NAME);
+        TableConnector stateDbFdb(&state_db, STATE_FDB_TABLE_NAME);
+        gFdbOrch = new FdbOrch(applDbFdb, stateDbFdb, gPortsOrch);
+
+        TableConnector stateDbMirrorSession(&state_db, APP_MIRROR_SESSION_TABLE_NAME);
+        TableConnector confDbMirrorSession(&config_db, CFG_MIRROR_SESSION_TABLE_NAME);
+        gMirrorOrch = new MirrorOrch(stateDbMirrorSession, confDbMirrorSession,
+            gPortsOrch, gRouteOrch, gNeighOrch, gFdbOrch);
+
+        vector<TableConnector> acl_table_connectors = { confDbAclTable,
+            confDbAclRuleTable };
+
+        gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
+            gNeighOrch, gRouteOrch);
+
+        /* Starting test
+         */
+        bool b_ret = false;
+        b_ret = gAclOrch->addAclTable(acl, acl.id);
+        if (true != b_ret) {
+            return nullptr;
+        }
+
+        /*
+        FieldValueTuple tmpFieldValues;
+        std::vector<FieldValueTuple> filedValues;
+
+        tmpFieldValues = std::make_pair(string(ACTION_PACKET_ACTION), string(PACKET_ACTION_FORWARD));
+        filedValues.push_back(tmpFieldValues);
+        tmpFieldValues = std::make_pair(string(MATCH_SRC_IP), string("10.0.0.1"));
+        filedValues.push_back(tmpFieldValues);
+        */
+
+        KeyOpFieldsValuesTuple data; // key, op, fieldValue
+        string rule_key = acl.id + ":" + rule_id;
+        string rule_cmd(SET_COMMAND);
+        data = std::make_tuple(rule_key, rule_cmd, filedValues);
+
+        shared_ptr<AclRule> newRule = AclRule::makeShared(acl.type, gAclOrch, gMirrorOrch,
+            nullptr /*m_dTelOrch*/, rule_id, acl.id, data);
+
+        b_ret = gAclOrch->addAclRule(newRule, acl.id);
+        if (true != b_ret) {
+            return nullptr;
+        }
+
+        delete gAclOrch;
+        delete gFdbOrch;
+        delete gMirrorOrch;
+        delete gRouteOrch;
+        delete gNeighOrch;
+        delete gIntfsOrch;
+        delete gVrfOrch;
+        //delete gCrmOrch;
+        delete gPortsOrch;
+
+        ret->ret_val = true;
+        return ret;
+    }
+
     bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
@@ -182,6 +528,16 @@ struct AclTest : public TestBase {
     AclTest()
     {
         m_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    }
+
+    static void SetUpTestCase()
+    {
+        //system(REDIS_START_CMD);
+    }
+
+    static void TearDownTestCase()
+    {
+        //system(REDIS_STOP_CMD);
     }
 
     void SetUp() override
@@ -465,6 +821,42 @@ TEST_F(AclTest, create_default_acl_table_4)
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
 
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+}
+
+TEST_F(AclTest, create_l3_acl_table_and_rule)
+{
+    //createL3AclTableAndRule
+    AclTable aclTable;
+    aclTable.type = ACL_TABLE_L3;
+    string rule_id("acl_rule_l3");
+
+    FieldValueTuple tmpFieldValues;
+    std::vector<FieldValueTuple> filedValues;
+
+    tmpFieldValues = std::make_pair(string(ACTION_PACKET_ACTION), string(PACKET_ACTION_FORWARD));
+    filedValues.push_back(tmpFieldValues);
+    tmpFieldValues = std::make_pair(string(MATCH_SRC_IP), string("10.0.0.1"));
+    filedValues.push_back(tmpFieldValues);
+
+    auto res = createL3AclTableAndRule(aclTable, rule_id, filedValues);
+    ASSERT_TRUE(res->ret_val == true);
+
+    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+        { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+        { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
+
+    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    /* FIXME: verify rule attribute
+     */
 }
 
 TEST_F(AclTestRedis, create_default_acl_table_on_redis)
