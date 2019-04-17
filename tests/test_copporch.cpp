@@ -225,6 +225,9 @@ bool verify_attrs(vector<sai_attribute_t>& expect_table_attrs, sai_attribute_t* 
             case SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION:
                 if (it.value.s32 != target_attribute.value.s32)
                     return false;
+                break;
+            default:
+                return false;
             }
         }
     }
