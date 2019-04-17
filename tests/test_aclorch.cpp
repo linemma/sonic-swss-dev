@@ -43,20 +43,6 @@ int fake_create_acl_table(sai_object_id_t* acl_table_id,
 
 TEST(foo, foo)
 {
-    // auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "true" },
-    // { "SAI_ACL_ENTRY_ATTR_FIELD_IN_PORTS", "true" } });
-
-    // attr.id = SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST;
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE;   //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE;  //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL;  //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_SRC_IP;       //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_DST_IP;       //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT;  //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT;  //
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS;
-    // attr.id = SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE;
-    // attr.id = SAI_ACL_TABLE_ATTR_ACL_STAGE;
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
         { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
@@ -142,7 +128,8 @@ struct TestBase : public ::testing::Test {
             for (auto i = 0; i < attr_count; ++i) {
                 ret->attr_list.emplace_back(attr_list[i]);
             }
-            return SAI_STATUS_FAILURE;
+            // return SAI_STATUS_FAILURE;
+            return SAI_STATUS_SUCCESS;
         };
 
         ret->ret_val = acl.create();
@@ -183,14 +170,26 @@ TestBase* TestBase::that = nullptr;
 
 struct AclTest : public TestBase {
 
+    std::shared_ptr<swss::DBConnector> m_db;
+
     AclTest()
     {
+        m_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     }
 
     void SetUp() override
     {
         set_attr_count = 0;
         memset(set_attr_list, 0, sizeof(set_attr_list));
+
+        assert(gCrmOrch == nullptr);
+        gCrmOrch = new CrmOrch(m_db.get(), CFG_CRM_TABLE_NAME);
+    }
+
+    void TearDown() override
+    {
+        delete gCrmOrch;
+        gCrmOrch = nullptr;
     }
 };
 
@@ -225,7 +224,8 @@ int fake_create_acl_table(sai_object_id_t* acl_table_id,
 {
     set_attr_count = attr_count;
     memcpy(set_attr_list, attr_list, sizeof(sai_attribute_t) * attr_count);
-    return SAI_STATUS_FAILURE;
+    // return SAI_STATUS_FAILURE;
+    return SAI_STATUS_SUCCESS;
 }
 
 void assign_default_acltable_attr(vector<sai_attribute_t>& table_attrs)
@@ -359,6 +359,7 @@ TEST_F(AclTest, create_default_acl_table)
 
     sai_acl_api->create_acl_table = NULL;
     delete sai_acl_api;
+    sai_acl_api = nullptr;
 }
 
 TEST_F(AclTest, create_default_acl_table_2)
@@ -441,7 +442,7 @@ TEST_F(AclTest, create_default_acl_table_4)
     acltable.type = ACL_TABLE_L3;
     auto res = createAclTable_4(acltable);
 
-    ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
+    ASSERT_TRUE(res->ret_val == true);
 
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
