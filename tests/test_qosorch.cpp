@@ -36,12 +36,12 @@ struct SetQosResult {
 };
 
 struct TestBase : public ::testing::Test {
-    static sai_status_t sai_set_qos_map(sai_object_id_t* sai_object_id,
+    static sai_status_t create_qos_map(sai_object_id_t* sai_object_id,
         sai_object_id_t switch_id,
         uint32_t attr_count,
         const sai_attribute_t* attr_list)
     {
-        return that->sai_set_qos_map_fn(sai_object_id, switch_id, attr_count,
+        return that->create_qos_map_fn(sai_object_id, switch_id, attr_count,
             attr_list);
     }
 
@@ -49,7 +49,7 @@ struct TestBase : public ::testing::Test {
 
     std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t,
         const sai_attribute_t*)>
-        sai_set_qos_map_fn;
+        create_qos_map_fn;
 
     std::shared_ptr<SetQosResult> setDscp2Tc(DscpToTcMapHandler& dscpToTc, vector<sai_attribute_t>& attributes)
     {
@@ -61,12 +61,13 @@ struct TestBase : public ::testing::Test {
             sai_qos_map_api = nullptr;
         });
 
-        sai_qos_map_api->create_qos_map = sai_set_qos_map;
+        // FIXME: add new function to setup spy function
+        sai_qos_map_api->create_qos_map = create_qos_map;
         that = this;
 
         auto ret = std::make_shared<SetQosResult>();
 
-        sai_set_qos_map_fn =
+        create_qos_map_fn =
             [&](sai_object_id_t* sai_object_id, sai_object_id_t switch_id,
                 uint32_t attr_count,
                 const sai_attribute_t* attr_list) -> sai_status_t {
@@ -77,6 +78,36 @@ struct TestBase : public ::testing::Test {
         };
 
         ret->ret_val = dscpToTc.addQosItem(attributes);
+        return ret;
+    }
+
+    std::shared_ptr<SetQosResult> setTc2Queue(TcToQueueMapHandler& tcToQueue, vector<sai_attribute_t>& attributes)
+    {
+        assert(sai_qos_map_api == nullptr);
+
+        sai_qos_map_api = new sai_qos_map_api_t();
+        auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t* p) {
+            delete p;
+            sai_qos_map_api = nullptr;
+        });
+
+        // FIXME: add new function to setup spy function
+        sai_qos_map_api->create_qos_map = create_qos_map;
+        that = this;
+
+        auto ret = std::make_shared<SetQosResult>();
+
+        create_qos_map_fn =
+            [&](sai_object_id_t* sai_object_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_FAILURE;
+        };
+
+        ret->ret_val = tcToQueue.addQosItem(attributes);
         return ret;
     }
 
@@ -120,14 +151,10 @@ struct TestBase : public ::testing::Test {
 
 TestBase* TestBase::that = nullptr;
 
-struct DscpToTcTest : public TestBase {
-
-    DscpToTcTest()
-    {
-    }
+struct QosMapHandlerTest : public TestBase {
 };
 
-TEST_F(DscpToTcTest, setDscp2Tc)
+TEST_F(QosMapHandlerTest, DscpToTcMap)
 {
     DscpToTcMapHandler dscpToTcMapHandler;
 
@@ -143,7 +170,39 @@ TEST_F(DscpToTcTest, setDscp2Tc)
 
     auto res = setDscp2Tc(dscpToTcMapHandler, exp_dscp_to_tc);
 
+    // FIXME: should check SAI_QOS_MAP_TYPE_DSCP_TO_TC
+
     ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
 
     ASSERT_TRUE(AttrListEq(res->attr_list, exp_dscp_to_tc));
 }
+
+TEST_F(QosMapHandlerTest, TcToQueueMap)
+{
+    TcToQueueMapHandler tcToQueueMapHandler;
+
+    auto v = std::vector<swss::FieldValueTuple>({ { "1", "0" },
+        { "2", "0" },
+        { "3", "3" } });
+    // SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
+
+    // FIXME: add attr_list to dscp_to_tc_tuple
+    KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "setDscoToTc", v);
+    vector<sai_attribute_t> exp_dscp_to_tc;
+    tcToQueueMapHandler.convertFieldValuesToAttributes(dscp_to_tc_tuple, exp_dscp_to_tc);
+
+    auto res = setTc2Queue(tcToQueueMapHandler, exp_dscp_to_tc);
+
+    // FIXME: should check SAI_QOS_MAP_TYPE_TC_TO_QUEUE
+
+    ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
+
+    ASSERT_TRUE(AttrListEq(res->attr_list, exp_dscp_to_tc));
+}
+
+// TODO: add for TcToPgHandler
+// TODO: add for PfcPrioToPgHandler
+// TODO: add for PfcToQueueHandler
+
+struct QosOrchTest : public TestBase {
+};
