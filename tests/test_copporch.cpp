@@ -132,6 +132,7 @@ int fake_create_hostif_trap_group(sai_object_id_t* hostif_trap_group_id,
     const sai_attribute_t* attr_list)
 {
     set_hostif_group_attr_count = attr_count;
+    // FIXME: should not hard code !!
     *hostif_trap_group_id = 12345l;
     memcpy(set_hostif_group_attr_list, attr_list, sizeof(sai_attribute_t) * attr_count);
     return SAI_STATUS_SUCCESS;
@@ -158,6 +159,7 @@ int fake_create_hostif_trap(sai_object_id_t* hostif_trap_id,
     }
 
     if (!defaultTrap) {
+        // FIXME: should not hard code !!
         *hostif_trap_id = 12345l;
     }
     memcpy(set_hostif_attr_list, attr_list, sizeof(sai_attribute_t) * attr_count);
@@ -290,6 +292,7 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
     consumer->addToSync(setData);
     copp_orch_extend->processCoppRule(*consumer);
 
+    // FIXME: Using the way for validating result => ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
     //verify
     EXPECT_EQ(1, set_hostif_group_attr_count);
     auto b_ret = verify_group_attrs(expected_trap_group_attr_list, set_hostif_group_attr_list, set_hostif_group_attr_count);

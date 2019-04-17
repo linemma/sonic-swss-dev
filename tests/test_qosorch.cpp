@@ -2,8 +2,8 @@
 
 #include "hiredis.h"
 #include "orchdaemon.h"
-#include "saihelper.h"
 #include "saiattributelist.h"
+#include "saihelper.h"
 
 void syncd_apply_view()
 {
@@ -27,38 +27,36 @@ bool gLogRotate = false;
 ofstream gRecordOfs;
 string gRecordFile;
 
-extern sai_qos_map_api_t *sai_qos_map_api;
+extern sai_qos_map_api_t* sai_qos_map_api;
 
-struct CreateQosResult
-{
+struct CreateQosResult {
     bool ret_val;
 
     std::vector<sai_attribute_t> attr_list;
 };
 
-struct TestBase : public ::testing::Test
-{
-    static sai_status_t sai_create_qos_map(sai_object_id_t *sai_object_id,
-                                           sai_object_id_t switch_id,
-                                           uint32_t attr_count,
-                                           const sai_attribute_t *attr_list)
+struct TestBase : public ::testing::Test {
+    static sai_status_t sai_create_qos_map(sai_object_id_t* sai_object_id,
+        sai_object_id_t switch_id,
+        uint32_t attr_count,
+        const sai_attribute_t* attr_list)
     {
         return that->sai_create_qos_map_fn(sai_object_id, switch_id, attr_count,
-                                           attr_list);
+            attr_list);
     }
 
-    static TestBase *that;
+    static TestBase* that;
 
-    std::function<sai_status_t(sai_object_id_t *, sai_object_id_t, uint32_t,
-                               const sai_attribute_t *)>
+    std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t,
+        const sai_attribute_t*)>
         sai_create_qos_map_fn;
 
-    std::shared_ptr<CreateQosResult> createDscpToTcMap(DscpToTcMapHandler &dscpToTc)
+    std::shared_ptr<CreateQosResult> createDscpToTcMap(DscpToTcMapHandler& dscpToTc)
     {
         assert(sai_qos_map_api == nullptr);
 
         sai_qos_map_api = new sai_qos_map_api_t();
-        auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t *p) {
+        auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t* p) {
             delete p;
             sai_qos_map_api = nullptr;
         });
@@ -69,18 +67,18 @@ struct TestBase : public ::testing::Test
         auto ret = std::make_shared<CreateQosResult>();
 
         sai_create_qos_map_fn =
-            [&](sai_object_id_t *sai_object_id, sai_object_id_t switch_id,
+            [&](sai_object_id_t* sai_object_id, sai_object_id_t switch_id,
                 uint32_t attr_count,
-                const sai_attribute_t *attr_list) -> sai_status_t {
-            for (auto i = 0; i < attr_count; ++i)
-            {
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            for (auto i = 0; i < attr_count; ++i) {
                 ret->attr_list.emplace_back(attr_list[i]);
             }
             return SAI_STATUS_FAILURE;
         };
 
+        // FIXME: move to check_dscp_to_tc_attrs
         // set attribute tuple
-        KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "addDscoToTc", {{"1", "0"}, {"2", "0"}, {"3", "3"}});
+        KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "addDscoToTc", { { "1", "0" }, { "2", "0" }, { "3", "3" } });
         vector<sai_attribute_t> dscp_to_tc_attributes;
 
         dscpToTc.convertFieldValuesToAttributes(dscp_to_tc_tuple, dscp_to_tc_attributes);
@@ -88,47 +86,43 @@ struct TestBase : public ::testing::Test
         return ret;
     }
 
-    bool AttrListEq(const std::vector<sai_attribute_t> &act_attr_list, vector<sai_attribute_t> &exp_attr_list)
+    bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, vector<sai_attribute_t>& exp_attr_list)
     {
-        if (act_attr_list.size() != exp_attr_list.size())
-        {
+        if (act_attr_list.size() != exp_attr_list.size()) {
             return false;
         }
 
         auto l = exp_attr_list;
-        for (int i = 0; i < exp_attr_list.size(); i++)
-        {
-            auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t &attr) {
-                if (attr.id != l[i].id)
-                {
+        for (int i = 0; i < exp_attr_list.size(); i++) {
+            auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t& attr) {
+                if (attr.id != l[i].id) {
                     return false;
                 }
 
-                switch (attr.id)
-                {
+                // FIXME: find a way to conver attribute id to type
+                // type = idToType(attr.id) // metadata ..
+                // switch (type) {
+                //     case SAI_ATTR_VALUE_TYPE_BOOL:
+                //     ...
+                // }
+
+                switch (attr.id) {
                 case SAI_QOS_MAP_ATTR_TYPE:
-                    if (attr.value.u32 != l[i].value.u32)
-                    {
+                    if (attr.value.u32 != l[i].value.u32) {
                         return false;
                     }
                     break;
                 case SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST:
-                    if (attr.value.qosmap.count == l[i].value.qosmap.count)
-                    {
-                        for (int j = 0; j < attr.value.qosmap.count; j++)
-                        {
-                            if (attr.value.qosmap.list[j].key.dscp != l[i].value.qosmap.list[j].key.dscp)
-                            {
+                    if (attr.value.qosmap.count == l[i].value.qosmap.count) {
+                        for (int j = 0; j < attr.value.qosmap.count; j++) {
+                            if (attr.value.qosmap.list[j].key.dscp != l[i].value.qosmap.list[j].key.dscp) {
                                 return false;
                             }
-                            if (attr.value.qosmap.list[j].value.tc != l[i].value.qosmap.list[j].value.tc)
-                            {
+                            if (attr.value.qosmap.list[j].value.tc != l[i].value.qosmap.list[j].value.tc) {
                                 return false;
                             }
                         }
-                    }
-                    else
-                    {
+                    } else {
                         return false;
                     }
                     break;
@@ -136,8 +130,7 @@ struct TestBase : public ::testing::Test
                 return true;
             });
 
-            if (found == act_attr_list.end())
-            {
+            if (found == act_attr_list.end()) {
                 return false;
             }
         }
@@ -145,20 +138,28 @@ struct TestBase : public ::testing::Test
     }
 };
 
-TestBase *TestBase::that = nullptr;
+TestBase* TestBase::that = nullptr;
 
-struct DscpToTcTest : public TestBase
-{
+struct DscpToTcTest : public TestBase {
 
     DscpToTcTest()
     {
     }
 };
 
+// FIXME: setDscp2Tc
 TEST_F(DscpToTcTest, check_dscp_to_tc_attrs)
 {
     DscpToTcMapHandler dscpToTcMapHandler;
 
+    // FIXME: add attributes = { "1", "0" }, { "2", "0" }, { "3", "3" }
+    // dscp_to_tc_tuple = "dscpToTc", "addDscoToTc" + $attributes
+
+    // FIXME: pass into
+    KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "addDscoToTc", { { "1", "0" }, { "2", "0" }, { "3", "3" } });
+    vector<sai_attribute_t> dscp_to_tc_attributes;
+
+    // FIXME: rename createDscpToTcMap => setDscp2Tc
     auto res = createDscpToTcMap(dscpToTcMapHandler);
 
     ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
@@ -184,5 +185,7 @@ TEST_F(DscpToTcTest, check_dscp_to_tc_attrs)
     attr.value.qosmap.list[2].value.tc = 3;
     attr_list.push_back(attr);
 
+    // FIXME: res->attr_list == ConverToAttrList(dscp_to_tc_tuple)
+    // FIXME: res->attr_list == $attributes
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
 }

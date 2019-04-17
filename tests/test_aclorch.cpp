@@ -151,6 +151,13 @@ struct TestBase : public ::testing::Test {
                     return false;
                 }
 
+                // FIXME: find a way to conver attribute id to type
+                // type = idToType(attr.id) // metadata ..
+                // switch (type) {
+                //     case SAI_ATTR_VALUE_TYPE_BOOL:
+                //     ...
+                // }
+
                 return true;
             });
 
