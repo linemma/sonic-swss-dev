@@ -47,6 +47,7 @@
             ],
             "sourceFileMap": {
                 "/mnt/c": "c:\\",
+                "/usr": "${env:LOCALAPPDATA}\\Packages\\CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc\\LocalState\\rootfs\\usr",
                 "/mnt/d": "d:\\",
                 "/mnt/e": "e:\\",
                 "/mnt/f": "f:\\"
