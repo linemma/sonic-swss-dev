@@ -86,6 +86,10 @@ public:
     {
         Consumer::addToSync(entries);
     }
+
+    void clear() {
+        Consumer::m_toSync.clear();
+    }
 };
 
 // struct CoppTestRedis : public ::testing::Test {
@@ -135,6 +139,10 @@ int fake_create_hostif_trap_group(sai_object_id_t* hostif_trap_group_id,
     // FIXME: should not hard code !!
     *hostif_trap_group_id = 12345l;
     memcpy(set_hostif_group_attr_list, attr_list, sizeof(sai_attribute_t) * attr_count);
+    return SAI_STATUS_SUCCESS;
+}
+
+int fake_set_hostif_trap_group_attribute(sai_object_id_t hostif_trap_group_id, const sai_attribute_t* attr_list) {
     return SAI_STATUS_SUCCESS;
 }
 
@@ -242,6 +250,7 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
     sai_switch_api = new sai_switch_api_t();
 
     sai_hostif_api->create_hostif_trap_group = fake_create_hostif_trap_group;
+    sai_hostif_api->set_hostif_trap_group_attribute = fake_set_hostif_trap_group_attribute;
     sai_hostif_api->create_hostif_trap = fake_create_hostif_trap;
     sai_hostif_api->create_hostif_table_entry = fake_create_hostif_table_entry;
     sai_switch_api->get_switch_attribute = fake_get_switch_attribute;
@@ -251,59 +260,78 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
     ConsumerExtend* consumer = new ConsumerExtend(new ConsumerStateTable(appl_db, APP_COPP_TABLE_NAME, 1, 1), copp_orch_extend, APP_COPP_TABLE_NAME);
 
     std::deque<KeyOpFieldsValuesTuple> setData = {};
-    KeyOpFieldsValuesTuple groupAttr("copp1", "SET", { { "trap_ids", "stp,lacp,eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
-    setData.push_back(groupAttr);
+    map<string, sai_packet_action_t> packet_action_map = {
+        { "drop", SAI_PACKET_ACTION_DROP },
+        { "forward", SAI_PACKET_ACTION_FORWARD },
+        { "copy", SAI_PACKET_ACTION_COPY },
+        { "copy_cancel", SAI_PACKET_ACTION_COPY_CANCEL },
+        { "trap", SAI_PACKET_ACTION_TRAP },
+        { "log", SAI_PACKET_ACTION_LOG },
+        { "deny", SAI_PACKET_ACTION_DENY },
+        { "transit", SAI_PACKET_ACTION_TRANSIT }
+    };
 
-    //prepare expect data
-    uint32_t expected_trap_group_attr_count = 1;
-    uint32_t expected_trap_attr_count = 2;
-    vector<sai_attribute_t> expected_trap_group_attr_list;
-    vector<sai_attribute_t> expected_trap_attr_list;
+     std::map<std::string, sai_packet_action_t>::iterator it = packet_action_map.begin();
+    while (it != packet_action_map.end()) {
+        setData.clear();
+        consumer->clear();
+        KeyOpFieldsValuesTuple rule1Attr("coppRule1", "SET", { { "trap_ids", "stp,lacp,eapol" }, { "trap_action", it->first }, { "queue", "3" }, { "trap_priority", "1" } });
+        setData.push_back(rule1Attr);
 
-    //prepare expect group data
-    sai_attribute_t attr;
-    memset(&attr, 0, sizeof(attr));
-    attr.id = SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE;
-    attr.value.u32 = 3;
-    expected_trap_group_attr_list.push_back(attr);
+        //prepare expect data
+        uint32_t expected_trap_group_attr_count = 1;
+        uint32_t expected_trap_attr_count = 2;
+        vector<sai_attribute_t> expected_trap_group_attr_list;
+        vector<sai_attribute_t> expected_trap_attr_list;
 
-    //prepare expect trap data
-    memset(&attr, 0, sizeof(attr));
-    attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE;
-    attr.value.s32 = 3;
-    expected_trap_attr_list.push_back(attr);
+        //prepare expect group data
+        sai_attribute_t attr;
+        memset(&attr, 0, sizeof(attr));
+        attr.id = SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE;
+        attr.value.u32 = 3;
+        expected_trap_group_attr_list.push_back(attr);
 
-    memset(&attr, 0, sizeof(attr));
-    attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP;
-    attr.value.s32 = 3;
-    expected_trap_attr_list.push_back(attr);
+        //prepare expect trap data
+        memset(&attr, 0, sizeof(attr));
+        attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE;
+        attr.value.s32 = 3;
+        expected_trap_attr_list.push_back(attr);
 
-    memset(&attr, 0, sizeof(attr));
-    attr.id = SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION;
-    attr.value.s32 = 0;
-    expected_trap_attr_list.push_back(attr);
+        memset(&attr, 0, sizeof(attr));
+        attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP;
+        attr.value.s32 = 3;
+        expected_trap_attr_list.push_back(attr);
 
-    memset(&attr, 0, sizeof(attr));
-    attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY;
-    attr.value.u32 = 1;
-    expected_trap_attr_list.push_back(attr);
+        memset(&attr, 0, sizeof(attr));
+        attr.id = SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION;
+        attr.value.s32 = it->second;
+        expected_trap_attr_list.push_back(attr);
 
-    //call CoPP function
-    consumer->addToSync(setData);
-    copp_orch_extend->processCoppRule(*consumer);
+        memset(&attr, 0, sizeof(attr));
+        attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY;
+        attr.value.u32 = 1;
+        expected_trap_attr_list.push_back(attr);
 
-    // FIXME: Using the way for validating result => ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
-    //verify
-    EXPECT_EQ(1, set_hostif_group_attr_count);
-    auto b_ret = verify_group_attrs(expected_trap_group_attr_list, set_hostif_group_attr_list, set_hostif_group_attr_count);
-    ASSERT_EQ(b_ret, true);
+        //call CoPP function
+        consumer->addToSync(setData);
+        copp_orch_extend->processCoppRule(*consumer);
 
-    EXPECT_EQ(4, set_hostif_attr_count);
-    b_ret = verify_attrs(expected_trap_attr_list, set_hostif_attr_list, set_hostif_attr_count);
-    ASSERT_EQ(b_ret, true);
+        // FIXME: Using the way for validating result => ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+        //verify
+        EXPECT_EQ(1, set_hostif_group_attr_count);
+        auto b_ret = verify_group_attrs(expected_trap_group_attr_list, set_hostif_group_attr_list, set_hostif_group_attr_count);
+        ASSERT_EQ(b_ret, true);
+
+        EXPECT_EQ(4, set_hostif_attr_count);
+        b_ret = verify_attrs(expected_trap_attr_list, set_hostif_attr_list, set_hostif_attr_count);
+        ASSERT_EQ(b_ret, true);
+
+        it++;
+    }
 
     //teardown
     sai_hostif_api->create_hostif_trap_group = NULL;
+    sai_hostif_api->set_hostif_trap_group_attribute = NULL;
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
