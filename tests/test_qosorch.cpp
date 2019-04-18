@@ -38,7 +38,7 @@ struct QosOrchMock : public QosOrch {
 
     task_process_status handleDscpToTcTable2(Consumer& consumer)
     {
-        SWSS_LOG_ENTER();
+        // SWSS_LOG_ENTER();
         DscpToTcMapHandler dscp_tc_handler;
         return dscp_tc_handler.processWorkItem(consumer);
     }
@@ -217,6 +217,11 @@ struct TestBase : public ::testing::Test {
 TestBase* TestBase::that = nullptr;
 
 struct QosMapHandlerTest : public TestBase {
+    void SetUp() override
+    {
+        // ...
+        ASSERT_TRUE(0 == setenv("platform", "x86_64-barefoot_p4-r0", 1));
+    }
 };
 
 TEST_F(QosMapHandlerTest, DscpToTcMap)
