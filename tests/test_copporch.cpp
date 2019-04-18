@@ -76,6 +76,11 @@ struct CreateCoppResult {
 
     std::vector<sai_attribute_t> group_attr_list;
     std::vector<sai_attribute_t> trap_attr_list;
+
+    void reset() {
+        group_attr_list.clear();
+        trap_attr_list.clear();
+    }
 };
 
 struct TestBase : public ::testing::Test {
@@ -194,6 +199,8 @@ struct CoppTest : public TestBase {
 
     CoppTest()
     {
+        sai_hostif_api = new sai_hostif_api_t();
+        sai_switch_api = new sai_switch_api_t();
     }
     ~CoppTest()
     {
@@ -204,77 +211,9 @@ struct CoppTest : public TestBase {
     }
 };
 
-bool verify_group_attrs(vector<sai_attribute_t>& expect_table_attrs, sai_attribute_t* verify_attrs, uint32_t verify_count)
+TEST_F(CoppTest, create_copp_stp_rule_without_policer)
 {
-    bool result = false;
-    if (expect_table_attrs.size() != verify_count && expect_table_attrs.size() != 1)
-        return false;
-
-    sai_attribute_t expected_value = expect_table_attrs.at(0);
-    sai_attribute_t verify_value = verify_attrs[0];
-
-    if (expected_value.id != SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE)
-        return false;
-
-    if (verify_value.id != SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE)
-        return false;
-
-    if (expected_value.value.u32 != verify_value.value.u32)
-        return false;
-    return true;
-}
-
-bool verify_attrs(vector<sai_attribute_t>& expect_table_attrs, sai_attribute_t* verify_attrs, uint32_t verify_count)
-{
-    bool result = false;
-    if (expect_table_attrs.size() != verify_count)
-        return false;
-
-    for (auto it : expect_table_attrs) {
-        bool find = false;
-        sai_attribute_t target_attribute;
-
-        if (it.id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE)
-            continue;
-
-        if (it.id == SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP)
-            continue;
-
-        for (int j = 0; j < verify_count; j++) {
-            if (it.id == verify_attrs[j].id) {
-                target_attribute = verify_attrs[j];
-                find = true;
-                break;
-            }
-        }
-        if (!find) {
-            return false;
-        } else {
-            switch (it.id) {
-            case SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY:
-                if (it.value.u32 != target_attribute.value.u32)
-                    return false;
-                break;
-            case SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION:
-                if (it.value.s32 != target_attribute.value.s32)
-                    return false;
-                break;
-            default:
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-TEST_F(CoppTest, create_copp_rule_without_policer)
-{
-    sai_hostif_api = new sai_hostif_api_t();
-    sai_switch_api = new sai_switch_api_t();
-
-    // sai_acl_api->create_acl_table = fake_create_acl_table;
     sai_hostif_api->create_hostif_trap_group = sai_create_hostif_trap_group_;
-    sai_hostif_api->set_hostif_trap_group_attribute = sai_set_hostif_trap_group_attribute_;
     sai_hostif_api->create_hostif_trap = sai_create_hostif_trap_;
     sai_hostif_api->create_hostif_table_entry = sai_create_hostif_table_entry_;
     sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
@@ -294,11 +233,6 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
         return SAI_STATUS_SUCCESS;
     };
 
-    sai_set_hostif_trap_group_attribute_fn =
-        [&](sai_object_id_t hostif_trap_group_id, const sai_attribute_t* attr_list) -> sai_status_t {
-        return SAI_STATUS_SUCCESS;
-    };
-
     sai_create_hostif_trap_fn =
         [&](sai_object_id_t* hostif_trap_id,
             sai_object_id_t switch_id,
@@ -307,8 +241,10 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
         bool defaultTrap = false;
         for (auto i = 0; i < attr_count; ++i) {
             if (attr_list[i].id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE) {
-                if (attr_list[i].value.s32 == SAI_HOSTIF_TRAP_TYPE_TTL_ERROR)
+                if (attr_list[i].value.s32 == SAI_HOSTIF_TRAP_TYPE_TTL_ERROR) {
                     defaultTrap = true;
+                    break;
+                }
             }
         }
 
@@ -364,84 +300,134 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
 
     //teardown
     sai_hostif_api->create_hostif_trap_group = NULL;
-    sai_hostif_api->set_hostif_trap_group_attribute = NULL;
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
     delete sai_hostif_api;
     delete sai_switch_api;
+    delete appl_db;
+    delete copp_orch_extend;
+    delete consumer;
 }
 
-// TEST_F(CoppTest, delete_copp_rule_without_policer)
-// {
-//     sai_hostif_api = new sai_hostif_api_t();
-//     sai_switch_api = new sai_switch_api_t();
+TEST_F(CoppTest, delete_copp_stp_rule_without_policer)
+{
+    sai_hostif_api->create_hostif_trap_group = sai_create_hostif_trap_group_;
+    sai_hostif_api->remove_hostif_trap_group = sai_remove_hostif_trap_group_;
+    sai_hostif_api->create_hostif_trap = sai_create_hostif_trap_;
+    sai_hostif_api->create_hostif_table_entry = sai_create_hostif_table_entry_;
+    sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
 
-//     sai_hostif_api->remove_hostif_trap_group = fake_remove_hostif_trap_group;
-//     sai_hostif_api->create_hostif_trap_group = fake_create_hostif_trap_group;
-//     sai_hostif_api->create_hostif_trap = fake_create_hostif_trap;
-//     sai_hostif_api->create_hostif_table_entry = fake_create_hostif_table_entry;
-//     sai_switch_api->get_switch_attribute = fake_get_switch_attribute;
+    that = this;
 
-//     DBConnector* appl_db = new DBConnector(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 1);
-//     CoppOrchExtend* copp_orch_extend = new CoppOrchExtend(appl_db, APP_COPP_TABLE_NAME);
-//     ConsumerExtend* consumer = new ConsumerExtend(new ConsumerStateTable(appl_db, APP_COPP_TABLE_NAME, 1, 1), copp_orch_extend, APP_COPP_TABLE_NAME);
+    auto ret = std::make_shared<CreateCoppResult>();
 
-//     std::deque<KeyOpFieldsValuesTuple> setData = {};
-//     KeyOpFieldsValuesTuple addAttr("copp1", "SET", { { "trap_ids", "stp,lacp,eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
-//     setData.push_back(addAttr);
+    sai_create_hostif_trap_group_fn =
+        [&](sai_object_id_t* hostif_trap_group_id,
+            sai_object_id_t switch_id,
+            uint32_t attr_count,
+            const sai_attribute_t* attr_list) -> sai_status_t {
+        for (auto i = 0; i < attr_count; ++i) {
+            ret->group_attr_list.emplace_back(attr_list[i]);
+        }
+        *hostif_trap_group_id = 12345l;
+        return SAI_STATUS_SUCCESS;
+    };
 
-//     //prepare expect data
-//     uint32_t expected_trap_group_attr_count = 1;
-//     uint32_t expected_trap_attr_count = 2;
-//     vector<sai_attribute_t> expected_trap_group_attr_list;
-//     vector<sai_attribute_t> expected_trap_attr_list;
+    sai_remove_hostif_trap_group_fn =
+        [&](sai_object_id_t hostif_trap_group_id) -> sai_status_t {
+        return SAI_STATUS_SUCCESS;
+    };
 
-//     //prepare expect group data
-//     sai_attribute_t attr;
-//     memset(&attr, 0, sizeof(attr));
-//     attr.id = SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE;
-//     attr.value.u32 = 3;
-//     expected_trap_group_attr_list.push_back(attr);
+    sai_create_hostif_trap_fn =
+        [&](sai_object_id_t* hostif_trap_id,
+            sai_object_id_t switch_id,
+            uint32_t attr_count,
+            const sai_attribute_t* attr_list) -> sai_status_t {
+        bool defaultTrap = false;
+        for (auto i = 0; i < attr_count; ++i) {
+            if (attr_list[i].id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE) {
+                if (attr_list[i].value.s32 == SAI_HOSTIF_TRAP_TYPE_TTL_ERROR)
+                    defaultTrap = true;
+                break;
+            }
+        }
 
-//     //prepare expect trap data
-//     memset(&attr, 0, sizeof(attr));
-//     attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE;
-//     attr.value.s32 = 3;
-//     expected_trap_attr_list.push_back(attr);
+        if (!defaultTrap) {
+            // FIXME: should not hard code !!
+            *hostif_trap_id = 12345l;
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->trap_attr_list.emplace_back(attr_list[i]);
+            }
+        }
+        return SAI_STATUS_SUCCESS;
+    };
 
-//     memset(&attr, 0, sizeof(attr));
-//     attr.id = SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP;
-//     attr.value.s32 = 0;
-//     expected_trap_attr_list.push_back(attr);
+    sai_create_hostif_table_entry_fn =
+        [&](sai_object_id_t* hostif_trap_id,
+            sai_object_id_t switch_id,
+            uint32_t attr_count,
+            const sai_attribute_t* attr_list) -> sai_status_t {
+        return SAI_STATUS_SUCCESS;
+    };
 
-//     memset(&attr, 0, sizeof(attr));
-//     attr.id = SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION;
-//     attr.value.s32 = SAI_PACKET_ACTION_FORWARD;
-//     expected_trap_attr_list.push_back(attr);
+    sai_get_switch_attribute_fn =
+        [&](sai_object_id_t switch_id,
+            sai_uint32_t attr_count,
+            sai_attribute_t* attr_list) -> sai_status_t {
+        return SAI_STATUS_SUCCESS;
+    };
 
-//     //call CoPP function
-//     consumer->addToSync(setData);
-//     copp_orch_extend->processCoppRule(*consumer);
+    DBConnector* appl_db = new DBConnector(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 1);
+    CoppOrchExtend* copp_orch_extend = new CoppOrchExtend(appl_db, APP_COPP_TABLE_NAME);
+    ConsumerExtend* consumer = new ConsumerExtend(new ConsumerStateTable(appl_db, APP_COPP_TABLE_NAME, 1, 1), copp_orch_extend, APP_COPP_TABLE_NAME);
 
-//     KeyOpFieldsValuesTuple delAttr("copp1", "DEL", { { "trap_ids", "stp,lacp,eapol" } });
-//     setData.clear();
-//     setData.push_back(delAttr);
+    std::deque<KeyOpFieldsValuesTuple> setData = {};
 
-//     consumer->addToSync(setData);
-//     copp_orch_extend->processCoppRule(*consumer);
+    setData.clear();
+    consumer->clear();
+    KeyOpFieldsValuesTuple addRuleAttr("coppRule1", "SET", { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
+    setData.push_back(addRuleAttr);
 
-//     //verify
-//     EXPECT_EQ(3, set_hostif_attr_count);
-//     auto b_ret = verify_attrs(expected_trap_attr_list, set_hostif_attr_list, set_hostif_attr_count);
-//     ASSERT_EQ(b_ret, true);
+    auto groupValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", "1" } });
+    SaiAttributeList group_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, groupValue, false);
 
-//     //teardown
-//     sai_hostif_api->remove_hostif_trap_group = NULL;
-//     sai_hostif_api->create_hostif_trap_group = NULL;
-//     sai_hostif_api->create_hostif_trap = NULL;
-//     sai_hostif_api->create_hostif_table_entry = NULL;
-//     sai_switch_api->get_switch_attribute = NULL;
-//     delete sai_hostif_api;
-//     delete sai_switch_api;
-// }
+    auto trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "1" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
+    SaiAttributeList trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
+
+    //call CoPP function
+    consumer->addToSync(setData);
+    copp_orch_extend->processCoppRule(*consumer);
+
+    ASSERT_TRUE(AttrListEq(ret->group_attr_list, group_attr_list));
+    ASSERT_TRUE(AttrListEq(ret->trap_attr_list, trap_attr_list));
+
+    KeyOpFieldsValuesTuple delAttr("coppRule1", "DEL", { { "trap_ids", "stp" } });
+    setData.clear();
+    setData.push_back(delAttr);
+
+    trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "1" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x1" } });
+    SaiAttributeList delete_trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
+
+    //reset list data on create rule
+    ret->reset();
+
+    consumer->clear();
+    consumer->addToSync(setData);
+    copp_orch_extend->processCoppRule(*consumer);
+
+    //verify
+    ASSERT_TRUE(AttrListEq(ret->trap_attr_list, delete_trap_attr_list));
+
+    //teardown
+    sai_hostif_api->create_hostif_trap_group = NULL;
+    sai_hostif_api->remove_hostif_trap_group = NULL;
+    sai_hostif_api->create_hostif_trap = NULL;
+    sai_hostif_api->create_hostif_table_entry = NULL;
+    sai_switch_api->get_switch_attribute = NULL;
+    delete sai_hostif_api;
+    delete sai_switch_api;
+    delete appl_db;
+    delete copp_orch_extend;
+    delete consumer;
+}
