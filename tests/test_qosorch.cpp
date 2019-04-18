@@ -3,6 +3,7 @@
 #include "consumerstatetable.h"
 #include "hiredis.h"
 #include "orchdaemon.h"
+#include "sai_vs.h"
 #include "saiattributelist.h"
 #include "saihelper.h"
 
@@ -298,6 +299,31 @@ TEST_F(QosMapHandlerTest, DscpToTcMap2)
     ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
 
     ASSERT_TRUE(AttrListEq(res->attr_list, exp_dscp_to_tc));
+}
+
+TEST_F(QosMapHandlerTest, DscpToTcMap3)
+{
+    DscpToTcMapHandler dscpToTcMapHandler;
+
+    auto v = std::vector<swss::FieldValueTuple>({ { "1", "0" },
+        { "2", "0" },
+        { "3", "3" } });
+    // SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
+
+    // FIXME: add attr_list to dscp_to_tc_tuple
+    KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "setDscoToTc", v);
+    vector<sai_attribute_t> exp_dscp_to_tc;
+    dscpToTcMapHandler.convertFieldValuesToAttributes(dscp_to_tc_tuple, exp_dscp_to_tc);
+
+    // auto res = setDscp2Tc(dscpToTcMapHandler, exp_dscp_to_tc);
+    sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
+    bool ret_val = dscpToTcMapHandler.addQosItem(exp_dscp_to_tc);
+
+    // FIXME: should check SAI_QOS_MAP_TYPE_DSCP_TO_TC
+
+    // ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
+
+    // ASSERT_TRUE(AttrListEq(res->attr_list, exp_dscp_to_tc));
 }
 
 TEST_F(QosMapHandlerTest, TcToQueueMap)

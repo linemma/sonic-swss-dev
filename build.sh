@@ -156,7 +156,7 @@ build_sairedis() {
         cd "${BUILD_PATH}/sonic-sairedis"
 
         #                                                                                     for #include "meta/sai_meta.h"
-        "${SAIREDIS_PATH}/configure" --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-I${SAIREDIS_PATH} -I$(realpath ${BUILD_PATH}/install/include) \
+        "${SAIREDIS_PATH}/configure" --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-g -O0 -I${SAIREDIS_PATH} -I$(realpath ${BUILD_PATH}/install/include) \
         -Wno-error=long-long \
         -std=c++11 \
         -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
@@ -191,7 +191,7 @@ build_swss_orchagent() {
     echo "Build sonic-swss-orchagent ..."
 
     cd ${BUILD_PATH}
-    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
+    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="-I${SAIREDIS_PATH}/vslib/inc $CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
     make "-j$(nproc)"
 }
 
