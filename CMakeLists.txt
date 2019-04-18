@@ -208,4 +208,4 @@ target_link_libraries(coppTest ${GTEST_LIBRARIES})
 target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimetadata orchagent)
 
 target_link_libraries(qosTest ${GTEST_LIBRARIES})
-target_link_libraries(qosTest pthread hiredis swsscommon sairedis saimetadata orchagent)
+target_link_libraries(qosTest pthread hiredis swsscommon sairedis saimetadata orchagent saivs)
