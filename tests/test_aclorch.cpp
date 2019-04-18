@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 
+#include "converter.h"
 #include "hiredis.h"
 #include "orchdaemon.h"
 #include "saihelper.h"
@@ -78,6 +79,13 @@ struct CreateAclResult {
     bool ret_val;
 
     std::vector<sai_attribute_t> attr_list;
+};
+
+struct CreateRuleResult {
+    bool ret_val;
+
+    std::vector<sai_attribute_t> counter_attr_list;
+    std::vector<sai_attribute_t> rule_attr_list;
 };
 
 struct TestBase : public ::testing::Test {
@@ -257,14 +265,93 @@ struct TestBase : public ::testing::Test {
         return ret;
     }
 
-    std::shared_ptr<CreateAclResult> createL3AclTableAndRule(AclTable& acl, string& rule_id, std::vector<FieldValueTuple> filedValues)
+    bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
-        assert(sai_acl_api == nullptr);
+        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
+            return false;
+        }
 
-        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
-            delete p;
-            sai_acl_api = nullptr;
-        });
+        auto l = exp_attr_list.get_attr_list();
+        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
+            // sai_attribute_t* ptr = &l[i];
+            // sai_attribute_t& ref = l[i];
+            auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t& attr) {
+                if (attr.id != l[i].id) {
+                    return false;
+                }
+
+                // FIXME: find a way to conver attribute id to type
+                // type = idToType(attr.id) // metadata ..
+                // switch (type) {
+                //     case SAI_ATTR_VALUE_TYPE_BOOL:
+                //     ...
+                // }
+
+                return true;
+            });
+
+            if (found == act_attr_list.end()) {
+                std::cout << "Can not found " << l[i].id;
+                // TODO: Show act_attr_list
+                // TODO: Show exp_attr_list
+                return false;
+            }
+        }
+
+        return true;
+    }
+};
+
+TestBase* TestBase::that = nullptr;
+
+struct AclTest : public TestBase {
+
+    std::shared_ptr<swss::DBConnector> m_app_db;
+    std::shared_ptr<swss::DBConnector> m_config_db;
+    std::shared_ptr<swss::DBConnector> m_state_db;
+    sai_object_id_t acl_table_num;
+    sai_object_id_t acl_entry_num;
+    sai_object_id_t acl_counter_num;
+
+    AclTest()
+    {
+        m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+        m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+        m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+
+        acl_table_num = 0;
+        acl_entry_num = 0;
+        acl_counter_num = 0;
+    }
+
+    static void SetUpTestCase()
+    {
+        //system(REDIS_START_CMD);
+    }
+
+    static void TearDownTestCase()
+    {
+        //system(REDIS_STOP_CMD);
+    }
+
+    void allocateGlobalOrch()
+    {
+        assert(gAclOrch == nullptr);
+        assert(gFdbOrch == nullptr);
+        assert(gMirrorOrch == nullptr);
+        assert(gRouteOrch == nullptr);
+        assert(gNeighOrch == nullptr);
+        assert(gIntfsOrch == nullptr);
+        assert(gVrfOrch == nullptr);
+        assert(gCrmOrch == nullptr);
+        assert(gPortsOrch == nullptr);
+
+        assert(sai_switch_api == nullptr);
+        assert(sai_port_api == nullptr);
+        assert(sai_vlan_api == nullptr);
+        assert(sai_bridge_api == nullptr);
+        assert(sai_route_api == nullptr);
+
         auto sai_switch = std::shared_ptr<sai_switch_api_t>(new sai_switch_api_t(), [](sai_switch_api_t* p) {
             delete p;
             sai_switch_api = nullptr;
@@ -286,16 +373,12 @@ struct TestBase : public ::testing::Test {
             sai_route_api = nullptr;
         });
 
-        sai_acl_api = sai_acl.get();
         sai_switch_api = sai_switch.get();
         sai_port_api = sai_port.get();
         sai_vlan_api = sai_vlan.get();
         sai_bridge_api = sai_bridge.get();
         sai_route_api = sai_route.get();
 
-        sai_acl_api->create_acl_table = sai_create_acl_table_;
-        sai_acl_api->create_acl_counter = sai_create_acl_counter_;
-        sai_acl_api->create_acl_entry = sai_create_acl_entry_;
         sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
         sai_port_api->get_port_attribute = sai_get_port_attribute_;
         sai_vlan_api->get_vlan_attribute = sai_get_vlan_attribute_;
@@ -305,14 +388,6 @@ struct TestBase : public ::testing::Test {
         sai_bridge_api->remove_bridge_port = sai_remove_bridge_port_;
         sai_route_api->create_route_entry = sai_create_route_entry_;
         that = this;
-
-        sai_create_acl_counter_fn =
-            [](_Out_ sai_object_id_t* acl_counter_id,
-                _In_ sai_object_id_t switch_id,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
 
         sai_create_switch_fn =
             [](_Out_ sai_object_id_t* switch_id,
@@ -373,37 +448,8 @@ struct TestBase : public ::testing::Test {
             return SAI_STATUS_SUCCESS;
         };
 
-        /* FIXME: Add ace create result to ret
-         */
-        auto ret = std::make_shared<CreateAclResult>();
-
-        sai_create_acl_table_fn =
-            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
-                uint32_t attr_count,
-                const sai_attribute_t* attr_list) -> sai_status_t {
-            // FIXME:  not hard code for acl_table_id
-            *acl_table_id = 1;
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->attr_list.emplace_back(attr_list[i]);
-            }
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_create_acl_entry_fn =
-            [](_Out_ sai_object_id_t* acl_entry_id,
-                _In_ sai_object_id_t switch_id,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            // FIXME:  add atttibute to ret
-            return SAI_STATUS_SUCCESS;
-        };
-
-        DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-        DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-        DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-
-        TableConnector confDbAclTable(&config_db, CFG_ACL_TABLE_NAME);
-        TableConnector confDbAclRuleTable(&config_db, CFG_ACL_RULE_TABLE_NAME);
+        TableConnector confDbAclTable(m_config_db.get(), CFG_ACL_TABLE_NAME);
+        TableConnector confDbAclRuleTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME);
 
         const int portsorch_base_pri = 40;
 
@@ -414,46 +460,138 @@ struct TestBase : public ::testing::Test {
             { APP_LAG_TABLE_NAME, portsorch_base_pri + 4 },
             { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
         };
-        gPortsOrch = new PortsOrch(&appl_db, ports_tables);
+        gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
-        //gCrmOrch = new CrmOrch(&config_db, CFG_CRM_TABLE_NAME);
-        gVrfOrch = new VRFOrch(&appl_db, APP_VRF_TABLE_NAME);
-        gIntfsOrch = new IntfsOrch(&appl_db, APP_INTF_TABLE_NAME, gVrfOrch);
-        gNeighOrch = new NeighOrch(&appl_db, APP_NEIGH_TABLE_NAME, gIntfsOrch);
-        gRouteOrch = new RouteOrch(&appl_db, APP_ROUTE_TABLE_NAME, gNeighOrch);
+        gCrmOrch = new CrmOrch(m_config_db.get(), CFG_CRM_TABLE_NAME);
+        gVrfOrch = new VRFOrch(m_app_db.get(), APP_VRF_TABLE_NAME);
+        gIntfsOrch = new IntfsOrch(m_app_db.get(), APP_INTF_TABLE_NAME, gVrfOrch);
+        gNeighOrch = new NeighOrch(m_app_db.get(), APP_NEIGH_TABLE_NAME, gIntfsOrch);
+        gRouteOrch = new RouteOrch(m_app_db.get(), APP_ROUTE_TABLE_NAME, gNeighOrch);
 
-        TableConnector applDbFdb(&appl_db, APP_FDB_TABLE_NAME);
-        TableConnector stateDbFdb(&state_db, STATE_FDB_TABLE_NAME);
+        TableConnector applDbFdb(m_app_db.get(), APP_FDB_TABLE_NAME);
+        TableConnector stateDbFdb(m_state_db.get(), STATE_FDB_TABLE_NAME);
         gFdbOrch = new FdbOrch(applDbFdb, stateDbFdb, gPortsOrch);
 
-        TableConnector stateDbMirrorSession(&state_db, APP_MIRROR_SESSION_TABLE_NAME);
-        TableConnector confDbMirrorSession(&config_db, CFG_MIRROR_SESSION_TABLE_NAME);
+        TableConnector stateDbMirrorSession(m_state_db.get(), APP_MIRROR_SESSION_TABLE_NAME);
+        TableConnector confDbMirrorSession(m_config_db.get(), CFG_MIRROR_SESSION_TABLE_NAME);
         gMirrorOrch = new MirrorOrch(stateDbMirrorSession, confDbMirrorSession,
             gPortsOrch, gRouteOrch, gNeighOrch, gFdbOrch);
 
-        vector<TableConnector> acl_table_connectors = { confDbAclTable,
-            confDbAclRuleTable };
+        vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
 
         gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
             gNeighOrch, gRouteOrch);
+    }
 
-        /* Starting test
-         */
-        bool b_ret = false;
-        b_ret = gAclOrch->addAclTable(acl, acl.id);
-        if (true != b_ret) {
-            return nullptr;
-        }
+    void deleteGlobalOrch()
+    {
+        delete gAclOrch;
+        gAclOrch = nullptr;
+        delete gFdbOrch;
+        gFdbOrch = nullptr;
+        delete gMirrorOrch;
+        gMirrorOrch = nullptr;
+        delete gRouteOrch;
+        gRouteOrch = nullptr;
+        delete gNeighOrch;
+        gNeighOrch = nullptr;
+        delete gIntfsOrch;
+        gIntfsOrch = nullptr;
+        delete gVrfOrch;
+        gVrfOrch = nullptr;
+        delete gCrmOrch;
+        gCrmOrch = nullptr;
+        delete gPortsOrch;
+        gPortsOrch = nullptr;
+    }
 
-        /*
-        FieldValueTuple tmpFieldValues;
-        std::vector<FieldValueTuple> filedValues;
+    void SetUp() override
+    {
+        set_attr_count = 0;
+        memset(set_attr_list, 0, sizeof(set_attr_list));
 
-        tmpFieldValues = std::make_pair(string(ACTION_PACKET_ACTION), string(PACKET_ACTION_FORWARD));
-        filedValues.push_back(tmpFieldValues);
-        tmpFieldValues = std::make_pair(string(MATCH_SRC_IP), string("10.0.0.1"));
-        filedValues.push_back(tmpFieldValues);
-        */
+        allocateGlobalOrch();
+        //assert(gCrmOrch == nullptr);
+        //gCrmOrch = new CrmOrch(m_app_db.get(), CFG_CRM_TABLE_NAME);
+    }
+
+    void TearDown() override
+    {
+        deleteGlobalOrch();
+        //delete gCrmOrch;
+        //gCrmOrch = nullptr;
+    }
+
+    std::shared_ptr<CreateAclResult> createAclTable(AclTable& acl)
+    {
+        auto ret = std::make_shared<CreateAclResult>();
+
+        assert(sai_acl_api == nullptr);
+
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+
+        sai_acl_api = sai_acl.get();
+        sai_acl_api->create_acl_table = sai_create_acl_table_;
+
+        sai_create_acl_table_fn =
+            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            *acl_table_id = (++acl_table_num);
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_SUCCESS;
+        };
+
+        ret->ret_val = gAclOrch->addAclTable(acl, acl.id);
+
+        return ret;
+    }
+
+    std::shared_ptr<CreateRuleResult> createRuleToAcl(
+        AclTable& acl, string& rule_id, std::vector<FieldValueTuple> filedValues)
+    {
+        auto ret = std::make_shared<CreateRuleResult>();
+
+        assert(sai_acl_api == nullptr);
+
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+
+        sai_acl_api = sai_acl.get();
+
+        sai_acl_api->create_acl_counter = sai_create_acl_counter_;
+        sai_acl_api->create_acl_entry = sai_create_acl_entry_;
+
+        sai_create_acl_counter_fn =
+            [&](_Out_ sai_object_id_t* acl_counter_id,
+                _In_ sai_object_id_t switch_id,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            *acl_counter_id = (++acl_counter_num);
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->counter_attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_create_acl_entry_fn =
+            [&](_Out_ sai_object_id_t* acl_entry_id,
+                _In_ sai_object_id_t switch_id,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            *acl_entry_id = (++acl_entry_num);
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->rule_attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_SUCCESS;
+        };
 
         KeyOpFieldsValuesTuple data; // key, op, fieldValue
         string rule_key = acl.id + ":" + rule_id;
@@ -463,96 +601,30 @@ struct TestBase : public ::testing::Test {
         shared_ptr<AclRule> newRule = AclRule::makeShared(acl.type, gAclOrch, gMirrorOrch,
             nullptr /*m_dTelOrch*/, rule_id, acl.id, data);
 
-        b_ret = gAclOrch->addAclRule(newRule, acl.id);
-        if (true != b_ret) {
-            return nullptr;
-        }
+        for (const auto& itr : filedValues) {
+            string attr_name = swss::to_upper(fvField(itr));
+            string attr_value = fvValue(itr);
 
-        delete gAclOrch;
-        delete gFdbOrch;
-        delete gMirrorOrch;
-        delete gRouteOrch;
-        delete gNeighOrch;
-        delete gIntfsOrch;
-        delete gVrfOrch;
-        //delete gCrmOrch;
-        delete gPortsOrch;
-
-        ret->ret_val = true;
-        return ret;
-    }
-
-    bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
-    {
-        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
-            return false;
-        }
-
-        auto l = exp_attr_list.get_attr_list();
-        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
-            // sai_attribute_t* ptr = &l[i];
-            // sai_attribute_t& ref = l[i];
-            auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t& attr) {
-                if (attr.id != l[i].id) {
-                    return false;
-                }
-
-                // FIXME: find a way to conver attribute id to type
-                // type = idToType(attr.id) // metadata ..
-                // switch (type) {
-                //     case SAI_ATTR_VALUE_TYPE_BOOL:
-                //     ...
-                // }
-
-                return true;
-            });
-
-            if (found == act_attr_list.end()) {
-                std::cout << "Can not found " << l[i].id;
-                // TODO: Show act_attr_list
-                // TODO: Show exp_attr_list
-                return false;
+            if (newRule->validateAddPriority(attr_name, attr_value)) {
+                //SWSS_LOG_INFO("Added priority attribute");
+            } else if (newRule->validateAddMatch(attr_name, attr_value)) {
+                //SWSS_LOG_INFO("Added match attribute '%s'", attr_name.c_str());
+            } else if (newRule->validateAddAction(attr_name, attr_value)) {
+                //SWSS_LOG_INFO("Added action attribute '%s'", attr_name.c_str());
+            } else {
+                ret->ret_val = false;
+                return ret;
             }
         }
 
-        return true;
-    }
-};
+        if (!newRule->validate()) {
+            ret->ret_val = false;
+            return ret;
+        }
 
-TestBase* TestBase::that = nullptr;
+        ret->ret_val = gAclOrch->addAclRule(newRule, acl.id);
 
-struct AclTest : public TestBase {
-
-    std::shared_ptr<swss::DBConnector> m_db;
-
-    AclTest()
-    {
-        m_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-    }
-
-    static void SetUpTestCase()
-    {
-        //system(REDIS_START_CMD);
-    }
-
-    static void TearDownTestCase()
-    {
-        //system(REDIS_STOP_CMD);
-    }
-
-    void SetUp() override
-    {
-        set_attr_count = 0;
-        memset(set_attr_list, 0, sizeof(set_attr_list));
-
-        assert(gCrmOrch == nullptr);
-        gCrmOrch = new CrmOrch(m_db.get(), CFG_CRM_TABLE_NAME);
-    }
-
-    void TearDown() override
-    {
-        delete gCrmOrch;
-        gCrmOrch = nullptr;
+        return ret;
     }
 };
 
@@ -823,23 +895,14 @@ TEST_F(AclTest, create_default_acl_table_4)
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
 }
 
-TEST_F(AclTest, create_l3_acl_table_and_rule)
+TEST_F(AclTest, create_l3_rule_filter_sip)
 {
     //createL3AclTableAndRule
     AclTable aclTable;
     aclTable.type = ACL_TABLE_L3;
-    string rule_id("acl_rule_l3");
 
-    FieldValueTuple tmpFieldValues;
-    std::vector<FieldValueTuple> filedValues;
-
-    tmpFieldValues = std::make_pair(string(ACTION_PACKET_ACTION), string(PACKET_ACTION_FORWARD));
-    filedValues.push_back(tmpFieldValues);
-    tmpFieldValues = std::make_pair(string(MATCH_SRC_IP), string("10.0.0.1"));
-    filedValues.push_back(tmpFieldValues);
-
-    auto res = createL3AclTableAndRule(aclTable, rule_id, filedValues);
-    ASSERT_TRUE(res->ret_val == true);
+    auto talbe_ret = createAclTable(aclTable);
+    ASSERT_TRUE(talbe_ret->ret_val == true);
 
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
@@ -854,9 +917,35 @@ TEST_F(AclTest, create_l3_acl_table_and_rule)
         { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
-    /* FIXME: verify rule attribute
-     */
+    ASSERT_TRUE(AttrListEq(talbe_ret->attr_list, attr_list));
+
+    string rule_id("acl_rule_l3");
+    FieldValueTuple tmpFieldValues;
+    std::vector<FieldValueTuple> filedValues;
+
+    tmpFieldValues = std::make_pair(string(ACTION_PACKET_ACTION), string(PACKET_ACTION_FORWARD));
+    filedValues.push_back(tmpFieldValues);
+    tmpFieldValues = std::make_pair(string(MATCH_SRC_IP), string("10.0.0.1"));
+    filedValues.push_back(tmpFieldValues);
+
+    auto rule_ret = createRuleToAcl(aclTable, rule_id, filedValues);
+    ASSERT_TRUE(rule_ret->ret_val == true);
+
+    auto counter = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_COUNTER_ATTR_TABLE_ID", "oid:0x1" },
+            { "SAI_ACL_COUNTER_ATTR_ENABLE_BYTE_COUNT", "true" },
+            { "SAI_ACL_COUNTER_ATTR_ENABLE_PACKET_COUNT", "true" } });
+    SaiAttributeList counter_attr_list(SAI_OBJECT_TYPE_ACL_COUNTER, counter, false);
+    auto rule = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_ENTRY_ATTR_TABLE_ID", "oid:0x1" },
+            { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+            { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+            { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", "disabled" },
+            { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
+            { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
+    SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
+    ASSERT_TRUE(AttrListEq(rule_ret->counter_attr_list, counter_attr_list));
+    ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
 }
 
 TEST_F(AclTestRedis, create_default_acl_table_on_redis)
