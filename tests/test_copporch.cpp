@@ -306,7 +306,6 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
             const sai_attribute_t* attr_list) -> sai_status_t {
         bool defaultTrap = false;
         for (auto i = 0; i < attr_count; ++i) {
-            ret->trap_attr_list.emplace_back(attr_list[i]);
             if (attr_list[i].id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE) {
                 if (attr_list[i].value.s32 == SAI_HOSTIF_TRAP_TYPE_TTL_ERROR)
                     defaultTrap = true;
@@ -316,6 +315,9 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
         if (!defaultTrap) {
             // FIXME: should not hard code !!
             *hostif_trap_id = 12345l;
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->trap_attr_list.emplace_back(attr_list[i]);
+            }
         }
         return SAI_STATUS_SUCCESS;
     };
@@ -343,26 +345,22 @@ TEST_F(CoppTest, create_copp_rule_without_policer)
 
     setData.clear();
     consumer->clear();
-    KeyOpFieldsValuesTuple rule1Attr("coppRule1", "SET", { { "trap_ids", "stp,lacp,eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
+    KeyOpFieldsValuesTuple rule1Attr("coppRule1", "SET", { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
     setData.push_back(rule1Attr);
 
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "1" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "3" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
-    SaiAttributeList attr_list(SAI_OBJECT_TYPE_HOSTIF, v, false);
+    auto groupValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", "1" } });
+    SaiAttributeList group_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, groupValue, false);
+
+    auto trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "1" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
+    SaiAttributeList trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
 
     //call CoPP function
     consumer->addToSync(setData);
     copp_orch_extend->processCoppRule(*consumer);
 
-    // FIXME: Using the way for validating result => ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
     //verify
-    // EXPECT_EQ(1, set_hostif_group_attr_count);
-    // auto b_ret = verify_group_attrs(expected_trap_group_attr_list, set_hostif_group_attr_list, set_hostif_group_attr_count);
-    // ASSERT_EQ(b_ret, true);
-
-    // EXPECT_EQ(4, set_hostif_attr_count);
-    // b_ret = verify_attrs(expected_trap_attr_list, set_hostif_attr_list, set_hostif_attr_count);
-    // ASSERT_EQ(b_ret, true);
-    ASSERT_TRUE(AttrListEq(ret->trap_attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(ret->group_attr_list, group_attr_list));
+    ASSERT_TRUE(AttrListEq(ret->trap_attr_list, trap_attr_list));
 
     //teardown
     sai_hostif_api->create_hostif_trap_group = NULL;
