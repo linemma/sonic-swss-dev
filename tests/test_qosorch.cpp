@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 
+#include "consumerstatetable.h"
 #include "hiredis.h"
 #include "orchdaemon.h"
 #include "saiattributelist.h"
@@ -28,6 +29,70 @@ ofstream gRecordOfs;
 string gRecordFile;
 
 extern sai_qos_map_api_t* sai_qos_map_api;
+
+struct QosOrchMock : public QosOrch {
+    QosOrchMock(swss::DBConnector* db, vector<string>& tableNames)
+        : QosOrch(db, tableNames)
+    {
+    }
+
+    task_process_status handleDscpToTcTable2(Consumer& consumer)
+    {
+        SWSS_LOG_ENTER();
+        DscpToTcMapHandler dscp_tc_handler;
+        return dscp_tc_handler.processWorkItem(consumer);
+    }
+};
+
+size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>& entries)
+{
+    // SWSS_LOG_ENTER();
+
+    /* Nothing popped */
+    if (entries.empty()) {
+        return 0;
+    }
+
+    for (auto& entry : entries) {
+        string key = kfvKey(entry);
+        string op = kfvOp(entry);
+
+        // /* Record incoming tasks */
+        // if (gSwssRecord)
+        // {
+        //     Orch::recordTuple(*this, entry);
+        // }
+
+        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+            consumer->m_toSync[key] = entry;
+        }
+        /* If an old task is still there, we combine the old task with new task */
+        else {
+            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+            auto new_values = kfvFieldsValues(entry);
+            auto existing_values = kfvFieldsValues(existing_data);
+
+            for (auto it : new_values) {
+                string field = fvField(it);
+                string value = fvValue(it);
+
+                auto iu = existing_values.begin();
+                while (iu != existing_values.end()) {
+                    string ofield = fvField(*iu);
+                    if (field == ofield)
+                        iu = existing_values.erase(iu);
+                    else
+                        iu++;
+                }
+                existing_values.push_back(FieldValueTuple(field, value));
+            }
+            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+        }
+    }
+    return entries.size();
+}
 
 struct SetQosResult {
     bool ret_val;
@@ -162,6 +227,59 @@ TEST_F(QosMapHandlerTest, DscpToTcMap)
         { "2", "0" },
         { "3", "3" } });
     // SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
+
+    // FIXME: add attr_list to dscp_to_tc_tuple
+    KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "setDscoToTc", v);
+    vector<sai_attribute_t> exp_dscp_to_tc;
+    dscpToTcMapHandler.convertFieldValuesToAttributes(dscp_to_tc_tuple, exp_dscp_to_tc);
+
+    auto res = setDscp2Tc(dscpToTcMapHandler, exp_dscp_to_tc);
+
+    // FIXME: should check SAI_QOS_MAP_TYPE_DSCP_TO_TC
+
+    ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
+
+    ASSERT_TRUE(AttrListEq(res->attr_list, exp_dscp_to_tc));
+}
+
+TEST_F(QosMapHandlerTest, DscpToTcMap2)
+{
+    auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+
+    vector<string> qos_tables = {
+        CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
+        CFG_SCHEDULER_TABLE_NAME,
+        CFG_DSCP_TO_TC_MAP_TABLE_NAME,
+        CFG_QUEUE_TABLE_NAME,
+        CFG_PORT_QOS_MAP_TABLE_NAME,
+        CFG_WRED_PROFILE_TABLE_NAME,
+        CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+        CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+        CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
+    };
+    auto qosorch = QosOrchMock(&configDb, qos_tables);
+
+    //
+    // input
+    //
+    auto v = std::vector<swss::FieldValueTuple>({ { "1", "0" },
+        { "2", "0" },
+        { "3", "3" } });
+    // SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
+    // //
+
+    // qosorch.addConsumer(&configDb, std::string(APP_PORT_QOS_MAP_TABLE_NAME), 1);
+    auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&configDb, std::string(APP_COPP_TABLE_NAME), 1, 1), &qosorch, std::string(APP_COPP_TABLE_NAME)));
+
+    KeyOpFieldsValuesTuple rule1Attr("coppRule1", "SET", { { "trap_ids", "stp,lacp,eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
+    std::deque<KeyOpFieldsValuesTuple> setData = { rule1Attr };
+
+    // consumer->addToSync(setData);
+    consumerAddToSync(consumer.get(), setData);
+
+    qosorch.handleDscpToTcTable2(*(consumer.get()));
+
+    DscpToTcMapHandler dscpToTcMapHandler;
 
     // FIXME: add attr_list to dscp_to_tc_tuple
     KeyOpFieldsValuesTuple dscp_to_tc_tuple("dscpToTc", "setDscoToTc", v);
