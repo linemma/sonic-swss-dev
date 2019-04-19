@@ -3,6 +3,7 @@
 #include "hiredis.h"
 #include "orchdaemon.h"
 #include "saihelper.h"
+#include "sai_vs.h"
 
 #include "consumertablebase.h"
 #include "saiattributelist.h"
