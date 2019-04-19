@@ -88,6 +88,24 @@ struct CreateRuleResult {
     std::vector<sai_attribute_t> rule_attr_list;
 };
 
+class ConsumerExtend : public Consumer {
+public:
+    ConsumerExtend(ConsumerTableBase* select, Orch* orch, const string& name)
+        : Consumer(select, orch, name)
+    {
+    }
+
+    size_t addToSync(std::deque<KeyOpFieldsValuesTuple>& entries)
+    {
+        Consumer::addToSync(entries);
+    }
+
+    void clear()
+    {
+        Consumer::m_toSync.clear();
+    }
+};
+
 struct TestBase : public ::testing::Test {
     static sai_status_t sai_create_acl_table_(sai_object_id_t* acl_table_id,
         sai_object_id_t switch_id,
@@ -879,22 +897,29 @@ TEST_F(AclTest, create_default_acl_table_4)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
-        { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    auto v = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
 
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
 }
-
+/* 1. create / delete ACL table
+ * 2. Create / remove ACL rule to table
+ * 3. Verify pattern
+ *    _sai_packet_action_t: {DROP | FORWARD | COPY | COPY_CANCEL | TRAP | LOG | DENY | TRANSIT}
+ *     SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6 sai_ip6_t
+ *     ...
+ */
 TEST_F(AclTest, create_l3_rule_filter_sip)
 {
     //createL3AclTableAndRule
@@ -904,29 +929,27 @@ TEST_F(AclTest, create_l3_rule_filter_sip)
     auto talbe_ret = createAclTable(aclTable);
     ASSERT_TRUE(talbe_ret->ret_val == true);
 
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
-        { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
-        { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    auto v = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
 
     ASSERT_TRUE(AttrListEq(talbe_ret->attr_list, attr_list));
 
     string rule_id("acl_rule_l3");
-    FieldValueTuple tmpFieldValues;
-    std::vector<FieldValueTuple> filedValues;
 
-    tmpFieldValues = std::make_pair(string(ACTION_PACKET_ACTION), string(PACKET_ACTION_FORWARD));
-    filedValues.push_back(tmpFieldValues);
-    tmpFieldValues = std::make_pair(string(MATCH_SRC_IP), string("10.0.0.1"));
-    filedValues.push_back(tmpFieldValues);
+    auto filedValues = std::vector<swss::FieldValueTuple>(
+        { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
+            { MATCH_SRC_IP, "10.0.0.1" } });
 
     auto rule_ret = createRuleToAcl(aclTable, rule_id, filedValues);
     ASSERT_TRUE(rule_ret->ret_val == true);
@@ -946,6 +969,24 @@ TEST_F(AclTest, create_l3_rule_filter_sip)
     SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
     ASSERT_TRUE(AttrListEq(rule_ret->counter_attr_list, counter_attr_list));
     ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
+}
+
+TEST_F(AclTest, doAclTableTask_create)
+{
+    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+    auto consumer = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+
+    auto setData = std::deque<KeyOpFieldsValuesTuple>(
+        { { "FORWARD_SIP",
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3 },
+                { TABLE_STAGE, TABLE_INGRESS } } } });
+    consumer->addToSync(setData);
+
+    /* FIXME: how to call private function doTask ?
+     *  doTask & doAclTableTask & doAclRuleTask are all private function and lots of logical
+     */
 }
 
 TEST_F(AclTestRedis, create_default_acl_table_on_redis)
