@@ -2,8 +2,8 @@
 
 #include "hiredis.h"
 #include "orchdaemon.h"
-#include "saihelper.h"
 #include "sai_vs.h"
+#include "saihelper.h"
 
 #include "consumertablebase.h"
 #include "saiattributelist.h"
@@ -33,6 +33,10 @@ string gRecordFile;
 extern sai_hostif_api_t* sai_hostif_api;
 extern sai_policer_api_t* sai_policer_api;
 extern sai_switch_api_t* sai_switch_api;
+
+sai_hostif_api_t* vs_sai_hostif_api;
+sai_policer_api_t* vs_sai_policer_api;
+sai_switch_api_t* vs_sai_switch_api;
 
 class CoppOrchMock : public CoppOrch {
 public:
@@ -245,8 +249,11 @@ struct CoppTest : public TestBase {
     void SetUp() override
     {
         sai_hostif_api = new sai_hostif_api_t();
-        sai_policer_api = new sai_policer_api_t();
         sai_switch_api = new sai_switch_api_t();
+        sai_policer_api = new sai_policer_api_t();
+        vs_sai_hostif_api = const_cast<sai_hostif_api_t*>(&vs_hostif_api);
+        vs_sai_policer_api = const_cast<sai_policer_api_t*>(&vs_policer_api);
+        vs_sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
     }
 
     void TearDown() override
@@ -254,6 +261,9 @@ struct CoppTest : public TestBase {
         delete sai_hostif_api;
         delete sai_switch_api;
         delete sai_policer_api;
+        delete vs_sai_hostif_api;
+        delete vs_sai_policer_api;
+        delete vs_sai_switch_api;
     }
 };
 
@@ -275,7 +285,10 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
         for (auto i = 0; i < attr_count; ++i) {
             ret->group_attr_list.emplace_back(attr_list[i]);
         }
-        return SAI_STATUS_SUCCESS;
+        return vs_sai_hostif_api->create_hostif_trap_group(hostif_trap_group_id,
+            switch_id,
+            attr_count,
+            attr_list);
     };
 
     sai_create_hostif_trap_fn =
