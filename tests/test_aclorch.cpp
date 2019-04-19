@@ -81,6 +81,13 @@ struct CreateAclResult {
     std::vector<sai_attribute_t> attr_list;
 };
 
+struct AclTableResult {
+    bool ret_val;
+
+    sai_object_id_t acl_table_id;
+    std::vector<sai_attribute_t> attr_list;
+};
+
 struct CreateRuleResult {
     bool ret_val;
 
@@ -114,6 +121,11 @@ struct TestBase : public ::testing::Test {
     {
         return that->sai_create_acl_table_fn(acl_table_id, switch_id, attr_count,
             attr_list);
+    }
+
+    static sai_status_t sai_remove_acl_table_(_In_ sai_object_id_t acl_table_id)
+    {
+        return that->sai_remove_acl_table_fn(acl_table_id);
     }
 
     static sai_status_t sai_create_acl_counter_(_Out_ sai_object_id_t* acl_counter_id,
@@ -196,6 +208,9 @@ struct TestBase : public ::testing::Test {
     std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t,
         const sai_attribute_t*)>
         sai_create_acl_table_fn;
+
+    std::function<sai_status_t(sai_object_id_t)>
+        sai_remove_acl_table_fn;
 
     std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)>
         sai_create_acl_counter_fn;
@@ -327,9 +342,9 @@ struct AclTest : public TestBase {
     std::shared_ptr<swss::DBConnector> m_app_db;
     std::shared_ptr<swss::DBConnector> m_config_db;
     std::shared_ptr<swss::DBConnector> m_state_db;
-    sai_object_id_t acl_table_num;
-    sai_object_id_t acl_entry_num;
-    sai_object_id_t acl_counter_num;
+    sai_object_id_t m_acl_table_num;
+    sai_object_id_t m_acl_entry_num;
+    sai_object_id_t m_acl_counter_num;
 
     AclTest()
     {
@@ -337,9 +352,9 @@ struct AclTest : public TestBase {
         m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
         m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
 
-        acl_table_num = 0;
-        acl_entry_num = 0;
-        acl_counter_num = 0;
+        m_acl_table_num = 0;
+        m_acl_entry_num = 0;
+        m_acl_counter_num = 0;
     }
 
     static void SetUpTestCase()
@@ -499,6 +514,19 @@ struct AclTest : public TestBase {
 
         gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
             gNeighOrch, gRouteOrch);
+
+        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
+        auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+
+        auto setData = std::deque<KeyOpFieldsValuesTuple>(
+            { { "PortInitDone",
+                EMPTY_PREFIX,
+                { { "", "" } } } });
+        consumerExt->addToSync(setData);
+
+        Orch* orch = gPortsOrch;
+        Consumer* consumer = consumerExt.get();
+        orch->doTask(*consumer);
     }
 
     void deleteGlobalOrch()
@@ -558,7 +586,7 @@ struct AclTest : public TestBase {
             [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
                 uint32_t attr_count,
                 const sai_attribute_t* attr_list) -> sai_status_t {
-            *acl_table_id = (++acl_table_num);
+            *acl_table_id = (++m_acl_table_num);
             for (auto i = 0; i < attr_count; ++i) {
                 ret->attr_list.emplace_back(attr_list[i]);
             }
@@ -592,7 +620,7 @@ struct AclTest : public TestBase {
                 _In_ sai_object_id_t switch_id,
                 _In_ uint32_t attr_count,
                 _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            *acl_counter_id = (++acl_counter_num);
+            *acl_counter_id = (++m_acl_counter_num);
             for (auto i = 0; i < attr_count; ++i) {
                 ret->counter_attr_list.emplace_back(attr_list[i]);
             }
@@ -604,7 +632,7 @@ struct AclTest : public TestBase {
                 _In_ sai_object_id_t switch_id,
                 _In_ uint32_t attr_count,
                 _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            *acl_entry_id = (++acl_entry_num);
+            *acl_entry_id = (++m_acl_entry_num);
             for (auto i = 0; i < attr_count; ++i) {
                 ret->rule_attr_list.emplace_back(attr_list[i]);
             }
@@ -641,6 +669,69 @@ struct AclTest : public TestBase {
         }
 
         ret->ret_val = gAclOrch->addAclRule(newRule, acl.id);
+
+        return ret;
+    }
+
+    std::shared_ptr<AclTableResult> createAclTable(Consumer& consumer)
+    {
+        auto ret = std::make_shared<AclTableResult>();
+
+        assert(sai_acl_api == nullptr);
+
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+
+        sai_acl_api = sai_acl.get();
+        sai_acl_api->create_acl_table = sai_create_acl_table_;
+
+        sai_create_acl_table_fn =
+            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            *acl_table_id = (++m_acl_table_num);
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            ret->acl_table_id = *acl_table_id;
+            ret->ret_val = true;
+            return SAI_STATUS_SUCCESS;
+        };
+
+        Orch* orch = gAclOrch;
+        orch->doTask(consumer);
+
+        return ret;
+    }
+
+    std::shared_ptr<AclTableResult> deleteAclTable(Consumer& consumer)
+    {
+        auto ret = std::make_shared<AclTableResult>();
+
+        assert(sai_acl_api == nullptr);
+
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+
+        sai_acl_api = sai_acl.get();
+        sai_acl_api->remove_acl_table = sai_remove_acl_table_;
+
+        sai_remove_acl_table_fn =
+            [&](sai_object_id_t acl_table_id) -> sai_status_t {
+            if (acl_table_id != m_acl_table_num)
+                return SAI_STATUS_FAILURE;
+
+            ret->acl_table_id = acl_table_id;
+            ret->ret_val = true;
+            return SAI_STATUS_SUCCESS;
+        };
+
+        Orch* orch = gAclOrch;
+        orch->doTask(consumer);
 
         return ret;
     }
@@ -971,22 +1062,97 @@ TEST_F(AclTest, create_l3_rule_filter_sip)
     ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
 }
 
-TEST_F(AclTest, doAclTableTask_create)
+TEST_F(AclTest, doTask_createL3AclTable)
 {
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumer = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
-
+    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { "FORWARD_SIP",
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
                 { TABLE_TYPE, TABLE_TYPE_L3 },
-                { TABLE_STAGE, TABLE_INGRESS } } } });
-    consumer->addToSync(setData);
+                { TABLE_STAGE, TABLE_INGRESS },
+                { TABLE_PORTS, "1,2" } } } });
+    consumerExt->addToSync(setData);
+    Consumer* consumer = consumerExt.get();
 
-    /* FIXME: how to call private function doTask ?
-     *  doTask & doAclTableTask & doAclRuleTask are all private function and lots of logical
-     */
+    auto ret = createAclTable(*consumer);
+    ASSERT_TRUE(ret->ret_val == true);
+
+    auto v = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
+
+    ASSERT_TRUE(AttrListEq(ret->attr_list, attr_list));
+}
+
+TEST_F(AclTest, doTask_createL3AclRule)
+{
+    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto setData = std::deque<KeyOpFieldsValuesTuple>(
+        { { "FORWARD_SIP",
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3 },
+                { TABLE_STAGE, TABLE_INGRESS },
+                { TABLE_PORTS, "1,2" } } } });
+    consumerExt->addToSync(setData);
+    Consumer* consumer = consumerExt.get();
+
+    auto ret = createAclTable(*consumer);
+    ASSERT_TRUE(ret->ret_val == true);
+
+    auto v = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
+
+    ASSERT_TRUE(AttrListEq(ret->attr_list, attr_list));
+}
+
+TEST_F(AclTest, doTask_deleteL3AclRule)
+{
+    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto setData = std::deque<KeyOpFieldsValuesTuple>(
+        { { "FORWARD_SIP",
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3 },
+                { TABLE_STAGE, TABLE_INGRESS },
+                { TABLE_PORTS, "1,2" } } } });
+    consumerExt->addToSync(setData);
+    Consumer* consumer = consumerExt.get();
+
+    auto ret = createAclTable(*consumer);
+    ASSERT_TRUE(ret->ret_val == true);
+
+    auto setData2 = std::deque<KeyOpFieldsValuesTuple>(
+        { { "FORWARD_SIP", DEL_COMMAND, {} } });
+    consumerExt->addToSync(setData2);
+
+    auto ret2 = deleteAclTable(*consumer);
+    ASSERT_TRUE(ret2->ret_val == true);
 }
 
 TEST_F(AclTestRedis, create_default_acl_table_on_redis)
