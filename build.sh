@@ -129,7 +129,8 @@ build_swsscommon() {
         exit 1
     fi
 
-    # TODO: No need to do this
+    # TODO: No need to do this ?
+    # TODO: Add variables to collect includedirs and libs for swss(commom/sairedis/orchagent ...) and passing to configure or just add into .env
     make install
 
     # TODO: Remove ?
@@ -156,7 +157,7 @@ build_sairedis() {
         cd "${BUILD_PATH}/sonic-sairedis"
 
         #                                                                                     for #include "meta/sai_meta.h" 
-        "${SAIREDIS_PATH}/configure" --prefix=${BUILD_PATH}/install --with-sai=vs CXXFLAGS="-I${SAIREDIS_PATH} -I${BUILD_PATH}/install/include \
+        "${SAIREDIS_PATH}/configure" --prefix=${BUILD_PATH}/install --with-sai=vs CXXFLAGS="-g -O0 -I${SAIREDIS_PATH} -I${BUILD_PATH}/install/include \
         -Wno-error=long-long \
         -std=c++11 \
         -L${BUILD_PATH}/install/lib $CXXFLAGS"
@@ -184,6 +185,7 @@ build_sairedis() {
     fi
 
     # TODO: No need to do this
+    # TODO: Add variables to collect includedirs and libs for swss(commom/sairedis/orchagent ...) and passing to configure or just add into .env
     make install
 }
 
@@ -200,7 +202,7 @@ build_swss_orchagent() {
 
         cd "${BUILD_PATH}/sonic-swss"
 
-        "${SWSS_PATH}/configure" --prefix=${BUILD_PATH}/install --with-sai=vs CXXFLAGS="-I${SWSS_PATH} \
+        "${SWSS_PATH}/configure" --prefix=${BUILD_PATH}/install --with-sai=vs CXXFLAGS="-g -O0 -I${SWSS_PATH} \
         -I${BUILD_PATH}/install/include/swss \
         -I${BUILD_PATH}/install/include/ \
         -I${SRC_PATH}/sonic-sairedis/SAI/inc \
@@ -223,10 +225,10 @@ build_swss_orchagent() {
         exit 1
     fi
 
-
+    ##################################
 
     cd ${BUILD_PATH}
-    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
+    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="-I${SAIREDIS_PATH}/vslib/inc $CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
     make "-j$(nproc)"
 }
 
