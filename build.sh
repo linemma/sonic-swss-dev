@@ -113,7 +113,7 @@ build_swsscommon() {
         # mkdir -p "${BUILD_PATH}/sonic-swss-common"
         cd "${BUILD_PATH}/sonic-swss-common"
 
-        "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
+        "${SRC_PATH}/sonic-swss-common/configure" --prefix=${BUILD_PATH}/install
     fi
 
     # cd "${SRC_PATH}/sonic-swss-common"
@@ -155,11 +155,11 @@ build_sairedis() {
         mkdir -p "${BUILD_PATH}/sonic-sairedis"
         cd "${BUILD_PATH}/sonic-sairedis"
 
-        #                                                                                     for #include "meta/sai_meta.h"
-        "${SAIREDIS_PATH}/configure" --prefix=$(realpath ${BUILD_PATH}/install) --with-sai=vs CXXFLAGS="-g -O0 -I${SAIREDIS_PATH} -I$(realpath ${BUILD_PATH}/install/include) \
+        #                                                                                     for #include "meta/sai_meta.h" 
+        "${SAIREDIS_PATH}/configure" --prefix=${BUILD_PATH}/install --with-sai=vs CXXFLAGS="-I${SAIREDIS_PATH} -I${BUILD_PATH}/install/include \
         -Wno-error=long-long \
         -std=c++11 \
-        -L$(realpath ${BUILD_PATH}/install/lib) $CXXFLAGS"
+        -L${BUILD_PATH}/install/lib $CXXFLAGS"
     fi
 
     echo "Generating saimetadata.c and saimetadata.h ..."
@@ -190,8 +190,43 @@ build_sairedis() {
 build_swss_orchagent() {
     echo "Build sonic-swss-orchagent ..."
 
+    SWSS_PATH="${SRC_PATH}/sonic-swss"
+    mkdir -p "${BUILD_PATH}/sonic-swss"
+    cd "${BUILD_PATH}/sonic-swss"
+
+    if [ ! -e "${BUILD_PATH}/sonic-swss/Makefile" ]; then
+        cd "${SRC_PATH}/sonic-swss"
+        ./autogen.sh
+
+        cd "${BUILD_PATH}/sonic-swss"
+
+        "${SWSS_PATH}/configure" --prefix=${BUILD_PATH}/install --with-sai=vs CXXFLAGS="-I${SWSS_PATH} \
+        -I${BUILD_PATH}/install/include/swss \
+        -I${BUILD_PATH}/install/include/ \
+        -I${SRC_PATH}/sonic-sairedis/SAI/inc \
+        -I${SRC_PATH}/sonic-sairedis/lib/inc \
+        -I${SRC_PATH}/sonic-sairedis/meta \
+        -I${SRC_PATH}/sonic-sairedis/SAI/meta \
+        -I${SRC_PATH}/sonic-sairedis/SAI/experimental \
+        -I${SRC_PATH}/sonic-swss/orchagent \
+        -Wno-error=long-long -std=c++11 \
+        -L${BUILD_PATH}/install/lib $CXXFLAGS"
+    fi
+
+    echo "Build swss ..."
+    
+    cd ${BUILD_PATH}/sonic-swss
+    make "-j$(nproc)" && make -C ./tests
+
+    if [ "$?" -ne "0" ]; then
+        echo "Failed to build swss"
+        exit 1
+    fi
+
+
+
     cd ${BUILD_PATH}
-    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="-I${SAIREDIS_PATH}/vslib/inc $CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
+    cmake ${SRC_PATH} -DCMAKE_CXX_FLAGS="$CXXFLAGS $LIBS" -DGTEST_ROOT_DIR=$(pkg-config --variable=prefix googletest) -DREDIS_START_CMD="$BUILD_PATH/redis/start_redis.sh" -DREDIS_STOP_CMD="$BUILD_PATH/redis/stop_redis.sh"
     make "-j$(nproc)"
 }
 
