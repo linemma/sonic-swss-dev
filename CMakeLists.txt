@@ -202,7 +202,7 @@ add_executable(qosTest
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests.out")
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_BINARY_DIR}/tests)
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent)
+target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent saivs)
 
 target_link_libraries(coppTest ${GTEST_LIBRARIES})
 target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimetadata orchagent saivs)
