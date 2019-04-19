@@ -172,6 +172,36 @@ struct TestBase : public ::testing::Test {
         return ret;
     }
 
+    std::shared_ptr<SetQosResult> setDscp2Tc2(QosOrchMock& qosorch, Consumer& consumer)
+    {
+        assert(sai_qos_map_api == nullptr);
+
+        sai_qos_map_api = new sai_qos_map_api_t();
+        auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t* p) {
+            delete p;
+            sai_qos_map_api = nullptr;
+        });
+
+        // FIXME: add new function to setup spy function
+        sai_qos_map_api->create_qos_map = create_qos_map;
+        that = this;
+
+        auto ret = std::make_shared<SetQosResult>();
+
+        create_qos_map_fn =
+            [&](sai_object_id_t* sai_object_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            return SAI_STATUS_FAILURE;
+        };
+
+        ret->ret_val = qosorch.handleDscpToTcTable2(consumer);
+        return ret;
+    }
+
     std::shared_ptr<SetQosResult> setTc2Queue(TcToQueueMapHandler& tcToQueue, KeyOpFieldsValuesTuple& tuple)
     {
         // assert(sai_qos_map_api == nullptr);
@@ -419,13 +449,9 @@ TEST_F(QosMapHandlerTest, DscpToTcMap2)
     std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
     consumerAddToSync(consumer.get(), setData);
-    qosorch.handleDscpToTcTable2(*(consumer.get()));
+    auto res = setDscp2Tc2(qosorch, *consumer);
 
-    DscpToTcMapHandler dscpToTcMapHandler;
-
-    auto res = setDscp2Tc(dscpToTcMapHandler, dscp_to_tc_tuple);
-
-    ASSERT_TRUE(res->ret_val == false); // FIXME: should be true
+    ASSERT_TRUE(res->ret_val == true);
 
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
