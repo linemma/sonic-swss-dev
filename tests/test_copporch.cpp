@@ -263,6 +263,9 @@ struct CoppTest : public TestBase {
 
     void TearDown() override
     {
+        delete sai_hostif_api;
+        delete sai_switch_api;
+        delete sai_policer_api;
     }
 };
 
@@ -339,9 +342,6 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, delete_copp_stp_rule_without_policer)
@@ -435,9 +435,6 @@ TEST_F(CoppTest, delete_copp_stp_rule_without_policer)
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, create_copp_lacp_rule_without_policer)
@@ -513,9 +510,6 @@ TEST_F(CoppTest, create_copp_lacp_rule_without_policer)
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, delete_copp_lacp_rule_without_policer)
@@ -609,9 +603,6 @@ TEST_F(CoppTest, delete_copp_lacp_rule_without_policer)
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, create_copp_eapol_rule_without_policer)
@@ -687,9 +678,6 @@ TEST_F(CoppTest, create_copp_eapol_rule_without_policer)
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, delete_copp_eapol_rule_without_policer)
@@ -783,9 +771,6 @@ TEST_F(CoppTest, delete_copp_eapol_rule_without_policer)
     sai_hostif_api->create_hostif_trap = NULL;
     sai_hostif_api->create_hostif_table_entry = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, create_copp_stp_rule_with_policer)
@@ -892,9 +877,6 @@ TEST_F(CoppTest, create_copp_stp_rule_with_policer)
     sai_hostif_api->set_hostif_trap_group_attribute = NULL;
     sai_policer_api->create_policer = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
 
 TEST_F(CoppTest, delete_copp_stp_rule_with_policer)
@@ -1026,7 +1008,4 @@ TEST_F(CoppTest, delete_copp_stp_rule_with_policer)
     sai_policer_api->create_policer = NULL;
     sai_policer_api->remove_policer = NULL;
     sai_switch_api->get_switch_attribute = NULL;
-    delete sai_hostif_api;
-    delete sai_switch_api;
-    delete sai_policer_api;
 }
