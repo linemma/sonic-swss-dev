@@ -95,19 +95,6 @@ size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>&
     return entries.size();
 }
 
-class ConsumerExtend : public Consumer {
-public:
-    ConsumerExtend(ConsumerTableBase* select, Orch* orch, const string& name)
-        : Consumer(select, orch, name)
-    {
-    }
-
-    size_t addToSync(std::deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        Consumer::addToSync(entries);
-    }
-};
-
 struct CreateCoppResult {
     bool ret_val;
 
