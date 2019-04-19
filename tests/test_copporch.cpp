@@ -260,10 +260,7 @@ struct CoppTest : public TestBase {
     {
         delete sai_hostif_api;
         delete sai_switch_api;
-        delete sai_policer_api;
-        delete vs_sai_hostif_api;
-        delete vs_sai_policer_api;
-        delete vs_sai_switch_api;
+        delete sai_policer_api;        
     }
 };
 
