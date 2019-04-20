@@ -116,6 +116,8 @@ file(GLOB ORCH_HEADERS
     ${SWSS_PATH}/orchagent/watermarkorch.h
 )
 
+# TODO: Link to lib build by autoconfig
+# TODO: Just can see source code (group), set as HEADER_FILE_ONLY
 add_library(orchagent
     ${ORCH_SRCS}
     ${ORCH_HEADERS}
@@ -202,10 +204,10 @@ add_executable(qosTest
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests.out")
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_BINARY_DIR}/tests)
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon sairedis saimetadata orchagent saivs)
+target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon saimeta saimetadata orchagent saivs sairedis)
 
 target_link_libraries(coppTest ${GTEST_LIBRARIES})
-target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimetadata orchagent saivs)
+target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimeta saimetadata orchagent saivs)
 
 target_link_libraries(qosTest ${GTEST_LIBRARIES})
-target_link_libraries(qosTest pthread hiredis swsscommon sairedis saimetadata orchagent saivs)
+target_link_libraries(qosTest pthread hiredis swsscommon sairedis saimeta saimetadata orchagent saivs)

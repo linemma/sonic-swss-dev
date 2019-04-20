@@ -342,10 +342,45 @@ struct TestBase : public ::testing::Test {
 
         return true;
     }
+
+    bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+    {
+        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
+            return false;
+        }
+
+        auto l = exp_attr_list.get_attr_list();
+        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
+            sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
+            auto meta = sai_metadata_get_attr_metadata(objecttype, id);
+
+            assert(meta != nullptr);
+
+            char act_buf[0x4000];
+            char exp_buf[0x4000];
+
+            auto act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
+            auto exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
+
+            assert(act_len < sizeof(act_buf));
+            assert(exp_len < sizeof(exp_buf));
+
+            if (act_len != exp_len) {
+                return false;
+            }
+
+            if (strcmp(act_buf, exp_buf) != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 };
 
 TestBase* TestBase::that = nullptr;
 
+// FIXME: create new AclOrchTest
 struct AclTest : public TestBase {
 
     std::shared_ptr<swss::DBConnector> m_app_db;
@@ -354,6 +389,8 @@ struct AclTest : public TestBase {
     sai_object_id_t m_acl_table_num;
     sai_object_id_t m_acl_entry_num;
     sai_object_id_t m_acl_counter_num;
+
+    std::vector<int32_t*> m_s32list_pool;
 
     AclTest()
     {
@@ -364,6 +401,13 @@ struct AclTest : public TestBase {
         m_acl_table_num = 0;
         m_acl_entry_num = 0;
         m_acl_counter_num = 0;
+    }
+
+    virtual ~AclTest()
+    {
+        for (auto p : m_s32list_pool) {
+            free(p);
+        }
     }
 
     static void SetUpTestCase()
@@ -521,6 +565,7 @@ struct AclTest : public TestBase {
 
         vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
 
+        // FIXME: Using local variable or data member for aclorch ... ??
         gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
             gNeighOrch, gRouteOrch);
 
@@ -563,12 +608,12 @@ struct AclTest : public TestBase {
     {
         // set_attr_count = 0;
         // memset(set_attr_list, 0, sizeof(set_attr_list));
-        allocateGlobalOrch();
+        allocateGlobalOrch(); // FIXME: move all content into Setup and remove allocateGlobalOrch
     }
 
     void TearDown() override
     {
-        deleteGlobalOrch();
+        deleteGlobalOrch(); // FIXME: move all content into Setup and remove deleteGlobalOrch
     }
 
     // std::shared_ptr<CreateAclResult> createAclTable(AclTable& acl)
@@ -703,6 +748,7 @@ struct AclTest : public TestBase {
             return SAI_STATUS_SUCCESS;
         };
 
+        // FIXME: passing aclorch or using self member data (DON'T using global variable)
         static_cast<Orch*>(gAclOrch)->doTask(consumer);
 
         return ret;
@@ -732,6 +778,7 @@ struct AclTest : public TestBase {
             return SAI_STATUS_SUCCESS;
         };
 
+        // FIXME: passing aclorch or using self member data (DON'T using global variable)
         static_cast<Orch*>(gAclOrch)->doTask(consumer);
 
         return ret;
@@ -779,6 +826,7 @@ struct AclTest : public TestBase {
             return SAI_STATUS_SUCCESS;
         };
 
+        // FIXME: passing aclorch or using self member data (DON'T using global variable)
         static_cast<Orch*>(gAclOrch)->doTask(consumer);
 
         return ret;
@@ -1119,6 +1167,7 @@ TEST_F(AclTest, doTask_createL3AclTable)
     consumerExt->addToSync(setData);
     Consumer* consumer = consumerExt.get();
 
+    // TODO: vs create_default_acl_table_4
     auto ret = createAclTable(*consumer);
     ASSERT_TRUE(ret->ret_val == true);
 
@@ -1195,6 +1244,9 @@ TEST_F(AclTest, doTask_createL3AclRule)
     consumer = ruleConsumerExt.get();
 
     // FIXME: still failed to call gAclOrch to create rule
+    // FIXME: this is not correct passing ref converted from *pointer and point to derived class
+    //                                                       ^-- the ref will ref to nullptr !
+    //                                                                             ^-- ref to base class, that just all base function not derived class
     auto ruleRet = createAclRule(*consumer);
     ASSERT_TRUE(ruleRet->ret_val == true);
 
@@ -1263,22 +1315,42 @@ static sai_service_method_table_t test_services = {
     profile_get_next_value
 };
 
+// FIXME: AclOrchTest
 TEST_F(AclTest, vs_createL3AclRule)
 {
     /* FIXME: Call sai_api_initialize will call the function belong to sai_redis_interfacequery.cpp
      * but we need call the function in sai_vs_interfacequery.cpp here
      */
-    // sai_status_t status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-    // sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+    auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
-    // sai_attribute_t swattr;
+    sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+    sai_acl_api = const_cast<sai_acl_api_t*>(&vs_acl_api);
 
-    // swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-    // swattr.value.booldata = true;
+    sai_attribute_t swattr;
 
-    // sai_object_id_t switch_id;
-    // status = sai_switch_api->create_switch(&switch_id, 1, &swattr);
-    // ASSERT_EQ(status, SAI_STATUS_SUCCESS);
+    swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+    swattr.value.booldata = true;
+
+    // sai_object_id_t switch_id; // TODO: should save into member data
+    status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // TODO: vs create_default_acl_table_4
+
+    std::string acl_table_name = "acl_table_1";
+    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto setData = std::deque<KeyOpFieldsValuesTuple>(
+        { { acl_table_name,
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3 },
+                { TABLE_STAGE, TABLE_INGRESS },
+                { TABLE_PORTS, "1,2" } } } });
+    consumerExt->addToSync(setData);
+    Consumer* consumer = consumerExt.get();
 
     // AclTable aclTable;
     // aclTable.type = ACL_TABLE_L3;
@@ -1289,21 +1361,74 @@ TEST_F(AclTest, vs_createL3AclRule)
     // auto b_ret = aclTable.create();
     // ASSERT_TRUE(b_ret);
 
-    // // auto v = std::vector<swss::FieldValueTuple>(
-    // //     { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
-    // //         { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
-    // //         { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
-    // // SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
+    // FIXME: still failed to call gAclOrch to create rule
+    // FIXME: this is not correct passing ref converted from *pointer and point to derived class
+    //                                                       ^-- the ref will ref to nullptr !
+    //                                                                             ^-- ref to base class, that just all base function not derived class
+    //auto ruleRet = createAclRule(*consumer);
+    static_cast<Orch*>(gAclOrch)->doTask(*consumer);
+    auto id = gAclOrch->getTableById(acl_table_name);
 
-    // // ASSERT_TRUE(AttrListEq(talbe_ret->attr_list, attr_list));
+    //     sai_acl_api->get_acl_table_attribute()
+    // typedef sai_status_t (*sai_get_acl_table_attribute_fn)(
+    //     _In_ sai_object_id_t acl_table_id,
+    //     _In_ uint32_t attr_count,
+    //     _Inout_ sai_attribute_t *attr_list);
+
+    auto exp_fields = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    SaiAttributeList exp_attrlist(SAI_OBJECT_TYPE_ACL_TABLE, exp_fields, false);
+
+    //sai_attribute_t* get_attr_list();
+    //uint32_t get_attr_count();
+
+    // std::vector<sai_int32_t
+    // sai_int32_t s32;
+    // std::vector<int32_t*> s32list_pool;
+
+    sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE;
+
+    std::vector<sai_attribute_t> act_attr;
+    // act_attr.reserve(v.size());
+    for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+        const auto attr = exp_attrlist.get_attr_list()[i];
+        auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+
+        ASSERT_TRUE(meta != nullptr);
+
+        sai_attribute_t new_attr = { 0 };
+        new_attr.id = attr.id;
+
+        switch (meta->attrvaluetype) {
+        case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+            new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+            new_attr.value.s32list.count = attr.value.s32list.count;
+            m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+            break;
+
+        default:
+            std::cout << "";
+            ;
+        }
+
+        act_attr.emplace_back(new_attr);
+    }
+
+    status = sai_acl_api->get_acl_table_attribute(id, act_attr.size(), act_attr.data());
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    ///////////////////////////////////////////////////////////////////////////
+
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_ACL_TABLE, act_attr, exp_attrlist));
 
     // string rule_id = "acl_rule_l3";
 
@@ -1355,6 +1480,8 @@ TEST_F(AclTest, vs_createL3AclRule)
     // // SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
     // // ASSERT_TRUE(AttrListEq(rule_ret->counter_attr_list, counter_attr_list));
     // // ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
+
+    sai_api_uninitialize();
 }
 
 /* FIXME: test case pseudo code
