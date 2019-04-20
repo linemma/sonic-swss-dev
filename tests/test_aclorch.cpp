@@ -905,7 +905,7 @@ struct AclOrchTest : public AclTest {
 //     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->rule_attr_list, rule_attr_list));
 // }
 
-TEST_F(AclOrchTest, createL3AclTable)
+TEST_F(AclOrchTest, createL3AclTable_will_remove)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -941,7 +941,7 @@ TEST_F(AclOrchTest, createL3AclTable)
     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ret->attr_list, attr_list));
 }
 
-TEST_F(AclOrchTest, deleteL3AclTable)
+TEST_F(AclOrchTest, deleteL3AclTable_will_remove)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -967,7 +967,7 @@ TEST_F(AclOrchTest, deleteL3AclTable)
     ASSERT_TRUE(ret2->ret_val == true);
 }
 
-TEST_F(AclOrchTest, createL3AclRule)
+TEST_F(AclOrchTest, createL3AclRule_will_remove)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -1027,13 +1027,13 @@ const char* profile_get_value(
     // UNREFERENCED_PARAMETER(profile_id);
 
     if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-        return "/usr/share/sai_2410.xml";
+        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
     } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
         return "20:03:04:05:06:00";
     } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-        //return "1000";
+        return "1000";
     } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-        //return "2000";
+        return "2000";
     } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
         return "SAI_VS_SWITCH_TYPE_BCM56850";
     }
@@ -1057,7 +1057,7 @@ static int profile_get_next_value(
     return -1;
 }
 
-TEST_F(AclOrchTest, vs_createL3AclRule)
+TEST_F(AclOrchTest, create_L3Acl_Table)
 {
     sai_service_method_table_t test_services = {
         profile_get_value,
@@ -1082,8 +1082,6 @@ TEST_F(AclOrchTest, vs_createL3AclRule)
     // TODO: vs create_default_acl_table_4
     std::string acl_table_name = "acl_table_1";
 
-    // auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    // auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
     auto consumer = std::unique_ptr<Consumer>(new Consumer(
         new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
 
@@ -1094,9 +1092,10 @@ TEST_F(AclOrchTest, vs_createL3AclRule)
                 { TABLE_TYPE, TABLE_TYPE_L3 },
                 //            ^^^^^^^^^^^^^ L3 ACL
                 { TABLE_STAGE, TABLE_INGRESS },
+                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
                 { TABLE_PORTS, "1,2" } } } });
-    // consumerExt->addToSync(setData);
-    // Consumer* consumer = consumerExt.get();
+    // FIXME:                  ^^^^^^^^^^^^^ fixed port
+
     consumerAddToSync(consumer.get(), setData);
 
     ///////////////////////////////////////////////////////////////////////////
