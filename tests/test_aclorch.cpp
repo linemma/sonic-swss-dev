@@ -52,11 +52,7 @@ extern sai_vlan_api_t* sai_vlan_api;
 extern sai_bridge_api_t* sai_bridge_api;
 extern sai_route_api_t* sai_route_api;
 
-// int fake_create_acl_table(sai_object_id_t* acl_table_id,
-//     sai_object_id_t switch_id, uint32_t attr_count,
-//     const sai_attribute_t* attr_list);
-
-TEST(foo, foo)
+TEST(convert, field_value_to_attribute)
 {
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
@@ -254,28 +250,8 @@ struct TestBase : public ::testing::Test {
     std::function<sai_status_t(const sai_route_entry_t*, uint32_t, const sai_attribute_t*)>
         sai_create_route_entry_fn;
 
-    // bool createAclTable_3(AclTable* acl)
-    // {
-    //     assert(sai_acl_api == nullptr);
-
-    //     sai_acl_api = new sai_acl_api_t();
-    //     auto sai_acl = std::shared_ptr<sai_acl_api_t>(sai_acl_api, [](sai_acl_api_t* p) {
-    //         delete p;
-    //         sai_acl_api = nullptr;
-    //     });
-
-    //     sai_acl_api->create_acl_table = sai_create_acl_table_;
-    //     that = this;
-
-    //     sai_create_acl_table_fn =
-    //         [](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
-    //             uint32_t attr_count,
-    //             const sai_attribute_t* attr_list) -> sai_status_t {
-    //         return fake_create_acl_table(acl_table_id, switch_id, attr_count, attr_list);
-    //     };
-
-    //     return acl->create();
-    // }
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<CreateAclResult> createAclTable_4(AclTable& acl)
     {
@@ -380,7 +356,6 @@ struct TestBase : public ::testing::Test {
 
 TestBase* TestBase::that = nullptr;
 
-// FIXME: create new AclOrchTest
 struct AclTest : public TestBase {
 
     std::shared_ptr<swss::DBConnector> m_app_db;
@@ -833,31 +808,6 @@ struct AclTest : public TestBase {
     }
 };
 
-struct AclTestRedis : public ::testing::Test {
-    AclTestRedis() {}
-
-    void start_server_and_remote_all_data()
-    {
-        //.....
-    }
-
-    // override
-    void SetUp() override { start_server_and_remote_all_data(); }
-
-    void InjectData(int instance, void* data)
-    {
-        if (instance == APPL_DB) {
-            ///
-        } else if (instance == CONFIG_DB) {
-            ///
-        } else if (instance == STATE_DB) {
-            ///
-        }
-    }
-
-    int GetData(int instance) { return 0; }
-};
-
 // int fake_create_acl_table(sai_object_id_t* acl_table_id,
 //     sai_object_id_t switch_id, uint32_t attr_count,
 //     const sai_attribute_t* attr_list)
@@ -1101,6 +1051,104 @@ TEST_F(AclTest, create_default_acl_table_4)
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
 }
 
+struct AclTestRedis : public ::testing::Test {
+    AclTestRedis() {}
+
+    void start_server_and_remote_all_data()
+    {
+        //.....
+    }
+
+    // override
+    void SetUp() override { start_server_and_remote_all_data(); }
+
+    void InjectData(int instance, void* data)
+    {
+        if (instance == APPL_DB) {
+            ///
+        } else if (instance == CONFIG_DB) {
+            ///
+        } else if (instance == STATE_DB) {
+            ///
+        }
+    }
+
+    int GetData(int instance) { return 0; }
+};
+
+TEST_F(AclTestRedis, create_default_acl_table_on_redis)
+{
+    sai_status_t status;
+    AclTable acltable;
+
+    // DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+    DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+    // DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+
+    initSaiApi();
+    gCrmOrch = new CrmOrch(&config_db, CFG_CRM_TABLE_NAME);
+
+    sai_attribute_t attr;
+    vector<sai_attribute_t> attrs;
+    attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+    attr.value.booldata = true;
+    attrs.push_back(attr);
+
+    status = sai_switch_api->create_switch(&gSwitchId, (uint32_t)attrs.size(),
+        attrs.data());
+    ASSERT_EQ(status, SAI_STATUS_SUCCESS);
+    sleep(1);
+
+    acltable.create();
+    sleep(2);
+    // validate ...
+    // auto x = GetData(ASIC_DB);
+    {
+        redisContext* c;
+        redisReply* reply;
+
+        struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+        c = redisConnectUnixWithTimeout(DBConnector::DEFAULT_UNIXSOCKET, timeout);
+        if (c == NULL || c->err) {
+            ASSERT_TRUE(0);
+        }
+
+        reply = (redisReply*)redisCommand(c, "SELECT %d", ASIC_DB);
+        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
+        // printf("SELECT: %s\n", reply->str);
+        freeReplyObject(reply);
+
+        reply = (redisReply*)redisCommand(c, " LRANGE %s 0 -1",
+            "ASIC_STATE_KEY_VALUE_OP_QUEUE");
+        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
+        ASSERT_EQ(reply->elements, 6);
+        for (int i = 0; i < reply->elements; ++i) {
+            redisReply* sub_reply = reply->element[i];
+            // printf("(%d)LRANGE: %s\n", i, sub_reply->str);
+
+            if (i == 0) {
+                string op = string("Screate");
+                ASSERT_TRUE(0 == strncmp(op.c_str(), sub_reply->str, op.length()));
+            }
+        }
+        freeReplyObject(reply);
+
+        reply = (redisReply*)redisCommand(c, "FLUSHALL");
+        freeReplyObject(reply);
+        redisFree(c);
+    }
+
+    delete gCrmOrch;
+    sai_api_uninitialize();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+struct AclOrchTest : public AclTest {
+};
+
 // TEST_F(AclTest, create_l3_rule_filter_sip)
 // {
 //     //createL3AclTableAndRule
@@ -1152,7 +1200,7 @@ TEST_F(AclTest, create_default_acl_table_4)
 //     ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
 // }
 
-TEST_F(AclTest, doTask_createL3AclTable)
+TEST_F(AclOrchTest, createL3AclTable)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -1188,7 +1236,7 @@ TEST_F(AclTest, doTask_createL3AclTable)
     ASSERT_TRUE(AttrListEq(ret->attr_list, attr_list));
 }
 
-TEST_F(AclTest, doTask_deleteL3AclTable)
+TEST_F(AclOrchTest, deleteL3AclTable)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -1214,7 +1262,7 @@ TEST_F(AclTest, doTask_deleteL3AclTable)
     ASSERT_TRUE(ret2->ret_val == true);
 }
 
-TEST_F(AclTest, doTask_createL3AclRule)
+TEST_F(AclOrchTest, createL3AclRule)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -1315,8 +1363,7 @@ static sai_service_method_table_t test_services = {
     profile_get_next_value
 };
 
-// FIXME: AclOrchTest
-TEST_F(AclTest, vs_createL3AclRule)
+TEST_F(AclOrchTest, vs_createL3AclRule)
 {
     /* FIXME: Call sai_api_initialize will call the function belong to sai_redis_interfacequery.cpp
      * but we need call the function in sai_vs_interfacequery.cpp here
@@ -1562,69 +1609,3 @@ while true
 
 check the acl_count == max_number_acl
 */
-
-TEST_F(AclTestRedis, create_default_acl_table_on_redis)
-{
-    sai_status_t status;
-    AclTable acltable;
-
-    // DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-    DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-    // DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-
-    initSaiApi();
-    gCrmOrch = new CrmOrch(&config_db, CFG_CRM_TABLE_NAME);
-
-    sai_attribute_t attr;
-    vector<sai_attribute_t> attrs;
-    attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-    attr.value.booldata = true;
-    attrs.push_back(attr);
-
-    status = sai_switch_api->create_switch(&gSwitchId, (uint32_t)attrs.size(),
-        attrs.data());
-    ASSERT_EQ(status, SAI_STATUS_SUCCESS);
-    sleep(1);
-
-    acltable.create();
-    sleep(2);
-    // validate ...
-    // auto x = GetData(ASIC_DB);
-    {
-        redisContext* c;
-        redisReply* reply;
-
-        struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-        c = redisConnectUnixWithTimeout(DBConnector::DEFAULT_UNIXSOCKET, timeout);
-        if (c == NULL || c->err) {
-            ASSERT_TRUE(0);
-        }
-
-        reply = (redisReply*)redisCommand(c, "SELECT %d", ASIC_DB);
-        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
-        // printf("SELECT: %s\n", reply->str);
-        freeReplyObject(reply);
-
-        reply = (redisReply*)redisCommand(c, " LRANGE %s 0 -1",
-            "ASIC_STATE_KEY_VALUE_OP_QUEUE");
-        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
-        ASSERT_EQ(reply->elements, 6);
-        for (int i = 0; i < reply->elements; ++i) {
-            redisReply* sub_reply = reply->element[i];
-            // printf("(%d)LRANGE: %s\n", i, sub_reply->str);
-
-            if (i == 0) {
-                string op = string("Screate");
-                ASSERT_TRUE(0 == strncmp(op.c_str(), sub_reply->str, op.length()));
-            }
-        }
-        freeReplyObject(reply);
-
-        reply = (redisReply*)redisCommand(c, "FLUSHALL");
-        freeReplyObject(reply);
-        redisFree(c);
-    }
-
-    delete gCrmOrch;
-    sai_api_uninitialize();
-}
