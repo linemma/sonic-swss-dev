@@ -742,7 +742,7 @@ TEST_F(AclTestRedis_Old_Test_Refine_Then_Remove, create_default_acl_table_on_red
 }
 
 struct AclOrchTest : public AclTest {
-    std::shared_ptr<AclTableResult> createAclTable(Consumer& consumer)
+    std::shared_ptr<AclTableResult> createAclTable_DONT_USE(Consumer& consumer)
     {
         auto ret = std::make_shared<AclTableResult>();
 
@@ -775,7 +775,7 @@ struct AclOrchTest : public AclTest {
         return ret;
     }
 
-    std::shared_ptr<AclTableResult> deleteAclTable(Consumer& consumer)
+    std::shared_ptr<AclTableResult> deleteAclTable_DONT_USE(Consumer& consumer)
     {
         auto ret = std::make_shared<AclTableResult>();
 
@@ -805,7 +805,7 @@ struct AclOrchTest : public AclTest {
         return ret;
     }
 
-    std::shared_ptr<AclRuleResult> createAclRule(Consumer& consumer)
+    std::shared_ptr<AclRuleResult> createAclRule_DONT_USE(Consumer& consumer)
     {
         auto ret = std::make_shared<AclRuleResult>();
 
@@ -921,7 +921,7 @@ TEST_F(AclOrchTest, createL3AclTable)
     Consumer* consumer = consumerExt.get();
 
     // TODO: vs create_default_acl_table_4
-    auto ret = createAclTable(*consumer);
+    auto ret = createAclTable_DONT_USE(*consumer);
     ASSERT_TRUE(ret->ret_val == true);
 
     auto v = std::vector<swss::FieldValueTuple>(
@@ -956,14 +956,14 @@ TEST_F(AclOrchTest, deleteL3AclTable)
     consumerExt->addToSync(setData);
     Consumer* consumer = consumerExt.get();
 
-    auto ret = createAclTable(*consumer);
+    auto ret = createAclTable_DONT_USE(*consumer);
     ASSERT_TRUE(ret->ret_val == true);
 
     auto setData2 = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_name, DEL_COMMAND, {} } });
     consumerExt->addToSync(setData2);
 
-    auto ret2 = deleteAclTable(*consumer);
+    auto ret2 = deleteAclTable_DONT_USE(*consumer);
     ASSERT_TRUE(ret2->ret_val == true);
 }
 
@@ -982,7 +982,7 @@ TEST_F(AclOrchTest, createL3AclRule)
     consumerExt->addToSync(setData);
     Consumer* consumer = consumerExt.get();
 
-    auto ret = createAclTable(*consumer);
+    auto ret = createAclTable_DONT_USE(*consumer);
     ASSERT_TRUE(ret->ret_val == true);
 
     auto ruleConsumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1); // free by consumerStateTable
@@ -1000,7 +1000,7 @@ TEST_F(AclOrchTest, createL3AclRule)
     // FIXME: this is not correct passing ref converted from *pointer and point to derived class
     //                                                       ^-- the ref will ref to nullptr !
     //                                                                             ^-- ref to base class, that just all base function not derived class
-    auto ruleRet = createAclRule(*consumer);
+    auto ruleRet = createAclRule_DONT_USE(*consumer);
     ASSERT_TRUE(ruleRet->ret_val == true);
 
     auto counter = std::vector<swss::FieldValueTuple>(
