@@ -52,7 +52,49 @@ extern sai_vlan_api_t* sai_vlan_api;
 extern sai_bridge_api_t* sai_bridge_api;
 extern sai_route_api_t* sai_route_api;
 
-TEST(convert, field_value_to_attribute)
+size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>& entries)
+{
+    /* Nothing popped */
+    if (entries.empty()) {
+        return 0;
+    }
+
+    for (auto& entry : entries) {
+        string key = kfvKey(entry);
+        string op = kfvOp(entry);
+
+        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+            consumer->m_toSync[key] = entry;
+        }
+        /* If an old task is still there, we combine the old task with new task */
+        else {
+            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+            auto new_values = kfvFieldsValues(entry);
+            auto existing_values = kfvFieldsValues(existing_data);
+
+            for (auto it : new_values) {
+                string field = fvField(it);
+                string value = fvValue(it);
+
+                auto iu = existing_values.begin();
+                while (iu != existing_values.end()) {
+                    string ofield = fvField(*iu);
+                    if (field == ofield)
+                        iu = existing_values.erase(iu);
+                    else
+                        iu++;
+                }
+                existing_values.push_back(FieldValueTuple(field, value));
+            }
+            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+        }
+    }
+    return entries.size();
+}
+
+TEST(ConvertTest, field_value_to_attribute)
 {
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
@@ -100,9 +142,9 @@ struct AclRuleResult {
     std::vector<sai_attribute_t> rule_attr_list;
 };
 
-class ConsumerExtend : public Consumer {
+class ConsumerExtend_Dont_Use : public Consumer {
 public:
-    ConsumerExtend(ConsumerTableBase* select, Orch* orch, const string& name)
+    ConsumerExtend_Dont_Use(ConsumerTableBase* select, Orch* orch, const string& name)
         : Consumer(select, orch, name)
     {
     }
@@ -119,6 +161,9 @@ public:
 };
 
 struct TestBase : public ::testing::Test {
+    //
+    // spy functions
+    //
     static sai_status_t sai_create_acl_table_(sai_object_id_t* acl_table_id,
         sai_object_id_t switch_id,
         uint32_t attr_count,
@@ -250,40 +295,10 @@ struct TestBase : public ::testing::Test {
     std::function<sai_status_t(const sai_route_entry_t*, uint32_t, const sai_attribute_t*)>
         sai_create_route_entry_fn;
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////
-
-    std::shared_ptr<CreateAclResult> createAclTable_4(AclTable& acl)
-    {
-        assert(sai_acl_api == nullptr);
-
-        sai_acl_api = new sai_acl_api_t();
-        auto sai_acl = std::shared_ptr<sai_acl_api_t>(sai_acl_api, [](sai_acl_api_t* p) {
-            delete p;
-            sai_acl_api = nullptr;
-        });
-
-        sai_acl_api->create_acl_table = sai_create_acl_table_;
-        that = this;
-
-        auto ret = std::make_shared<CreateAclResult>();
-
-        sai_create_acl_table_fn =
-            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
-                uint32_t attr_count,
-                const sai_attribute_t* attr_list) -> sai_status_t {
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->attr_list.emplace_back(attr_list[i]);
-            }
-            // return SAI_STATUS_FAILURE;
-            return SAI_STATUS_SUCCESS;
-        };
-
-        ret->ret_val = acl.create();
-        return ret;
-    }
-
-    bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+    //
+    // validation functions (NO NEED TO put into Test class => move to Validation class)
+    //
+    bool AttrListEq_Miss_objecttype_Dont_Use(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
             return false;
@@ -385,17 +400,17 @@ struct AclTest : public TestBase {
         }
     }
 
-    static void SetUpTestCase()
-    {
-        //system(REDIS_START_CMD);
-    }
+    // static void SetUpTestCase()
+    // {
+    //     //system(REDIS_START_CMD);
+    // }
+    //
+    // static void TearDownTestCase()
+    // {
+    //     //system(REDIS_STOP_CMD);
+    // }
 
-    static void TearDownTestCase()
-    {
-        //system(REDIS_STOP_CMD);
-    }
-
-    void allocateGlobalOrch()
+    void SetUp() override
     {
         assert(gAclOrch == nullptr);
         assert(gFdbOrch == nullptr);
@@ -545,7 +560,7 @@ struct AclTest : public TestBase {
             gNeighOrch, gRouteOrch);
 
         auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
-        auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
 
         auto setData = std::deque<KeyOpFieldsValuesTuple>(
             { { "PortInitDone",
@@ -557,145 +572,176 @@ struct AclTest : public TestBase {
         static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
     }
 
-    void deleteGlobalOrch()
+    void TearDown() override
     {
-        delete gAclOrch;
+        delete gAclOrch; // FIXME: using auto ptr
         gAclOrch = nullptr;
-        delete gFdbOrch;
+        delete gFdbOrch; // FIXME: using auto ptr
         gFdbOrch = nullptr;
-        delete gMirrorOrch;
+        delete gMirrorOrch; // FIXME: using auto ptr
         gMirrorOrch = nullptr;
-        delete gRouteOrch;
+        delete gRouteOrch; // FIXME: using auto ptr
         gRouteOrch = nullptr;
-        delete gNeighOrch;
+        delete gNeighOrch; // FIXME: using auto ptr
         gNeighOrch = nullptr;
-        delete gIntfsOrch;
+        delete gIntfsOrch; // FIXME: using auto ptr
         gIntfsOrch = nullptr;
-        delete gVrfOrch;
+        delete gVrfOrch; // FIXME: using auto ptr
         gVrfOrch = nullptr;
-        delete gCrmOrch;
+        delete gCrmOrch; // FIXME: using auto ptr
         gCrmOrch = nullptr;
-        delete gPortsOrch;
+        delete gPortsOrch; // FIXME: using auto ptr
         gPortsOrch = nullptr;
     }
 
-    void SetUp() override
+    std::shared_ptr<CreateAclResult> createAclTable_4(AclTable& acl)
     {
-        // set_attr_count = 0;
-        // memset(set_attr_list, 0, sizeof(set_attr_list));
-        allocateGlobalOrch(); // FIXME: move all content into Setup and remove allocateGlobalOrch
+        assert(sai_acl_api == nullptr);
+
+        sai_acl_api = new sai_acl_api_t();
+        auto sai_acl = std::shared_ptr<sai_acl_api_t>(sai_acl_api, [](sai_acl_api_t* p) {
+            delete p;
+            sai_acl_api = nullptr;
+        });
+
+        sai_acl_api->create_acl_table = sai_create_acl_table_;
+        that = this;
+
+        auto ret = std::make_shared<CreateAclResult>();
+
+        sai_create_acl_table_fn =
+            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+                uint32_t attr_count,
+                const sai_attribute_t* attr_list) -> sai_status_t {
+            for (auto i = 0; i < attr_count; ++i) {
+                ret->attr_list.emplace_back(attr_list[i]);
+            }
+            // return SAI_STATUS_FAILURE;
+            return SAI_STATUS_SUCCESS;
+        };
+
+        ret->ret_val = acl.create();
+        return ret;
+    }
+};
+
+TEST_F(AclTest, create_default_acl_table_4)
+{
+    AclTable acltable;
+    acltable.type = ACL_TABLE_L3;
+    auto res = createAclTable_4(acltable);
+
+    ASSERT_TRUE(res->ret_val == true);
+
+    auto v = std::vector<swss::FieldValueTuple>(
+        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+    SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
+
+    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+}
+
+struct AclTestRedis_Old_Test_Refine_Then_Remove : public ::testing::Test {
+    AclTestRedis_Old_Test_Refine_Then_Remove() {}
+
+    void start_server_and_remote_all_data()
+    {
+        //.....
     }
 
-    void TearDown() override
+    // override
+    void SetUp() override { start_server_and_remote_all_data(); }
+
+    void InjectData(int instance, void* data)
     {
-        deleteGlobalOrch(); // FIXME: move all content into Setup and remove deleteGlobalOrch
+        if (instance == APPL_DB) {
+            ///
+        } else if (instance == CONFIG_DB) {
+            ///
+        } else if (instance == STATE_DB) {
+            ///
+        }
     }
 
-    // std::shared_ptr<CreateAclResult> createAclTable(AclTable& acl)
-    // {
-    //     auto ret = std::make_shared<CreateAclResult>();
+    int GetData(int instance) { return 0; }
+};
 
-    //     assert(sai_acl_api == nullptr);
+TEST_F(AclTestRedis_Old_Test_Refine_Then_Remove, create_default_acl_table_on_redis)
+{
+    sai_status_t status;
+    AclTable acltable;
 
-    //     auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
-    //         delete p;
-    //         sai_acl_api = nullptr;
-    //     });
+    // DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+    DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+    // DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
 
-    //     sai_acl_api = sai_acl.get();
-    //     sai_acl_api->create_acl_table = sai_create_acl_table_;
+    initSaiApi();
+    gCrmOrch = new CrmOrch(&config_db, CFG_CRM_TABLE_NAME);
 
-    //     sai_create_acl_table_fn =
-    //         [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
-    //             uint32_t attr_count,
-    //             const sai_attribute_t* attr_list) -> sai_status_t {
-    //         *acl_table_id = (++m_acl_table_num);
-    //         for (auto i = 0; i < attr_count; ++i) {
-    //             ret->attr_list.emplace_back(attr_list[i]);
-    //         }
-    //         return SAI_STATUS_SUCCESS;
-    //     };
+    sai_attribute_t attr;
+    vector<sai_attribute_t> attrs;
+    attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+    attr.value.booldata = true;
+    attrs.push_back(attr);
 
-    //     ret->ret_val = gAclOrch->addAclTable(acl, acl.id);
+    status = sai_switch_api->create_switch(&gSwitchId, (uint32_t)attrs.size(),
+        attrs.data());
+    ASSERT_EQ(status, SAI_STATUS_SUCCESS);
+    sleep(1);
 
-    //     return ret;
-    // }
+    acltable.create();
+    sleep(2);
+    // validate ...
+    // auto x = GetData(ASIC_DB);
+    {
+        redisContext* c;
+        redisReply* reply;
 
-    // std::shared_ptr<CreateRuleResult> createRuleToAcl(
-    //     AclTable& acl, string& rule_id, std::vector<FieldValueTuple> filedValues)
-    // {
-    //     auto ret = std::make_shared<CreateRuleResult>();
+        struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+        c = redisConnectUnixWithTimeout(DBConnector::DEFAULT_UNIXSOCKET, timeout);
+        if (c == NULL || c->err) {
+            ASSERT_TRUE(0);
+        }
 
-    //     assert(sai_acl_api == nullptr);
+        reply = (redisReply*)redisCommand(c, "SELECT %d", ASIC_DB);
+        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
+        // printf("SELECT: %s\n", reply->str);
+        freeReplyObject(reply);
 
-    //     auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
-    //         delete p;
-    //         sai_acl_api = nullptr;
-    //     });
+        reply = (redisReply*)redisCommand(c, " LRANGE %s 0 -1",
+            "ASIC_STATE_KEY_VALUE_OP_QUEUE");
+        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
+        ASSERT_EQ(reply->elements, 6);
+        for (int i = 0; i < reply->elements; ++i) {
+            redisReply* sub_reply = reply->element[i];
+            // printf("(%d)LRANGE: %s\n", i, sub_reply->str);
 
-    //     sai_acl_api = sai_acl.get();
+            if (i == 0) {
+                string op = string("Screate");
+                ASSERT_TRUE(0 == strncmp(op.c_str(), sub_reply->str, op.length()));
+            }
+        }
+        freeReplyObject(reply);
 
-    //     sai_acl_api->create_acl_counter = sai_create_acl_counter_;
-    //     sai_acl_api->create_acl_entry = sai_create_acl_entry_;
+        reply = (redisReply*)redisCommand(c, "FLUSHALL");
+        freeReplyObject(reply);
+        redisFree(c);
+    }
 
-    //     sai_create_acl_counter_fn =
-    //         [&](_Out_ sai_object_id_t* acl_counter_id,
-    //             _In_ sai_object_id_t switch_id,
-    //             _In_ uint32_t attr_count,
-    //             _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-    //         *acl_counter_id = (++m_acl_counter_num);
-    //         for (auto i = 0; i < attr_count; ++i) {
-    //             ret->counter_attr_list.emplace_back(attr_list[i]);
-    //         }
-    //         return SAI_STATUS_SUCCESS;
-    //     };
+    delete gCrmOrch;
+    sai_api_uninitialize();
+}
 
-    //     sai_create_acl_entry_fn =
-    //         [&](_Out_ sai_object_id_t* acl_entry_id,
-    //             _In_ sai_object_id_t switch_id,
-    //             _In_ uint32_t attr_count,
-    //             _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-    //         *acl_entry_id = (++m_acl_entry_num);
-    //         for (auto i = 0; i < attr_count; ++i) {
-    //             ret->rule_attr_list.emplace_back(attr_list[i]);
-    //         }
-    //         return SAI_STATUS_SUCCESS;
-    //     };
-
-    //     KeyOpFieldsValuesTuple data; // key, op, fieldValue
-    //     string rule_key = acl.id + ":" + rule_id;
-    //     string rule_cmd(SET_COMMAND);
-    //     data = std::make_tuple(rule_key, rule_cmd, filedValues);
-
-    //     shared_ptr<AclRule> newRule = AclRule::makeShared(acl.type, gAclOrch, gMirrorOrch,
-    //         nullptr /*m_dTelOrch*/, rule_id, acl.id, data);
-
-    //     for (const auto& itr : filedValues) {
-    //         string attr_name = swss::to_upper(fvField(itr));
-    //         string attr_value = fvValue(itr);
-
-    //         if (newRule->validateAddPriority(attr_name, attr_value)) {
-    //             //SWSS_LOG_INFO("Added priority attribute");
-    //         } else if (newRule->validateAddMatch(attr_name, attr_value)) {
-    //             //SWSS_LOG_INFO("Added match attribute '%s'", attr_name.c_str());
-    //         } else if (newRule->validateAddAction(attr_name, attr_value)) {
-    //             //SWSS_LOG_INFO("Added action attribute '%s'", attr_name.c_str());
-    //         } else {
-    //             ret->ret_val = false;
-    //             return ret;
-    //         }
-    //     }
-
-    //     if (!newRule->validate()) {
-    //         ret->ret_val = false;
-    //         return ret;
-    //     }
-
-    //     ret->ret_val = gAclOrch->addAclRule(newRule, acl.id);
-
-    //     return ret;
-    // }
-
+struct AclOrchTest : public AclTest {
     std::shared_ptr<AclTableResult> createAclTable(Consumer& consumer)
     {
         auto ret = std::make_shared<AclTableResult>();
@@ -808,129 +854,6 @@ struct AclTest : public TestBase {
     }
 };
 
-TEST_F(AclTest, create_default_acl_table_4)
-{
-    AclTable acltable;
-    acltable.type = ACL_TABLE_L3;
-    auto res = createAclTable_4(acltable);
-
-    ASSERT_TRUE(res->ret_val == true);
-
-    auto v = std::vector<swss::FieldValueTuple>(
-        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
-            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
-    SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
-
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
-}
-
-struct AclTestRedis : public ::testing::Test {
-    AclTestRedis() {}
-
-    void start_server_and_remote_all_data()
-    {
-        //.....
-    }
-
-    // override
-    void SetUp() override { start_server_and_remote_all_data(); }
-
-    void InjectData(int instance, void* data)
-    {
-        if (instance == APPL_DB) {
-            ///
-        } else if (instance == CONFIG_DB) {
-            ///
-        } else if (instance == STATE_DB) {
-            ///
-        }
-    }
-
-    int GetData(int instance) { return 0; }
-};
-
-TEST_F(AclTestRedis, create_default_acl_table_on_redis)
-{
-    sai_status_t status;
-    AclTable acltable;
-
-    // DBConnector appl_db(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-    DBConnector config_db(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-    // DBConnector state_db(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-
-    initSaiApi();
-    gCrmOrch = new CrmOrch(&config_db, CFG_CRM_TABLE_NAME);
-
-    sai_attribute_t attr;
-    vector<sai_attribute_t> attrs;
-    attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-    attr.value.booldata = true;
-    attrs.push_back(attr);
-
-    status = sai_switch_api->create_switch(&gSwitchId, (uint32_t)attrs.size(),
-        attrs.data());
-    ASSERT_EQ(status, SAI_STATUS_SUCCESS);
-    sleep(1);
-
-    acltable.create();
-    sleep(2);
-    // validate ...
-    // auto x = GetData(ASIC_DB);
-    {
-        redisContext* c;
-        redisReply* reply;
-
-        struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-        c = redisConnectUnixWithTimeout(DBConnector::DEFAULT_UNIXSOCKET, timeout);
-        if (c == NULL || c->err) {
-            ASSERT_TRUE(0);
-        }
-
-        reply = (redisReply*)redisCommand(c, "SELECT %d", ASIC_DB);
-        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
-        // printf("SELECT: %s\n", reply->str);
-        freeReplyObject(reply);
-
-        reply = (redisReply*)redisCommand(c, " LRANGE %s 0 -1",
-            "ASIC_STATE_KEY_VALUE_OP_QUEUE");
-        ASSERT_NE(reply->type, REDIS_REPLY_ERROR);
-        ASSERT_EQ(reply->elements, 6);
-        for (int i = 0; i < reply->elements; ++i) {
-            redisReply* sub_reply = reply->element[i];
-            // printf("(%d)LRANGE: %s\n", i, sub_reply->str);
-
-            if (i == 0) {
-                string op = string("Screate");
-                ASSERT_TRUE(0 == strncmp(op.c_str(), sub_reply->str, op.length()));
-            }
-        }
-        freeReplyObject(reply);
-
-        reply = (redisReply*)redisCommand(c, "FLUSHALL");
-        freeReplyObject(reply);
-        redisFree(c);
-    }
-
-    delete gCrmOrch;
-    sai_api_uninitialize();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-struct AclOrchTest : public AclTest {
-};
-
 // TEST_F(AclTest, create_l3_rule_filter_sip)
 // {
 //     //createL3AclTableAndRule
@@ -954,7 +877,7 @@ struct AclOrchTest : public AclTest {
 //             { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
 //     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
 
-//     ASSERT_TRUE(AttrListEq(talbe_ret->attr_list, attr_list));
+//     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(talbe_ret->attr_list, attr_list));
 
 //     string rule_id("acl_rule_l3");
 
@@ -978,15 +901,15 @@ struct AclOrchTest : public AclTest {
 //             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
 //             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
 //     SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
-//     ASSERT_TRUE(AttrListEq(rule_ret->counter_attr_list, counter_attr_list));
-//     ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
+//     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->counter_attr_list, counter_attr_list));
+//     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->rule_attr_list, rule_attr_list));
 // }
 
 TEST_F(AclOrchTest, createL3AclTable)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_name,
             SET_COMMAND,
@@ -1015,14 +938,14 @@ TEST_F(AclOrchTest, createL3AclTable)
             { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
 
-    ASSERT_TRUE(AttrListEq(ret->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ret->attr_list, attr_list));
 }
 
 TEST_F(AclOrchTest, deleteL3AclTable)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_name,
             SET_COMMAND,
@@ -1048,7 +971,7 @@ TEST_F(AclOrchTest, createL3AclRule)
 {
     std::string acl_table_name = "acl_table_1";
     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_name,
             SET_COMMAND,
@@ -1063,7 +986,7 @@ TEST_F(AclOrchTest, createL3AclRule)
     ASSERT_TRUE(ret->ret_val == true);
 
     auto ruleConsumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto ruleConsumerExt = std::make_shared<ConsumerExtend>(ruleConsumerStateTable, gAclOrch, CFG_ACL_RULE_TABLE_NAME);
+    auto ruleConsumerExt = std::make_shared<ConsumerExtend_Dont_Use>(ruleConsumerStateTable, gAclOrch, CFG_ACL_RULE_TABLE_NAME);
 
     auto setRuleData = std::deque<KeyOpFieldsValuesTuple>(
         { { "RULE_SIP_1",
@@ -1093,8 +1016,8 @@ TEST_F(AclOrchTest, createL3AclRule)
             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
     SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
-    ASSERT_TRUE(AttrListEq(ruleRet->counter_attr_list, counter_attr_list));
-    ASSERT_TRUE(AttrListEq(ruleRet->rule_attr_list, rule_attr_list));
+    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ruleRet->counter_attr_list, counter_attr_list));
+    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ruleRet->rule_attr_list, rule_attr_list));
 }
 
 const char* profile_get_value(
@@ -1123,20 +1046,14 @@ static int profile_get_next_value(
     _Out_ const char** variable,
     _Out_ const char** value)
 {
-    // SWSS_LOG_ENTER();
-
     if (value == NULL) {
-        SWSS_LOG_INFO("resetting profile map iterator");
-
         return 0;
     }
 
     if (variable == NULL) {
-        SWSS_LOG_WARN("variable is null");
         return -1;
     }
 
-    SWSS_LOG_INFO("iterator reached end");
     return -1;
 }
 
@@ -1147,9 +1064,6 @@ TEST_F(AclOrchTest, vs_createL3AclRule)
         profile_get_next_value
     };
 
-    /* FIXME: Call sai_api_initialize will call the function belong to sai_redis_interfacequery.cpp
-     * but we need call the function in sai_vs_interfacequery.cpp here
-     */
     auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
@@ -1161,33 +1075,32 @@ TEST_F(AclOrchTest, vs_createL3AclRule)
     swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
     swattr.value.booldata = true;
 
-    // sai_object_id_t switch_id; // TODO: should save into member data
     status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
     ///////////////////////////////////////////////////////////////////////////
     // TODO: vs create_default_acl_table_4
-
     std::string acl_table_name = "acl_table_1";
-    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+
+    // auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+    // auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+    auto consumer = std::unique_ptr<Consumer>(new Consumer(
+        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_name,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
                 { TABLE_TYPE, TABLE_TYPE_L3 },
+                //            ^^^^^^^^^^^^^ L3 ACL
                 { TABLE_STAGE, TABLE_INGRESS },
                 { TABLE_PORTS, "1,2" } } } });
-    consumerExt->addToSync(setData);
-    Consumer* consumer = consumerExt.get();
+    // consumerExt->addToSync(setData);
+    // Consumer* consumer = consumerExt.get();
+    consumerAddToSync(consumer.get(), setData);
 
     ///////////////////////////////////////////////////////////////////////////
 
-    // FIXME: still failed to call gAclOrch to create rule
-    // FIXME: this is not correct passing ref converted from *pointer and point to derived class
-    //                                                       ^-- the ref will ref to nullptr !
-    //                                                                             ^-- ref to base class, that just all base function not derived class
-    //auto ruleRet = createAclRule(*consumer);
     static_cast<Orch*>(gAclOrch)->doTask(*consumer);
     auto id = gAclOrch->getTableById(acl_table_name);
 
@@ -1287,8 +1200,8 @@ TEST_F(AclOrchTest, vs_createL3AclRule)
     // //         { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
     // //         { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
     // // SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
-    // // ASSERT_TRUE(AttrListEq(rule_ret->counter_attr_list, counter_attr_list));
-    // // ASSERT_TRUE(AttrListEq(rule_ret->rule_attr_list, rule_attr_list));
+    // // ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->counter_attr_list, counter_attr_list));
+    // // ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->rule_attr_list, rule_attr_list));
 
     sai_api_uninitialize();
 }
