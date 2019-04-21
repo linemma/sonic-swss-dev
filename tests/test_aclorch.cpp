@@ -52,7 +52,7 @@ extern sai_vlan_api_t* sai_vlan_api;
 extern sai_bridge_api_t* sai_bridge_api;
 extern sai_route_api_t* sai_route_api;
 
-size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>& entries)
+size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
 {
     /* Nothing popped */
     if (entries.empty()) {
@@ -92,6 +92,17 @@ size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>&
         }
     }
     return entries.size();
+}
+
+// TODO: move to separted file ?
+const map<sai_object_id_t, AclTable>& getAclTables(const AclOrch& orch)
+{
+    return orch.m_AclTables;
+}
+
+sai_object_id_t getAclRuleOid(const AclRule& aclrule)
+{
+    return aclrule.m_ruleOid;
 }
 
 TEST(ConvertTest, field_value_to_attribute)
@@ -353,14 +364,23 @@ struct TestBase : public ::testing::Test {
             auto act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
             auto exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
 
+            // auto act = sai_serialize_attr_value(*meta, act_attr_list[i].value, false);
+            // auto exp = sai_serialize_attr_value(*meta, &exp_attr_list.get_attr_list()[i].value, false);
+
             assert(act_len < sizeof(act_buf));
             assert(exp_len < sizeof(exp_buf));
 
             if (act_len != exp_len) {
+                std::cout << "AttrListEq failed\n";
+                std::cout << "Actual:   " << act_buf << "\n";
+                std::cout << "Expected: " << exp_buf << "\n";
                 return false;
             }
 
             if (strcmp(act_buf, exp_buf) != 0) {
+                std::cout << "AttrListEq failed\n";
+                std::cout << "Actual:   " << act_buf << "\n";
+                std::cout << "Expected: " << exp_buf << "\n";
                 return false;
             }
         }
@@ -1057,18 +1077,14 @@ static int profile_get_next_value(
     return -1;
 }
 
-TEST_F(AclOrchTest, create_L3Acl_Table)
+TEST_F(AclOrchTest, Create_L3Acl_Table)
 {
     sai_service_method_table_t test_services = {
         profile_get_value,
         profile_get_next_value
     };
 
-    std::cout << "sai_api_initialize ... "
-              << "\n";
     auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-    std::cout << "sai_api_initialize ... done"
-              << "\n";
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
     sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
@@ -1151,92 +1167,34 @@ TEST_F(AclOrchTest, create_L3Acl_Table)
 
     status = sai_acl_api->get_acl_table_attribute(id, act_attr.size(), act_attr.data());
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-    ///////////////////////////////////////////////////////////////////////////
 
     ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_ACL_TABLE, act_attr, exp_attrlist));
 
-    // string rule_id = "acl_rule_l3";
+    ///////////////////////////////////////////////////////////////////////////
 
-    // auto filedValues = std::vector<swss::FieldValueTuple>(
-    //     { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
-    //         { MATCH_SRC_IP, "10.0.0.1" } });
-
-    // string rule_key = aclTable.id + ":" + rule_id;
-    // string rule_cmd(SET_COMMAND);
-    // KeyOpFieldsValuesTuple data = std::make_tuple(rule_key, rule_cmd, filedValues);
-
-    // shared_ptr<AclRule> newRule = AclRule::makeShared(aclTable.type, gAclOrch, gMirrorOrch,
-    //     nullptr /*m_dTelOrch*/, rule_id, aclTable.id, data);
-
-    // for (const auto& itr : filedValues) {
-    //     string attr_name = swss::to_upper(fvField(itr));
-    //     string attr_value = fvValue(itr);
-
-    //     if (newRule->validateAddPriority(attr_name, attr_value)) {
-    //         //SWSS_LOG_INFO("Added priority attribute");
-    //     } else if (newRule->validateAddMatch(attr_name, attr_value)) {
-    //         //SWSS_LOG_INFO("Added match attribute '%s'", attr_name.c_str());
-    //     } else if (newRule->validateAddAction(attr_name, attr_value)) {
-    //         //SWSS_LOG_INFO("Added action attribute '%s'", attr_name.c_str());
-    //     } else {
-    //         ASSERT_TRUE(false);
-    //     }
-    // }
-
-    // if (!newRule->validate()) {
-    //     ASSERT_TRUE(false);
-    // }
-
-    // b_ret = gAclOrch->addAclRule(newRule, aclTable.id);
-    // ASSERT_TRUE(b_ret);
-
-    // // auto counter = std::vector<swss::FieldValueTuple>(
-    // //     { { "SAI_ACL_COUNTER_ATTR_TABLE_ID", "oid:0x1" },
-    // //         { "SAI_ACL_COUNTER_ATTR_ENABLE_BYTE_COUNT", "true" },
-    // //         { "SAI_ACL_COUNTER_ATTR_ENABLE_PACKET_COUNT", "true" } });
-    // // SaiAttributeList counter_attr_list(SAI_OBJECT_TYPE_ACL_COUNTER, counter, false);
-    // // auto rule = std::vector<swss::FieldValueTuple>(
-    // //     { { "SAI_ACL_ENTRY_ATTR_TABLE_ID", "oid:0x1" },
-    // //         { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-    // //         { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-    // //         { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", "disabled" },
-    // //         { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
-    // //         { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
-    // // SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
-    // // ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->counter_attr_list, counter_attr_list));
-    // // ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->rule_attr_list, rule_attr_list));
-
-    std::cout << "sai_api_uninitialize ... "
-              << "\n";
     status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    gSwitchId = 0;
 
     sai_api_uninitialize();
-    std::cout << "sai_api_uninitialize ... done"
-              << "\n";
 
     sai_switch_api = nullptr;
     sai_acl_api = nullptr;
 }
 
-TEST_F(AclOrchTest, create_L3v6Acl_Table)
+TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 {
     sai_service_method_table_t test_services = {
         profile_get_value,
         profile_get_next_value
     };
 
-    std::cout << "sai_api_initialize ... "
-              << "\n";
     auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-    std::cout << "sai_api_initialize ... done"
-              << "\n";
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
     sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
     sai_acl_api = const_cast<sai_acl_api_t*>(&vs_acl_api);
 
-    // FIXME: the
     sai_attribute_t swattr;
 
     swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
@@ -1316,68 +1274,214 @@ TEST_F(AclOrchTest, create_L3v6Acl_Table)
 
     status = sai_acl_api->get_acl_table_attribute(id, act_attr.size(), act_attr.data());
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-    ///////////////////////////////////////////////////////////////////////////
 
     ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_ACL_TABLE, act_attr, exp_attrlist));
 
-    // string rule_id = "acl_rule_l3";
+    ///////////////////////////////////////////////////////////////////////////
 
-    // auto filedValues = std::vector<swss::FieldValueTuple>(
-    //     { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
-    //         { MATCH_SRC_IP, "10.0.0.1" } });
-
-    // string rule_key = aclTable.id + ":" + rule_id;
-    // string rule_cmd(SET_COMMAND);
-    // KeyOpFieldsValuesTuple data = std::make_tuple(rule_key, rule_cmd, filedValues);
-
-    // shared_ptr<AclRule> newRule = AclRule::makeShared(aclTable.type, gAclOrch, gMirrorOrch,
-    //     nullptr /*m_dTelOrch*/, rule_id, aclTable.id, data);
-
-    // for (const auto& itr : filedValues) {
-    //     string attr_name = swss::to_upper(fvField(itr));
-    //     string attr_value = fvValue(itr);
-
-    //     if (newRule->validateAddPriority(attr_name, attr_value)) {
-    //         //SWSS_LOG_INFO("Added priority attribute");
-    //     } else if (newRule->validateAddMatch(attr_name, attr_value)) {
-    //         //SWSS_LOG_INFO("Added match attribute '%s'", attr_name.c_str());
-    //     } else if (newRule->validateAddAction(attr_name, attr_value)) {
-    //         //SWSS_LOG_INFO("Added action attribute '%s'", attr_name.c_str());
-    //     } else {
-    //         ASSERT_TRUE(false);
-    //     }
-    // }
-
-    // if (!newRule->validate()) {
-    //     ASSERT_TRUE(false);
-    // }
-
-    // b_ret = gAclOrch->addAclRule(newRule, aclTable.id);
-    // ASSERT_TRUE(b_ret);
-
-    // // auto counter = std::vector<swss::FieldValueTuple>(
-    // //     { { "SAI_ACL_COUNTER_ATTR_TABLE_ID", "oid:0x1" },
-    // //         { "SAI_ACL_COUNTER_ATTR_ENABLE_BYTE_COUNT", "true" },
-    // //         { "SAI_ACL_COUNTER_ATTR_ENABLE_PACKET_COUNT", "true" } });
-    // // SaiAttributeList counter_attr_list(SAI_OBJECT_TYPE_ACL_COUNTER, counter, false);
-    // // auto rule = std::vector<swss::FieldValueTuple>(
-    // //     { { "SAI_ACL_ENTRY_ATTR_TABLE_ID", "oid:0x1" },
-    // //         { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-    // //         { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-    // //         { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", "disabled" },
-    // //         { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
-    // //         { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
-    // // SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
-    // // ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->counter_attr_list, counter_attr_list));
-    // // ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->rule_attr_list, rule_attr_list));
-
-    std::cout << "sai_api_uninitialize ... "
-              << "\n";
     status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    gSwitchId = 0;
     sai_api_uninitialize();
-    std::cout << "sai_api_uninitialize ... done"
-              << "\n";
+
+    sai_switch_api = nullptr;
+    sai_acl_api = nullptr;
+}
+
+TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
+{
+    sai_service_method_table_t test_services = {
+        profile_get_value,
+        profile_get_next_value
+    };
+
+    auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+    sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+    sai_acl_api = const_cast<sai_acl_api_t*>(&vs_acl_api);
+
+    sai_attribute_t swattr;
+
+    swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+    swattr.value.booldata = true;
+
+    status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // TODO: vs create_default_acl_table_4
+    std::string acl_table_name = "acl_table_1";
+    std::string acl_rule_id = "acl_rule_1";
+
+    auto consumer_acl_table = std::unique_ptr<Consumer>(new Consumer(
+        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+
+    auto consumer_acl_rule = std::unique_ptr<Consumer>(new Consumer(
+        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    auto acl_cfg = std::deque<KeyOpFieldsValuesTuple>(
+        { { acl_table_name,
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3 },
+                //            ^^^^^^^^^^^^^ L3 ACL
+                { TABLE_STAGE, TABLE_INGRESS },
+                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+                { TABLE_PORTS, "1,2" } } } });
+    // FIXME:                  ^^^^^^^^^^^^^ fixed port
+
+    consumerAddToSync(consumer_acl_table.get(), acl_cfg);
+    consumerAddToSync(consumer_acl_rule.get(),
+        { { acl_table_name + "|" + acl_rule_id, SET_COMMAND,
+            { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
+
+                // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
+                // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
+                // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
+                // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
+                // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
+                // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
+                //
+                // TODO: required field (add new test cases for that ....)
+                //
+
+                { MATCH_SRC_IP, "1.2.3.4" } } } });
+
+    // TODO: RULE_PRIORITY (important field)
+    // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
+
+    // Logger::setMinPrio(Logger::SWSS_DEBUG);
+
+    ///////////////////////////////////////////////////////////////////////////
+    for (auto consumer : { consumer_acl_table.get(), consumer_acl_rule.get() }) {
+        static_cast<Orch*>(gAclOrch)->doTask(*consumer);
+        Logger::setMinPrio(Logger::SWSS_DEBUG);
+    }
+    // static_cast<Orch*>(gAclOrch)->doTask(*consumer_acl_table);
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    auto acl_table_oid = gAclOrch->getTableById(acl_table_name);
+    const auto& acl_tables = getAclTables(*gAclOrch);
+
+    // acl_table->rules[acl_rule_oid??];
+    auto it = acl_tables.find(acl_table_oid);
+    ASSERT_TRUE(it != acl_tables.end());
+
+    //auto acl_rule_oid = it->second.rules.begin()->first;
+    auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
+    auto acl_rule_oid = getAclRuleOid(*acl_rule.get());
+
+    ///////////////////////////////////////////////////////////////////////////
+    {
+        sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
+        auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+                { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+                { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+        SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+
+        std::vector<sai_attribute_t> act_attr;
+
+        for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+            const auto attr = exp_attrlist.get_attr_list()[i];
+            auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+
+            ASSERT_TRUE(meta != nullptr);
+
+            sai_attribute_t new_attr = { 0 };
+            new_attr.id = attr.id;
+
+            switch (meta->attrvaluetype) {
+            case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+                new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+                new_attr.value.s32list.count = attr.value.s32list.count;
+                m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+                break;
+
+            default:
+                std::cout << "";
+                ;
+            }
+
+            act_attr.emplace_back(new_attr);
+        }
+
+        status = sai_acl_api->get_acl_table_attribute(acl_table_oid, act_attr.size(), act_attr.data()); // <----------
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+    }
+    ///////////////////////////////////////////////////////////////////////////
+    {
+        auto table_id = sai_serialize_object_id(acl_table_oid);
+        auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
+
+        sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
+        auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            {
+                { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
+                { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+                { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+                { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
+
+                // cfg fields
+                { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" },
+                { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
+                //                                            SAI_PACKET_ACTION_FORWARD
+
+            });
+        SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+
+        std::vector<sai_attribute_t> act_attr;
+
+        for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+            const auto attr = exp_attrlist.get_attr_list()[i];
+            auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+
+            ASSERT_TRUE(meta != nullptr);
+
+            sai_attribute_t new_attr = { 0 };
+            new_attr.id = attr.id;
+
+            switch (meta->attrvaluetype) {
+            case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+                new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+                new_attr.value.s32list.count = attr.value.s32list.count;
+                m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+                break;
+
+            default:
+                std::cout << "";
+                ;
+            }
+
+            act_attr.emplace_back(new_attr);
+        }
+
+        status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+    }
+    ///////////////////////////////////////////////////////////////////////////
+
+    status = sai_switch_api->remove_switch(gSwitchId);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    gSwitchId = 0;
+
+    sai_api_uninitialize();
 
     sai_switch_api = nullptr;
     sai_acl_api = nullptr;
