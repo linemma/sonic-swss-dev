@@ -144,6 +144,16 @@ sai_object_id_t getAclRuleOid(const AclRule& aclrule)
     return aclrule.m_ruleOid;
 }
 
+const map<sai_acl_entry_attr_t, sai_attribute_value_t>& getAclRuleMatches(const AclRule& aclrule)
+{
+    return aclrule.m_matches;
+}
+
+const map<sai_acl_entry_attr_t, sai_attribute_value_t>& getAclRuleActions(const AclRule& aclrule)
+{
+    return aclrule.m_actions;
+}
+
 TEST(ConvertTest, field_value_to_attribute)
 {
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
@@ -384,7 +394,7 @@ struct TestBase : public ::testing::Test {
         return true;
     }
 
-    bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+    static bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
             return false;
@@ -2012,6 +2022,36 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     // acl_table->rules[acl_rule_oid??];
     auto it = acl_tables.find(acl_table_oid);
     ASSERT_TRUE(it != acl_tables.end());
+
+    // validate acl rule
+    const auto& acl_table = it->second;
+    auto it_rule = acl_table.rules.find(acl_rule_id);
+    ASSERT_TRUE(it_rule != acl_table.rules.end());
+
+    const auto& rule_matches = getAclRuleMatches(*it_rule->second);
+    const auto& rule_actions = getAclRuleActions(*it_rule->second);
+
+    // sip
+    {
+        auto it_field = rule_matches.find(SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP); // <----------
+        ASSERT_TRUE(it_field != rule_matches.end());
+
+        char addr[20];
+        sai_serialize_ip4(addr, it_field->second.aclfield.data.ip4);
+        ASSERT_STREQ(addr, "1.2.3.4");
+
+        char mask[20];
+        sai_serialize_ip4(mask, it_field->second.aclfield.mask.ip4);
+        ASSERT_STREQ(mask, "255.255.255.255");
+    }
+
+    // action
+    {
+        auto it_field = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION); // <----------
+        ASSERT_TRUE(it_field != rule_matches.end());
+
+        ASSERT_TRUE(it_field->second.aclaction.parameter.u32 == SAI_PACKET_ACTION_FORWARD);
+    }
 
     //auto acl_rule_oid = it->second.rules.begin()->first;
     auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
