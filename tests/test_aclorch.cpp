@@ -430,34 +430,45 @@ struct TestBase : public ::testing::Test {
 
 TestBase* TestBase::that = nullptr;
 
-struct AclTest : public TestBase {
-
-    std::shared_ptr<swss::DBConnector> m_app_db;
-    std::shared_ptr<swss::DBConnector> m_config_db;
-    std::shared_ptr<swss::DBConnector> m_state_db;
-    sai_object_id_t m_acl_table_num;
-    sai_object_id_t m_acl_entry_num;
-    sai_object_id_t m_acl_counter_num;
-
+struct AclTestBase : public TestBase {
     std::vector<int32_t*> m_s32list_pool;
 
-    AclTest()
-    {
-        m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-        m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-        m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-
-        m_acl_table_num = 0;
-        m_acl_entry_num = 0;
-        m_acl_counter_num = 0;
-    }
-
-    virtual ~AclTest()
+    virtual ~AclTestBase()
     {
         for (auto p : m_s32list_pool) {
             free(p);
         }
     }
+};
+
+struct AclTest : public AclTestBase {
+
+    // std::shared_ptr<swss::DBConnector> m_app_db;
+    std::shared_ptr<swss::DBConnector> m_config_db;
+    // std::shared_ptr<swss::DBConnector> m_state_db;
+    // sai_object_id_t m_acl_table_num;
+    // sai_object_id_t m_acl_entry_num;
+    // sai_object_id_t m_acl_counter_num;
+
+    // std::vector<int32_t*> m_s32list_pool;
+
+    AclTest()
+    {
+        // m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+        m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+        // m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+
+        // m_acl_table_num = 0;
+        // m_acl_entry_num = 0;
+        // m_acl_counter_num = 0;
+    }
+
+    // virtual ~AclTest()
+    // {
+    //     for (auto p : m_s32list_pool) {
+    //         free(p);
+    //     }
+    // }
 
     // static void SetUpTestCase()
     // {
@@ -471,220 +482,220 @@ struct AclTest : public TestBase {
 
     void SetUp() override
     {
-        assert(gAclOrch == nullptr);
-        assert(gFdbOrch == nullptr);
-        assert(gMirrorOrch == nullptr);
-        assert(gRouteOrch == nullptr);
-        assert(gNeighOrch == nullptr);
-        assert(gIntfsOrch == nullptr);
-        assert(gVrfOrch == nullptr);
-        assert(gCrmOrch == nullptr);
-        assert(gPortsOrch == nullptr);
+        // assert(gAclOrch == nullptr);
+        // assert(gFdbOrch == nullptr);
+        // assert(gMirrorOrch == nullptr);
+        // assert(gRouteOrch == nullptr);
+        // assert(gNeighOrch == nullptr);
+        // assert(gIntfsOrch == nullptr);
+        // assert(gVrfOrch == nullptr);
+        // assert(gCrmOrch == nullptr);
+        // assert(gPortsOrch == nullptr);
 
-        assert(sai_switch_api == nullptr);
-        assert(sai_port_api == nullptr);
-        assert(sai_vlan_api == nullptr);
-        assert(sai_bridge_api == nullptr);
-        assert(sai_route_api == nullptr);
+        // assert(sai_switch_api == nullptr);
+        // assert(sai_port_api == nullptr);
+        // assert(sai_vlan_api == nullptr);
+        // assert(sai_bridge_api == nullptr);
+        // assert(sai_route_api == nullptr);
 
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_switch = std::shared_ptr<sai_switch_api_t>(new sai_switch_api_t(), [](sai_switch_api_t* p) {
-            delete p;
-            sai_switch_api = nullptr;
-        });
+        // // FIXME: BUG ! the scope is not correct ! why not error ?
+        // auto sai_switch = std::shared_ptr<sai_switch_api_t>(new sai_switch_api_t(), [](sai_switch_api_t* p) {
+        //     delete p;
+        //     sai_switch_api = nullptr;
+        // });
 
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_port = std::shared_ptr<sai_port_api_t>(new sai_port_api_t(), [](sai_port_api_t* p) {
-            delete p;
-            sai_port_api = nullptr;
-        });
+        // // FIXME: BUG ! the scope is not correct ! why not error ?
+        // auto sai_port = std::shared_ptr<sai_port_api_t>(new sai_port_api_t(), [](sai_port_api_t* p) {
+        //     delete p;
+        //     sai_port_api = nullptr;
+        // });
 
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_vlan = std::shared_ptr<sai_vlan_api_t>(new sai_vlan_api_t(), [](sai_vlan_api_t* p) {
-            delete p;
-            sai_vlan_api = nullptr;
-        });
+        // // FIXME: BUG ! the scope is not correct ! why not error ?
+        // auto sai_vlan = std::shared_ptr<sai_vlan_api_t>(new sai_vlan_api_t(), [](sai_vlan_api_t* p) {
+        //     delete p;
+        //     sai_vlan_api = nullptr;
+        // });
 
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_bridge = std::shared_ptr<sai_bridge_api_t>(new sai_bridge_api_t(), [](sai_bridge_api_t* p) {
-            delete p;
-            sai_bridge_api = nullptr;
-        });
+        // // FIXME: BUG ! the scope is not correct ! why not error ?
+        // auto sai_bridge = std::shared_ptr<sai_bridge_api_t>(new sai_bridge_api_t(), [](sai_bridge_api_t* p) {
+        //     delete p;
+        //     sai_bridge_api = nullptr;
+        // });
 
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_route = std::shared_ptr<sai_route_api_t>(new sai_route_api_t(), [](sai_route_api_t* p) {
-            delete p;
-            sai_route_api = nullptr;
-        });
+        // // FIXME: BUG ! the scope is not correct ! why not error ?
+        // auto sai_route = std::shared_ptr<sai_route_api_t>(new sai_route_api_t(), [](sai_route_api_t* p) {
+        //     delete p;
+        //     sai_route_api = nullptr;
+        // });
 
-        // FIXME: Change the following function to "stub" or "dummy" (just return fixed value), just interact with AclTable / AclRule
-        sai_switch_api = sai_switch.get();
-        sai_port_api = sai_port.get();
-        sai_vlan_api = sai_vlan.get();
-        sai_bridge_api = sai_bridge.get();
-        sai_route_api = sai_route.get();
+        // // FIXME: Change the following function to "stub" or "dummy" (just return fixed value), just interact with AclTable / AclRule
+        // sai_switch_api = sai_switch.get();
+        // sai_port_api = sai_port.get();
+        // sai_vlan_api = sai_vlan.get();
+        // sai_bridge_api = sai_bridge.get();
+        // sai_route_api = sai_route.get();
 
-        // TODO: change these functions .... for init only ??
-        sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
-        sai_port_api->get_port_attribute = sai_get_port_attribute_;
-        sai_vlan_api->get_vlan_attribute = sai_get_vlan_attribute_;
-        sai_vlan_api->remove_vlan_member = sai_remove_vlan_member_;
-        sai_bridge_api->get_bridge_attribute = sai_get_bridge_attribute_;
-        sai_bridge_api->get_bridge_port_attribute = sai_get_bridge_port_attribute_;
-        sai_bridge_api->remove_bridge_port = sai_remove_bridge_port_;
-        sai_route_api->create_route_entry = sai_create_route_entry_;
-        that = this;
+        // // TODO: change these functions .... for init only ??
+        // sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
+        // sai_port_api->get_port_attribute = sai_get_port_attribute_;
+        // sai_vlan_api->get_vlan_attribute = sai_get_vlan_attribute_;
+        // sai_vlan_api->remove_vlan_member = sai_remove_vlan_member_;
+        // sai_bridge_api->get_bridge_attribute = sai_get_bridge_attribute_;
+        // sai_bridge_api->get_bridge_port_attribute = sai_get_bridge_port_attribute_;
+        // sai_bridge_api->remove_bridge_port = sai_remove_bridge_port_;
+        // sai_route_api->create_route_entry = sai_create_route_entry_;
+        // that = this;
 
-        sai_create_switch_fn =
-            [](_Out_ sai_object_id_t* switch_id,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_create_switch_fn =
+        //     [](_Out_ sai_object_id_t* switch_id,
+        //         _In_ uint32_t attr_count,
+        //         _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_get_switch_attribute_fn =
-            [](_In_ sai_object_id_t switch_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_get_switch_attribute_fn =
+        //     [](_In_ sai_object_id_t switch_id,
+        //         _In_ uint32_t attr_count,
+        //         _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_get_port_attribute_fn =
-            [](_In_ sai_object_id_t port_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_get_port_attribute_fn =
+        //     [](_In_ sai_object_id_t port_id,
+        //         _In_ uint32_t attr_count,
+        //         _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_get_vlan_attribute_fn =
-            [](_In_ sai_object_id_t vlan_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_get_vlan_attribute_fn =
+        //     [](_In_ sai_object_id_t vlan_id,
+        //         _In_ uint32_t attr_count,
+        //         _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_remove_vlan_member_fn =
-            [](_In_ sai_object_id_t vlan_member_id) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_remove_vlan_member_fn =
+        //     [](_In_ sai_object_id_t vlan_member_id) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_get_bridge_attribute_fn =
-            [](_In_ sai_object_id_t bridge_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_get_bridge_attribute_fn =
+        //     [](_In_ sai_object_id_t bridge_id,
+        //         _In_ uint32_t attr_count,
+        //         _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_get_bridge_port_attribute_fn =
-            [](_In_ sai_object_id_t bridge_port_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_get_bridge_port_attribute_fn =
+        //     [](_In_ sai_object_id_t bridge_port_id,
+        //         _In_ uint32_t attr_count,
+        //         _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_remove_bridge_port_fn =
-            [](_In_ sai_object_id_t bridge_port_id) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_remove_bridge_port_fn =
+        //     [](_In_ sai_object_id_t bridge_port_id) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        sai_create_route_entry_fn =
-            [](_In_ const sai_route_entry_t* route_entry,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
+        // sai_create_route_entry_fn =
+        //     [](_In_ const sai_route_entry_t* route_entry,
+        //         _In_ uint32_t attr_count,
+        //         _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+        //     return SAI_STATUS_SUCCESS;
+        // };
 
-        TableConnector confDbAclTable(m_config_db.get(), CFG_ACL_TABLE_NAME);
-        TableConnector confDbAclRuleTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME);
+        // TableConnector confDbAclTable(m_config_db.get(), CFG_ACL_TABLE_NAME);
+        // TableConnector confDbAclRuleTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME);
 
-        const int portsorch_base_pri = 40;
+        // const int portsorch_base_pri = 40;
 
-        vector<table_name_with_pri_t> ports_tables = {
-            { APP_PORT_TABLE_NAME, portsorch_base_pri + 5 },
-            { APP_VLAN_TABLE_NAME, portsorch_base_pri + 2 },
-            { APP_VLAN_MEMBER_TABLE_NAME, portsorch_base_pri },
-            { APP_LAG_TABLE_NAME, portsorch_base_pri + 4 },
-            { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
-        };
+        // vector<table_name_with_pri_t> ports_tables = {
+        //     { APP_PORT_TABLE_NAME, portsorch_base_pri + 5 },
+        //     { APP_VLAN_TABLE_NAME, portsorch_base_pri + 2 },
+        //     { APP_VLAN_MEMBER_TABLE_NAME, portsorch_base_pri },
+        //     { APP_LAG_TABLE_NAME, portsorch_base_pri + 4 },
+        //     { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
+        // };
 
-        // FIXME: doesn't use global variable !!
-        assert(gPortsOrch == nullptr);
-        gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
+        // // FIXME: doesn't use global variable !!
+        // assert(gPortsOrch == nullptr);
+        // gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
         // FIXME: doesn't use global variable !!
         assert(gCrmOrch == nullptr);
         gCrmOrch = new CrmOrch(m_config_db.get(), CFG_CRM_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
-        assert(gVrfOrch == nullptr);
-        gVrfOrch = new VRFOrch(m_app_db.get(), APP_VRF_TABLE_NAME);
+        // // FIXME: doesn't use global variable !!
+        // assert(gVrfOrch == nullptr);
+        // gVrfOrch = new VRFOrch(m_app_db.get(), APP_VRF_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
-        assert(gIntfsOrch == nullptr);
-        gIntfsOrch = new IntfsOrch(m_app_db.get(), APP_INTF_TABLE_NAME, gVrfOrch);
+        // // FIXME: doesn't use global variable !!
+        // assert(gIntfsOrch == nullptr);
+        // gIntfsOrch = new IntfsOrch(m_app_db.get(), APP_INTF_TABLE_NAME, gVrfOrch);
 
-        // FIXME: doesn't use global variable !!
-        assert(gNeighOrch == nullptr);
-        gNeighOrch = new NeighOrch(m_app_db.get(), APP_NEIGH_TABLE_NAME, gIntfsOrch);
+        // // FIXME: doesn't use global variable !!
+        // assert(gNeighOrch == nullptr);
+        // gNeighOrch = new NeighOrch(m_app_db.get(), APP_NEIGH_TABLE_NAME, gIntfsOrch);
 
-        // FIXME: doesn't use global variable !!
-        assert(gRouteOrch == nullptr);
-        gRouteOrch = new RouteOrch(m_app_db.get(), APP_ROUTE_TABLE_NAME, gNeighOrch);
+        // // FIXME: doesn't use global variable !!
+        // assert(gRouteOrch == nullptr);
+        // gRouteOrch = new RouteOrch(m_app_db.get(), APP_ROUTE_TABLE_NAME, gNeighOrch);
 
-        TableConnector applDbFdb(m_app_db.get(), APP_FDB_TABLE_NAME);
-        TableConnector stateDbFdb(m_state_db.get(), STATE_FDB_TABLE_NAME);
+        // TableConnector applDbFdb(m_app_db.get(), APP_FDB_TABLE_NAME);
+        // TableConnector stateDbFdb(m_state_db.get(), STATE_FDB_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
-        assert(gFdbOrch == nullptr);
-        gFdbOrch = new FdbOrch(applDbFdb, stateDbFdb, gPortsOrch);
+        // // FIXME: doesn't use global variable !!
+        // assert(gFdbOrch == nullptr);
+        // gFdbOrch = new FdbOrch(applDbFdb, stateDbFdb, gPortsOrch);
 
-        TableConnector stateDbMirrorSession(m_state_db.get(), APP_MIRROR_SESSION_TABLE_NAME);
-        TableConnector confDbMirrorSession(m_config_db.get(), CFG_MIRROR_SESSION_TABLE_NAME);
+        // TableConnector stateDbMirrorSession(m_state_db.get(), APP_MIRROR_SESSION_TABLE_NAME);
+        // TableConnector confDbMirrorSession(m_config_db.get(), CFG_MIRROR_SESSION_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
-        assert(gMirrorOrch == nullptr);
-        gMirrorOrch = new MirrorOrch(stateDbMirrorSession, confDbMirrorSession,
-            gPortsOrch, gRouteOrch, gNeighOrch, gFdbOrch);
+        // // FIXME: doesn't use global variable !!
+        // assert(gMirrorOrch == nullptr);
+        // gMirrorOrch = new MirrorOrch(stateDbMirrorSession, confDbMirrorSession,
+        //     gPortsOrch, gRouteOrch, gNeighOrch, gFdbOrch);
 
-        vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
+        // vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
 
-        // FIXME: Using local variable or data member for aclorch ... ??
-        gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
-            gNeighOrch, gRouteOrch);
+        // // FIXME: Using local variable or data member for aclorch ... ??
+        // gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
+        //     gNeighOrch, gRouteOrch);
 
-        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
-        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+        // auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
+        // auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
 
-        auto setData = std::deque<KeyOpFieldsValuesTuple>(
-            { { "PortInitDone",
-                EMPTY_PREFIX,
-                { { "", "" } } } });
-        consumerExt->addToSync(setData);
+        // auto setData = std::deque<KeyOpFieldsValuesTuple>(
+        //     { { "PortInitDone",
+        //         EMPTY_PREFIX,
+        //         { { "", "" } } } });
+        // consumerExt->addToSync(setData);
 
-        Consumer* consumer = consumerExt.get();
-        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
+        // Consumer* consumer = consumerExt.get();
+        // static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
     }
 
     void TearDown() override
     {
-        delete gAclOrch; // FIXME: using auto ptr
-        gAclOrch = nullptr;
-        delete gFdbOrch; // FIXME: using auto ptr
-        gFdbOrch = nullptr;
-        delete gMirrorOrch; // FIXME: using auto ptr
-        gMirrorOrch = nullptr;
-        delete gRouteOrch; // FIXME: using auto ptr
-        gRouteOrch = nullptr;
-        delete gNeighOrch; // FIXME: using auto ptr
-        gNeighOrch = nullptr;
-        delete gIntfsOrch; // FIXME: using auto ptr
-        gIntfsOrch = nullptr;
-        delete gVrfOrch; // FIXME: using auto ptr
-        gVrfOrch = nullptr;
+        // delete gAclOrch; // FIXME: using auto ptr
+        // gAclOrch = nullptr;
+        // delete gFdbOrch; // FIXME: using auto ptr
+        // gFdbOrch = nullptr;
+        // delete gMirrorOrch; // FIXME: using auto ptr
+        // gMirrorOrch = nullptr;
+        // delete gRouteOrch; // FIXME: using auto ptr
+        // gRouteOrch = nullptr;
+        // delete gNeighOrch; // FIXME: using auto ptr
+        // gNeighOrch = nullptr;
+        // delete gIntfsOrch; // FIXME: using auto ptr
+        // gIntfsOrch = nullptr;
+        // delete gVrfOrch; // FIXME: using auto ptr
+        // gVrfOrch = nullptr;
         delete gCrmOrch; // FIXME: using auto ptr
         gCrmOrch = nullptr;
-        delete gPortsOrch; // FIXME: using auto ptr
-        gPortsOrch = nullptr;
+        // delete gPortsOrch; // FIXME: using auto ptr
+        // gPortsOrch = nullptr;
     }
 
     std::shared_ptr<CreateAclResult> createAclTable_4(AclTable& acl)
@@ -946,10 +957,32 @@ struct AclOrchTest : public AclTest {
     //     return ret;
     // }
 
+    std::shared_ptr<swss::DBConnector> m_app_db;
+    std::shared_ptr<swss::DBConnector> m_config_db;
+    std::shared_ptr<swss::DBConnector> m_state_db;
+
+    AclOrchTest()
+    {
+        m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+        m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+        m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    }
+
     void SetUp() override
     {
-        AclTest::SetUp();
+        AclTestBase::SetUp();
 
+        assert(gAclOrch == nullptr);
+        assert(gFdbOrch == nullptr);
+        assert(gMirrorOrch == nullptr);
+        assert(gRouteOrch == nullptr);
+        assert(gNeighOrch == nullptr);
+        assert(gIntfsOrch == nullptr);
+        assert(gVrfOrch == nullptr);
+        assert(gCrmOrch == nullptr);
+        assert(gPortsOrch == nullptr);
+
+        ///////////////////////////////////////////////////////////////////////
         sai_service_method_table_t test_services = {
             profile_get_value,
             profile_get_next_value
@@ -958,7 +991,10 @@ struct AclOrchTest : public AclTest {
         auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
+        // FIXME: using clone not just assign
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+
+        // FIXME: using clone not just assign
         sai_acl_api = const_cast<sai_acl_api_t*>(&vs_acl_api);
 
         sai_attribute_t swattr;
@@ -968,11 +1004,216 @@ struct AclOrchTest : public AclTest {
 
         status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        ///////////////////////////////////////////////////////////////////////
+
+        // assert(sai_switch_api == nullptr);
+        assert(sai_port_api == nullptr);
+        assert(sai_vlan_api == nullptr);
+        assert(sai_bridge_api == nullptr);
+        assert(sai_route_api == nullptr);
+
+        // FIXME: BUG ! the scope is not correct ! why not error ?
+        // auto sai_switch = std::shared_ptr<sai_switch_api_t>(new sai_switch_api_t(), [](sai_switch_api_t* p) {
+        //     delete p;
+        //     sai_switch_api = nullptr;
+        // });
+
+        // FIXME: BUG ! the scope is not correct ! why not error ?
+        auto sai_port = std::shared_ptr<sai_port_api_t>(new sai_port_api_t(), [](sai_port_api_t* p) {
+            delete p;
+            sai_port_api = nullptr;
+        });
+
+        // FIXME: BUG ! the scope is not correct ! why not error ?
+        auto sai_vlan = std::shared_ptr<sai_vlan_api_t>(new sai_vlan_api_t(), [](sai_vlan_api_t* p) {
+            delete p;
+            sai_vlan_api = nullptr;
+        });
+
+        // FIXME: BUG ! the scope is not correct ! why not error ?
+        auto sai_bridge = std::shared_ptr<sai_bridge_api_t>(new sai_bridge_api_t(), [](sai_bridge_api_t* p) {
+            delete p;
+            sai_bridge_api = nullptr;
+        });
+
+        // FIXME: BUG ! the scope is not correct ! why not error ?
+        auto sai_route = std::shared_ptr<sai_route_api_t>(new sai_route_api_t(), [](sai_route_api_t* p) {
+            delete p;
+            sai_route_api = nullptr;
+        });
+
+        // FIXME: Change the following function to "stub" or "dummy" (just return fixed value), just interact with AclTable / AclRule
+        // sai_switch_api = sai_switch.get();
+        sai_port_api = sai_port.get();
+        sai_vlan_api = sai_vlan.get();
+        sai_bridge_api = sai_bridge.get();
+        sai_route_api = sai_route.get();
+
+        // TODO: change these functions .... for init only ??
+        // sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
+        sai_port_api->get_port_attribute = sai_get_port_attribute_;
+        sai_vlan_api->get_vlan_attribute = sai_get_vlan_attribute_;
+        sai_vlan_api->remove_vlan_member = sai_remove_vlan_member_;
+        sai_bridge_api->get_bridge_attribute = sai_get_bridge_attribute_;
+        sai_bridge_api->get_bridge_port_attribute = sai_get_bridge_port_attribute_;
+        sai_bridge_api->remove_bridge_port = sai_remove_bridge_port_;
+        sai_route_api->create_route_entry = sai_create_route_entry_;
+        that = this;
+
+        sai_create_switch_fn =
+            [](_Out_ sai_object_id_t* switch_id,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_switch_attribute_fn =
+            [](_In_ sai_object_id_t switch_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_port_attribute_fn =
+            [](_In_ sai_object_id_t port_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_vlan_attribute_fn =
+            [](_In_ sai_object_id_t vlan_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_remove_vlan_member_fn =
+            [](_In_ sai_object_id_t vlan_member_id) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_bridge_attribute_fn =
+            [](_In_ sai_object_id_t bridge_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_get_bridge_port_attribute_fn =
+            [](_In_ sai_object_id_t bridge_port_id,
+                _In_ uint32_t attr_count,
+                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_remove_bridge_port_fn =
+            [](_In_ sai_object_id_t bridge_port_id) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        sai_create_route_entry_fn =
+            [](_In_ const sai_route_entry_t* route_entry,
+                _In_ uint32_t attr_count,
+                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+            return SAI_STATUS_SUCCESS;
+        };
+
+        TableConnector confDbAclTable(m_config_db.get(), CFG_ACL_TABLE_NAME);
+        TableConnector confDbAclRuleTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME);
+
+        const int portsorch_base_pri = 40;
+
+        vector<table_name_with_pri_t> ports_tables = {
+            { APP_PORT_TABLE_NAME, portsorch_base_pri + 5 },
+            { APP_VLAN_TABLE_NAME, portsorch_base_pri + 2 },
+            { APP_VLAN_MEMBER_TABLE_NAME, portsorch_base_pri },
+            { APP_LAG_TABLE_NAME, portsorch_base_pri + 4 },
+            { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
+        };
+
+        // FIXME: doesn't use global variable !!
+        assert(gPortsOrch == nullptr);
+        gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
+
+        // FIXME: doesn't use global variable !!
+        assert(gCrmOrch == nullptr);
+        gCrmOrch = new CrmOrch(m_config_db.get(), CFG_CRM_TABLE_NAME);
+
+        // FIXME: doesn't use global variable !!
+        assert(gVrfOrch == nullptr);
+        gVrfOrch = new VRFOrch(m_app_db.get(), APP_VRF_TABLE_NAME);
+
+        // FIXME: doesn't use global variable !!
+        assert(gIntfsOrch == nullptr);
+        gIntfsOrch = new IntfsOrch(m_app_db.get(), APP_INTF_TABLE_NAME, gVrfOrch);
+
+        // FIXME: doesn't use global variable !!
+        assert(gNeighOrch == nullptr);
+        gNeighOrch = new NeighOrch(m_app_db.get(), APP_NEIGH_TABLE_NAME, gIntfsOrch);
+
+        // FIXME: doesn't use global variable !!
+        assert(gRouteOrch == nullptr);
+        gRouteOrch = new RouteOrch(m_app_db.get(), APP_ROUTE_TABLE_NAME, gNeighOrch);
+
+        TableConnector applDbFdb(m_app_db.get(), APP_FDB_TABLE_NAME);
+        TableConnector stateDbFdb(m_state_db.get(), STATE_FDB_TABLE_NAME);
+
+        // FIXME: doesn't use global variable !!
+        assert(gFdbOrch == nullptr);
+        gFdbOrch = new FdbOrch(applDbFdb, stateDbFdb, gPortsOrch);
+
+        TableConnector stateDbMirrorSession(m_state_db.get(), APP_MIRROR_SESSION_TABLE_NAME);
+        TableConnector confDbMirrorSession(m_config_db.get(), CFG_MIRROR_SESSION_TABLE_NAME);
+
+        // FIXME: doesn't use global variable !!
+        assert(gMirrorOrch == nullptr);
+        gMirrorOrch = new MirrorOrch(stateDbMirrorSession, confDbMirrorSession,
+            gPortsOrch, gRouteOrch, gNeighOrch, gFdbOrch);
+
+        vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
+
+        // FIXME: Using local variable or data member for aclorch ... ??
+        gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
+            gNeighOrch, gRouteOrch);
+
+        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
+        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+
+        auto setData = std::deque<KeyOpFieldsValuesTuple>(
+            { { "PortInitDone",
+                EMPTY_PREFIX,
+                { { "", "" } } } });
+        consumerExt->addToSync(setData);
+
+        Consumer* consumer = consumerExt.get();
+        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
     }
 
     void TearDown() override
     {
-        AclTest::TearDown();
+        AclTestBase::TearDown();
+
+        delete gAclOrch; // FIXME: using auto ptr
+        gAclOrch = nullptr;
+        delete gFdbOrch; // FIXME: using auto ptr
+        gFdbOrch = nullptr;
+        delete gMirrorOrch; // FIXME: using auto ptr
+        gMirrorOrch = nullptr;
+        delete gRouteOrch; // FIXME: using auto ptr
+        gRouteOrch = nullptr;
+        delete gNeighOrch; // FIXME: using auto ptr
+        gNeighOrch = nullptr;
+        delete gIntfsOrch; // FIXME: using auto ptr
+        gIntfsOrch = nullptr;
+        delete gVrfOrch; // FIXME: using auto ptr
+        gVrfOrch = nullptr;
+        delete gCrmOrch; // FIXME: using auto ptr
+        gCrmOrch = nullptr;
+        delete gPortsOrch; // FIXME: using auto ptr
+        gPortsOrch = nullptr;
+
+        ///////////////////////////////////////////////////////////////////////
 
         auto status = sai_switch_api->remove_switch(gSwitchId);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
@@ -1506,7 +1747,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
     ASSERT_TRUE(id != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
-    ASSERT_TRUE(acl_tables.at(id).type == ACL_TABLE_L3);
+    ASSERT_TRUE(acl_tables.at(id).type == ACL_TABLE_L3); // FIXME: using find() instead at()
     ASSERT_TRUE(acl_tables.at(id).stage == ACL_STAGE_INGRESS);
 
     // auto exp_fields = std::vector<swss::FieldValueTuple>(
@@ -1619,7 +1860,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     ASSERT_TRUE(id != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
-    ASSERT_TRUE(acl_tables.at(id).type == ACL_TABLE_L3V6);
+    ASSERT_TRUE(acl_tables.at(id).type == ACL_TABLE_L3V6); // FIXME: using find() instead at()
     ASSERT_TRUE(acl_tables.at(id).stage == ACL_STAGE_INGRESS);
 
     // auto exp_fields = std::vector<swss::FieldValueTuple>(
@@ -1754,7 +1995,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     ///////////////////////////////////////////////////////////////////////////
     for (auto consumer : { consumer_acl_table.get(), consumer_acl_rule.get() }) {
         static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-        Logger::setMinPrio(Logger::SWSS_DEBUG);
+        // Logger::setMinPrio(Logger::SWSS_DEBUG);
     }
     // static_cast<Orch*>(gAclOrch)->doTask(*consumer_acl_table);
 
@@ -1765,7 +2006,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
-    ASSERT_TRUE(acl_tables.at(acl_table_oid).type == ACL_TABLE_L3);
+    ASSERT_TRUE(acl_tables.at(acl_table_oid).type == ACL_TABLE_L3); // FIXME: using find() instead at()
     ASSERT_TRUE(acl_tables.at(acl_table_oid).stage == ACL_STAGE_INGRESS);
 
     // acl_table->rules[acl_rule_oid??];
@@ -1971,7 +2212,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
-    ASSERT_TRUE(acl_tables.at(acl_table_oid).type == ACL_TABLE_L3V6);
+    ASSERT_TRUE(acl_tables.at(acl_table_oid).type == ACL_TABLE_L3V6); // FIXME: using find() instead at()
     ASSERT_TRUE(acl_tables.at(acl_table_oid).stage == ACL_STAGE_INGRESS);
 
     // acl_table->rules[acl_rule_oid??];
