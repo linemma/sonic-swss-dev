@@ -762,115 +762,422 @@ TEST_F(AclTestRedis_Old_Test_Refine_Then_Remove, create_default_acl_table_on_red
 }
 
 struct AclOrchTest : public AclTest {
-    std::shared_ptr<AclTableResult> createAclTable_DONT_USE(Consumer& consumer)
+    // std::shared_ptr<AclTableResult> createAclTable_DONT_USE(Consumer& consumer)
+    // {
+    //     auto ret = std::make_shared<AclTableResult>();
+    //
+    //     assert(sai_acl_api == nullptr);
+    //
+    //     auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+    //         delete p;
+    //         sai_acl_api = nullptr;
+    //     });
+    //
+    //     sai_acl_api = sai_acl.get();
+    //     sai_acl_api->create_acl_table = sai_create_acl_table_;
+    //
+    //     sai_create_acl_table_fn =
+    //         [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
+    //             uint32_t attr_count,
+    //             const sai_attribute_t* attr_list) -> sai_status_t {
+    //         *acl_table_id = (++m_acl_table_num);
+    //         for (auto i = 0; i < attr_count; ++i) {
+    //             ret->attr_list.emplace_back(attr_list[i]);
+    //         }
+    //         ret->acl_table_id = *acl_table_id;
+    //         ret->ret_val = true;
+    //         return SAI_STATUS_SUCCESS;
+    //     };
+    //
+    //     // FIXME: passing aclorch or using self member data (DON'T using global variable)
+    //     static_cast<Orch*>(gAclOrch)->doTask(consumer);
+    //
+    //     return ret;
+    // }
+    //
+    // std::shared_ptr<AclTableResult> deleteAclTable_DONT_USE(Consumer& consumer)
+    // {
+    //     auto ret = std::make_shared<AclTableResult>();
+    //
+    //     assert(sai_acl_api == nullptr);
+    //
+    //     auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+    //         delete p;
+    //         sai_acl_api = nullptr;
+    //     });
+    //
+    //     sai_acl_api = sai_acl.get();
+    //     sai_acl_api->remove_acl_table = sai_remove_acl_table_;
+    //
+    //     sai_remove_acl_table_fn =
+    //         [&](sai_object_id_t acl_table_id) -> sai_status_t {
+    //         if (acl_table_id != m_acl_table_num)
+    //             return SAI_STATUS_FAILURE;
+    //
+    //         ret->acl_table_id = acl_table_id;
+    //         ret->ret_val = true;
+    //         return SAI_STATUS_SUCCESS;
+    //     };
+    //
+    //     // FIXME: passing aclorch or using self member data (DON'T using global variable)
+    //     static_cast<Orch*>(gAclOrch)->doTask(consumer);
+    //
+    //     return ret;
+    // }
+    //
+    // std::shared_ptr<AclRuleResult> createAclRule_DONT_USE(Consumer& consumer)
+    // {
+    //     auto ret = std::make_shared<AclRuleResult>();
+    //
+    //     assert(sai_acl_api == nullptr);
+    //
+    //     auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
+    //         delete p;
+    //         sai_acl_api = nullptr;
+    //     });
+    //
+    //     sai_acl_api = sai_acl.get();
+    //     sai_acl_api->create_acl_counter = sai_create_acl_counter_;
+    //     sai_acl_api->create_acl_entry = sai_create_acl_entry_;
+    //
+    //     sai_create_acl_counter_fn =
+    //         [&](_Out_ sai_object_id_t* acl_counter_id,
+    //             _In_ sai_object_id_t switch_id,
+    //             _In_ uint32_t attr_count,
+    //             _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+    //         *acl_counter_id = (++m_acl_counter_num);
+    //         for (auto i = 0; i < attr_count; ++i) {
+    //             ret->counter_attr_list.emplace_back(attr_list[i]);
+    //         }
+    //         ret->acl_counter_id = *acl_counter_id;
+    //         return SAI_STATUS_SUCCESS;
+    //     };
+    //
+    //     sai_create_acl_entry_fn =
+    //         [&](_Out_ sai_object_id_t* acl_entry_id,
+    //             _In_ sai_object_id_t switch_id,
+    //             _In_ uint32_t attr_count,
+    //             _In_ const sai_attribute_t* attr_list) -> sai_status_t {
+    //         *acl_entry_id = (++m_acl_entry_num);
+    //         for (auto i = 0; i < attr_count; ++i) {
+    //             ret->rule_attr_list.emplace_back(attr_list[i]);
+    //         }
+    //         ret->acl_entry_id = *acl_entry_id;
+    //         ret->ret_val = true;
+    //         return SAI_STATUS_SUCCESS;
+    //     };
+    //
+    //     // FIXME: passing aclorch or using self member data (DON'T using global variable)
+    //     static_cast<Orch*>(gAclOrch)->doTask(consumer);
+    //
+    //     return ret;
+    // }
+
+    std::shared_ptr<SaiAttributeList> GetActTableAttributeList(sai_object_type_t objecttype, const AclTable& acl_table)
     {
-        auto ret = std::make_shared<AclTableResult>();
+        // const sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
+        std::vector<swss::FieldValueTuple> fields;
 
-        assert(sai_acl_api == nullptr);
+        switch (acl_table.type) {
+        case ACL_TABLE_L3:
+            // sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
+            // auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            //     { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            //         { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            //         { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+            // // SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
 
-        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
-            delete p;
-            sai_acl_api = nullptr;
-        });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" });
 
-        sai_acl_api = sai_acl.get();
-        sai_acl_api->create_acl_table = sai_create_acl_table_;
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" });
+            break;
 
-        sai_create_acl_table_fn =
-            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
-                uint32_t attr_count,
-                const sai_attribute_t* attr_list) -> sai_status_t {
-            *acl_table_id = (++m_acl_table_num);
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->attr_list.emplace_back(attr_list[i]);
-            }
-            ret->acl_table_id = *acl_table_id;
-            ret->ret_val = true;
-            return SAI_STATUS_SUCCESS;
-        };
+        case ACL_TABLE_L3V6:
+            // auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            // { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IPV6", "true" },
+            //     //                          ^^^^^^^^ sip v6
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_DST_IPV6", "true" },
+            //     //                          ^^^^^^^^ dip v6
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            //     { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            //     { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
 
-        // FIXME: passing aclorch or using self member data (DON'T using global variable)
-        static_cast<Orch*>(gAclOrch)->doTask(consumer);
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_SRC_IPV6", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_DST_IPV6", "true" });
 
-        return ret;
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" });
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" });
+            break;
+
+        default:
+            assert(false);
+        }
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    std::shared_ptr<AclTableResult> deleteAclTable_DONT_USE(Consumer& consumer)
+    std::shared_ptr<SaiAttributeList> GetAclRuleAttributeList(sai_object_type_t objecttype, const AclRule& acl_rule, sai_object_id_t acl_table_oid, const AclTable& acl_table)
     {
-        auto ret = std::make_shared<AclTableResult>();
+        std::vector<swss::FieldValueTuple> fields;
 
-        assert(sai_acl_api == nullptr);
+        auto table_id = sai_serialize_object_id(acl_table_oid);
+        auto counter_id = sai_serialize_object_id(const_cast<AclRule&>(acl_rule).getCounterOid()); // FIXME: getcounterOid() should be const
 
-        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
-            delete p;
-            sai_acl_api = nullptr;
-        });
+        switch (acl_table.type) {
+        case ACL_TABLE_L3:
+            //     auto table_id = sai_serialize_object_id(acl_table_oid);
+            //     auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
+            //
+            //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
+            //     auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            //         {
+            //             { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
+            //             { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+            //             { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+            //             { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
+            //
+            //             // cfg fields
+            //             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" },
+            //             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
+            //             //                                            SAI_PACKET_ACTION_FORWARD
+            //
+            //         });
+            //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
 
-        sai_acl_api = sai_acl.get();
-        sai_acl_api->remove_acl_table = sai_remove_acl_table_;
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
 
-        sai_remove_acl_table_fn =
-            [&](sai_object_id_t acl_table_id) -> sai_status_t {
-            if (acl_table_id != m_acl_table_num)
-                return SAI_STATUS_FAILURE;
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" });
+            break;
 
-            ret->acl_table_id = acl_table_id;
-            ret->ret_val = true;
-            return SAI_STATUS_SUCCESS;
-        };
+        case ACL_TABLE_L3V6:
+            // auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            // {
+            //     { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
+            //     { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+            //     { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+            //     { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
+            //
+            //     // cfg fields
+            //     { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" },
+            //     { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
+            //     //                                            SAI_PACKET_ACTION_FORWARD
+            //
+            // });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
 
-        // FIXME: passing aclorch or using self member data (DON'T using global variable)
-        static_cast<Orch*>(gAclOrch)->doTask(consumer);
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" });
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" });
+            break;
 
-        return ret;
+        default:
+            assert(false);
+        }
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    std::shared_ptr<AclRuleResult> createAclRule_DONT_USE(Consumer& consumer)
+    bool ValidateAclRule(const std::string acl_rule_sid, const AclRule& acl_rule, sai_object_id_t acl_table_oid, const AclTable& acl_table)
     {
-        auto ret = std::make_shared<AclRuleResult>();
+        sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
+        auto exp_attrlist_2 = GetAclRuleAttributeList(objecttype, acl_rule, acl_table_oid, acl_table);
 
-        assert(sai_acl_api == nullptr);
+        // auto it = acl_tables.find(acl_table_oid);
+        // ASSERT_TRUE(it != acl_tables.end());
 
-        auto sai_acl = std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t(), [](sai_acl_api_t* p) {
-            delete p;
-            sai_acl_api = nullptr;
-        });
+        // //auto acl_rule_oid = it->second.rules.begin()->first;
+        // auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
+        auto acl_rule_oid = getAclRuleOid(acl_rule);
 
-        sai_acl_api = sai_acl.get();
-        sai_acl_api->create_acl_counter = sai_create_acl_counter_;
-        sai_acl_api->create_acl_entry = sai_create_acl_entry_;
+        {
+            //     auto table_id = sai_serialize_object_id(acl_table_oid);
+            //     auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
+            //
+            //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
+            //     auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            //         {
+            //             { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
+            //             { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+            //             { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+            //             { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
+            //
+            //             // cfg fields
+            //             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" },
+            //             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
+            //             //                                            SAI_PACKET_ACTION_FORWARD
+            //
+            //         });
+            //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+            auto& exp_attrlist = *exp_attrlist_2;
 
-        sai_create_acl_counter_fn =
-            [&](_Out_ sai_object_id_t* acl_counter_id,
-                _In_ sai_object_id_t switch_id,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            *acl_counter_id = (++m_acl_counter_num);
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->counter_attr_list.emplace_back(attr_list[i]);
+            std::vector<sai_attribute_t> act_attr;
+
+            for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+                const auto attr = exp_attrlist.get_attr_list()[i];
+                auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+
+                // ASSERT_TRUE(meta != nullptr);
+                if (meta == nullptr) {
+                    return false;
+                }
+
+                sai_attribute_t new_attr = { 0 };
+                new_attr.id = attr.id;
+
+                switch (meta->attrvaluetype) {
+                case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+                    new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+                    new_attr.value.s32list.count = attr.value.s32list.count;
+                    m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+                    break;
+
+                default:
+                    std::cout << "";
+                    ;
+                }
+
+                act_attr.emplace_back(new_attr);
             }
-            ret->acl_counter_id = *acl_counter_id;
-            return SAI_STATUS_SUCCESS;
-        };
 
-        sai_create_acl_entry_fn =
-            [&](_Out_ sai_object_id_t* acl_entry_id,
-                _In_ sai_object_id_t switch_id,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            *acl_entry_id = (++m_acl_entry_num);
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->rule_attr_list.emplace_back(attr_list[i]);
+            auto status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
+            // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+            if (status != SAI_STATUS_SUCCESS) {
+                return false;
             }
-            ret->acl_entry_id = *acl_entry_id;
-            ret->ret_val = true;
-            return SAI_STATUS_SUCCESS;
-        };
 
-        // FIXME: passing aclorch or using self member data (DON'T using global variable)
-        static_cast<Orch*>(gAclOrch)->doTask(consumer);
+            // ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+            auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
+            if (!b_attr_eq) {
+                return false;
+            }
+        }
 
-        return ret;
+        return true;
+    }
+
+    bool ValidateAclTable(sai_object_id_t acl_table_oid, const AclTable& acl_table)
+    {
+        const sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
+        auto exp_attrlist_2 = GetActTableAttributeList(objecttype, acl_table);
+
+        {
+            //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
+            //     auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+            //         { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+            //             { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+            //             { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+            //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+            auto& exp_attrlist = *exp_attrlist_2;
+
+            std::vector<sai_attribute_t> act_attr;
+
+            for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+                const auto attr = exp_attrlist.get_attr_list()[i];
+                auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+
+                //ASSERT_TRUE(meta != nullptr);
+                if (meta == nullptr) {
+                    return false;
+                }
+
+                sai_attribute_t new_attr = { 0 };
+                new_attr.id = attr.id;
+
+                switch (meta->attrvaluetype) {
+                case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+                    new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+                    new_attr.value.s32list.count = attr.value.s32list.count;
+                    m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+                    break;
+
+                default:
+                    std::cout << "";
+                    ;
+                }
+
+                act_attr.emplace_back(new_attr);
+            }
+
+            auto status = sai_acl_api->get_acl_table_attribute(acl_table_oid, act_attr.size(), act_attr.data()); // <----------
+            // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+            if (status != SAI_STATUS_SUCCESS) {
+                return false;
+            }
+
+            // ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+            auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
+            if (!b_attr_eq) {
+                return false;
+            }
+        }
+
+        for (const auto& sid_acl_rule : acl_table.rules) {
+            auto b_valid = ValidateAclRule(sid_acl_rule.first, *sid_acl_rule.second, acl_table_oid, acl_table);
+            if (!b_valid) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Validate(const AclOrch* orch)
+    {
+        assert(orch != nullptr);
+
+        const auto& acl_tables = getAclTables(*gAclOrch);
+
+        for (const auto& id_acl_table : acl_tables) {
+            if (!ValidateAclTable(id_acl_table.first, id_acl_table.second)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 };
 
@@ -879,10 +1186,10 @@ struct AclOrchTest : public AclTest {
 //     //createL3AclTableAndRule
 //     AclTable aclTable;
 //     aclTable.type = ACL_TABLE_L3;
-
+//
 //     auto talbe_ret = createAclTable(aclTable);
 //     ASSERT_TRUE(talbe_ret->ret_val == true);
-
+//
 //     auto v = std::vector<swss::FieldValueTuple>(
 //         { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
 //             { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
@@ -896,18 +1203,18 @@ struct AclOrchTest : public AclTest {
 //             { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
 //             { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
 //     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
-
+//
 //     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(talbe_ret->attr_list, attr_list));
-
+//
 //     string rule_id("acl_rule_l3");
-
+//
 //     auto filedValues = std::vector<swss::FieldValueTuple>(
 //         { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
 //             { MATCH_SRC_IP, "10.0.0.1" } });
-
+//
 //     auto rule_ret = createRuleToAcl(aclTable, rule_id, filedValues);
 //     ASSERT_TRUE(rule_ret->ret_val == true);
-
+//
 //     auto counter = std::vector<swss::FieldValueTuple>(
 //         { { "SAI_ACL_COUNTER_ATTR_TABLE_ID", "oid:0x1" },
 //             { "SAI_ACL_COUNTER_ATTR_ENABLE_BYTE_COUNT", "true" },
@@ -924,121 +1231,121 @@ struct AclOrchTest : public AclTest {
 //     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->counter_attr_list, counter_attr_list));
 //     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(rule_ret->rule_attr_list, rule_attr_list));
 // }
-
-TEST_F(AclOrchTest, createL3AclTable_will_remove)
-{
-    std::string acl_table_name = "acl_table_1";
-    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
-    auto setData = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3 },
-                { TABLE_STAGE, TABLE_INGRESS },
-                { TABLE_PORTS, "1,2" } } } });
-    consumerExt->addToSync(setData);
-    Consumer* consumer = consumerExt.get();
-
-    // TODO: vs create_default_acl_table_4
-    auto ret = createAclTable_DONT_USE(*consumer);
-    ASSERT_TRUE(ret->ret_val == true);
-
-    auto v = std::vector<swss::FieldValueTuple>(
-        { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
-            { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
-            { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
-    SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
-
-    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ret->attr_list, attr_list));
-}
-
-TEST_F(AclOrchTest, deleteL3AclTable_will_remove)
-{
-    std::string acl_table_name = "acl_table_1";
-    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
-    auto setData = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3 },
-                { TABLE_STAGE, TABLE_INGRESS },
-                { TABLE_PORTS, "1,2" } } } });
-    consumerExt->addToSync(setData);
-    Consumer* consumer = consumerExt.get();
-
-    auto ret = createAclTable_DONT_USE(*consumer);
-    ASSERT_TRUE(ret->ret_val == true);
-
-    auto setData2 = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name, DEL_COMMAND, {} } });
-    consumerExt->addToSync(setData2);
-
-    auto ret2 = deleteAclTable_DONT_USE(*consumer);
-    ASSERT_TRUE(ret2->ret_val == true);
-}
-
-TEST_F(AclOrchTest, createL3AclRule_will_remove)
-{
-    std::string acl_table_name = "acl_table_1";
-    auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
-    auto setData = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3 },
-                { TABLE_STAGE, TABLE_INGRESS },
-                { TABLE_PORTS, "1,2" } } } });
-    consumerExt->addToSync(setData);
-    Consumer* consumer = consumerExt.get();
-
-    auto ret = createAclTable_DONT_USE(*consumer);
-    ASSERT_TRUE(ret->ret_val == true);
-
-    auto ruleConsumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1); // free by consumerStateTable
-    auto ruleConsumerExt = std::make_shared<ConsumerExtend_Dont_Use>(ruleConsumerStateTable, gAclOrch, CFG_ACL_RULE_TABLE_NAME);
-
-    auto setRuleData = std::deque<KeyOpFieldsValuesTuple>(
-        { { "RULE_SIP_1",
-            SET_COMMAND,
-            { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
-                { MATCH_SRC_IP, "10.0.0.1" } } } });
-    ruleConsumerExt->addToSync(setRuleData);
-    consumer = ruleConsumerExt.get();
-
-    // FIXME: still failed to call gAclOrch to create rule
-    // FIXME: this is not correct passing ref converted from *pointer and point to derived class
-    //                                                       ^-- the ref will ref to nullptr !
-    //                                                                             ^-- ref to base class, that just all base function not derived class
-    auto ruleRet = createAclRule_DONT_USE(*consumer);
-    ASSERT_TRUE(ruleRet->ret_val == true);
-
-    auto counter = std::vector<swss::FieldValueTuple>(
-        { { "SAI_ACL_COUNTER_ATTR_TABLE_ID", "oid:0x1" },
-            { "SAI_ACL_COUNTER_ATTR_ENABLE_BYTE_COUNT", "true" },
-            { "SAI_ACL_COUNTER_ATTR_ENABLE_PACKET_COUNT", "true" } });
-    SaiAttributeList counter_attr_list(SAI_OBJECT_TYPE_ACL_COUNTER, counter, false);
-    auto rule = std::vector<swss::FieldValueTuple>(
-        { { "SAI_ACL_ENTRY_ATTR_TABLE_ID", "oid:0x1" },
-            { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-            { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-            { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", "disabled" },
-            { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
-            { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
-    SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
-    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ruleRet->counter_attr_list, counter_attr_list));
-    ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ruleRet->rule_attr_list, rule_attr_list));
-}
+//
+// TEST_F(AclOrchTest, createL3AclTable_will_remove)
+// {
+//     std::string acl_table_name = "acl_table_1";
+//     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+//     auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+//     auto setData = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_name,
+//             SET_COMMAND,
+//             { { TABLE_DESCRIPTION, "filter source IP" },
+//                 { TABLE_TYPE, TABLE_TYPE_L3 },
+//                 { TABLE_STAGE, TABLE_INGRESS },
+//                 { TABLE_PORTS, "1,2" } } } });
+//     consumerExt->addToSync(setData);
+//     Consumer* consumer = consumerExt.get();
+//
+//     // TODO: vs create_default_acl_table_4
+//     auto ret = createAclTable_DONT_USE(*consumer);
+//     ASSERT_TRUE(ret->ret_val == true);
+//
+//     auto v = std::vector<swss::FieldValueTuple>(
+//         { { "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" },
+//             { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
+//             { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
+//     SaiAttributeList attr_list(SAI_OBJECT_TYPE_ACL_TABLE, v, false);
+//
+//     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ret->attr_list, attr_list));
+// }
+//
+// TEST_F(AclOrchTest, deleteL3AclTable_will_remove)
+// {
+//     std::string acl_table_name = "acl_table_1";
+//     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+//     auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+//     auto setData = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_name,
+//             SET_COMMAND,
+//             { { TABLE_DESCRIPTION, "filter source IP" },
+//                 { TABLE_TYPE, TABLE_TYPE_L3 },
+//                 { TABLE_STAGE, TABLE_INGRESS },
+//                 { TABLE_PORTS, "1,2" } } } });
+//     consumerExt->addToSync(setData);
+//     Consumer* consumer = consumerExt.get();
+//
+//     auto ret = createAclTable_DONT_USE(*consumer);
+//     ASSERT_TRUE(ret->ret_val == true);
+//
+//     auto setData2 = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_name, DEL_COMMAND, {} } });
+//     consumerExt->addToSync(setData2);
+//
+//     auto ret2 = deleteAclTable_DONT_USE(*consumer);
+//     ASSERT_TRUE(ret2->ret_val == true);
+// }
+//
+// TEST_F(AclOrchTest, createL3AclRule_will_remove)
+// {
+//     std::string acl_table_name = "acl_table_1";
+//     auto consumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1); // free by consumerStateTable
+//     auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gAclOrch, CFG_ACL_TABLE_NAME);
+//     auto setData = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_name,
+//             SET_COMMAND,
+//             { { TABLE_DESCRIPTION, "filter source IP" },
+//                 { TABLE_TYPE, TABLE_TYPE_L3 },
+//                 { TABLE_STAGE, TABLE_INGRESS },
+//                 { TABLE_PORTS, "1,2" } } } });
+//     consumerExt->addToSync(setData);
+//     Consumer* consumer = consumerExt.get();
+//
+//     auto ret = createAclTable_DONT_USE(*consumer);
+//     ASSERT_TRUE(ret->ret_val == true);
+//
+//     auto ruleConsumerStateTable = new ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1); // free by consumerStateTable
+//     auto ruleConsumerExt = std::make_shared<ConsumerExtend_Dont_Use>(ruleConsumerStateTable, gAclOrch, CFG_ACL_RULE_TABLE_NAME);
+//
+//     auto setRuleData = std::deque<KeyOpFieldsValuesTuple>(
+//         { { "RULE_SIP_1",
+//             SET_COMMAND,
+//             { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
+//                 { MATCH_SRC_IP, "10.0.0.1" } } } });
+//     ruleConsumerExt->addToSync(setRuleData);
+//     consumer = ruleConsumerExt.get();
+//
+//     // FIXME: still failed to call gAclOrch to create rule
+//     // FIXME: this is not correct passing ref converted from *pointer and point to derived class
+//     //                                                       ^-- the ref will ref to nullptr !
+//     //                                                                             ^-- ref to base class, that just all base function not derived class
+//     auto ruleRet = createAclRule_DONT_USE(*consumer);
+//     ASSERT_TRUE(ruleRet->ret_val == true);
+//
+//     auto counter = std::vector<swss::FieldValueTuple>(
+//         { { "SAI_ACL_COUNTER_ATTR_TABLE_ID", "oid:0x1" },
+//             { "SAI_ACL_COUNTER_ATTR_ENABLE_BYTE_COUNT", "true" },
+//             { "SAI_ACL_COUNTER_ATTR_ENABLE_PACKET_COUNT", "true" } });
+//     SaiAttributeList counter_attr_list(SAI_OBJECT_TYPE_ACL_COUNTER, counter, false);
+//     auto rule = std::vector<swss::FieldValueTuple>(
+//         { { "SAI_ACL_ENTRY_ATTR_TABLE_ID", "oid:0x1" },
+//             { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+//             { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+//             { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", "disabled" },
+//             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
+//             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "10.0.0.1&mask:255.255.255.255" } });
+//     SaiAttributeList rule_attr_list(SAI_OBJECT_TYPE_ACL_ENTRY, rule, false);
+//     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ruleRet->counter_attr_list, counter_attr_list));
+//     ASSERT_TRUE(AttrListEq_Miss_objecttype_Dont_Use(ruleRet->rule_attr_list, rule_attr_list));
+// }
 
 const char* profile_get_value(
     _In_ sai_switch_profile_id_t profile_id,
@@ -1170,6 +1477,8 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
 
     ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_ACL_TABLE, act_attr, exp_attrlist));
 
+    Validate(gAclOrch); // <----------
+
     ///////////////////////////////////////////////////////////////////////////
 
     status = sai_switch_api->remove_switch(gSwitchId);
@@ -1276,6 +1585,8 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
     ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_ACL_TABLE, act_attr, exp_attrlist));
+
+    Validate(gAclOrch); // <----------
 
     ///////////////////////////////////////////////////////////////////////////
 
@@ -1477,6 +1788,8 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     }
     ///////////////////////////////////////////////////////////////////////////
 
+    Validate(gAclOrch); // <----------
+
     status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
     gSwitchId = 0;
@@ -1677,6 +1990,8 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
         ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
     }
     ///////////////////////////////////////////////////////////////////////////
+
+    Validate(gAclOrch); // <----------
 
     status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
