@@ -29,6 +29,7 @@ bool gLogRotate = false;
 ofstream gRecordOfs;
 string gRecordFile;
 
+extern sai_switch_api_t* sai_switch_api;
 extern sai_qos_map_api_t* sai_qos_map_api;
 sai_qos_map_api_t* vs_sai_qos_map_api;
 extern sai_wred_api_t* sai_wred_api;
@@ -44,6 +45,12 @@ struct QosOrchMock : public QosOrch {
         // SWSS_LOG_ENTER();
         DscpToTcMapHandler dscp_tc_handler;
         return dscp_tc_handler.processWorkItem(consumer);
+    }
+
+    type_map& getTypeMap()
+    {
+        //SWSS_LOG_ENTER();
+        return m_qos_maps;
     }
 };
 
@@ -95,6 +102,43 @@ size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>&
         }
     }
     return entries.size();
+}
+
+const char* profile_get_value(
+    _In_ sai_switch_profile_id_t profile_id,
+    _In_ const char* variable)
+{
+    // UNREFERENCED_PARAMETER(profile_id);
+
+    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+        return "20:03:04:05:06:00";
+    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+        return "1000";
+    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+        return "2000";
+    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+        return "SAI_VS_SWITCH_TYPE_BCM56850";
+    }
+
+    return NULL;
+}
+
+static int profile_get_next_value(
+    _In_ sai_switch_profile_id_t profile_id,
+    _Out_ const char** variable,
+    _Out_ const char** value)
+{
+    if (value == NULL) {
+        return 0;
+    }
+
+    if (variable == NULL) {
+        return -1;
+    }
+
+    return -1;
 }
 
 struct SetQosResult {
@@ -481,6 +525,49 @@ struct TestBase : public ::testing::Test {
         }
         return true;
     }
+
+    bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+    {
+        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
+            return false;
+        }
+
+        auto l = exp_attr_list.get_attr_list();
+        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
+            sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
+            auto meta = sai_metadata_get_attr_metadata(objecttype, id);
+
+            assert(meta != nullptr);
+
+            char act_buf[0x4000];
+            char exp_buf[0x4000];
+
+            auto act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
+            auto exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
+
+            // auto act = sai_serialize_attr_value(*meta, act_attr_list[i].value, false);
+            // auto exp = sai_serialize_attr_value(*meta, &exp_attr_list.get_attr_list()[i].value, false);
+
+            assert(act_len < sizeof(act_buf));
+            assert(exp_len < sizeof(exp_buf));
+
+            if (act_len != exp_len) {
+                std::cout << "AttrListEq failed\n";
+                std::cout << "Actual:   " << act_buf << "\n";
+                std::cout << "Expected: " << exp_buf << "\n";
+                return false;
+            }
+
+            if (strcmp(act_buf, exp_buf) != 0) {
+                std::cout << "AttrListEq failed\n";
+                std::cout << "Actual:   " << act_buf << "\n";
+                std::cout << "Expected: " << exp_buf << "\n";
+                return false;
+            }
+        }
+
+        return true;
+    }
 };
 
 TestBase* TestBase::that = nullptr;
@@ -490,6 +577,24 @@ struct QosMapHandlerTest : public TestBase {
     {
         // ...
         ASSERT_TRUE(0 == setenv("platform", "x86_64-barefoot_p4-r0", 1));
+    }
+};
+
+struct QosOrchTest : public TestBase {
+    bool Validate(const QosOrch* orch)
+    {
+        assert(orch != nullptr);
+
+        // const auto& qos_map = orch.getTypeMap();
+
+        ValidateQosMap();
+
+        return true;
+    }
+
+    bool ValidateQosMap()
+    {
+        return true;
     }
 };
 
@@ -557,28 +662,103 @@ TEST_F(QosMapHandlerTest, DscpToTcMapViaProcessWorkItem)
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
 }
 
-TEST_F(QosMapHandlerTest, DscpToTcMapViaVS)
+TEST_F(QosOrchTest, DscpToTcMapViaVS)
 {
-    DscpToTcMapHandler dscpToTcMapHandler;
+    sai_service_method_table_t test_services = {
+        profile_get_value,
+        profile_get_next_value
+    };
+
+    auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+    sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+    sai_attribute_t swattr;
+
+    swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+    swattr.value.booldata = true;
+
+    status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+    sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
+
+    auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+
+    vector<string> qos_tables = {
+        CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
+        CFG_SCHEDULER_TABLE_NAME,
+        CFG_DSCP_TO_TC_MAP_TABLE_NAME,
+        CFG_QUEUE_TABLE_NAME,
+        CFG_PORT_QOS_MAP_TABLE_NAME,
+        CFG_WRED_PROFILE_TABLE_NAME,
+        CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+        CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+        CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
+    };
+    auto qosorch = QosOrchMock(&configDb, qos_tables);
+
+    auto consumer = std::unique_ptr<Consumer>(new Consumer(
+        new swss::ConsumerStateTable(&configDb, CFG_DSCP_TO_TC_MAP_TABLE_NAME, 1, 1), &qosorch, CFG_DSCP_TO_TC_MAP_TABLE_NAME));
+
     KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
         { { "1", "0" }, { "2", "0" }, { "3", "3" } });
+    std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
-    auto res = setDscp2TcViaVS(dscpToTcMapHandler, dscp_to_tc_tuple);
+    consumerAddToSync(consumer.get(), setData);
 
-    ASSERT_TRUE(res->ret_val == true);
+    sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
+    auto exp_fields = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
+        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
+        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
+         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
+        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
+    SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
 
-    // ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    std::vector<sai_attribute_t> act_attr;
 
-    // vector<sai_attribute_t> exp_dscp_to_tc;
-    // dscpToTcMapHandler.convertFieldValuesToAttributes(dscp_to_tc_tuple, exp_dscp_to_tc);
-    // sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
-    // bool ret_val = dscpToTcMapHandler.addQosItem(exp_dscp_to_tc);
+    for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+        const auto attr = exp_attrlist.get_attr_list()[i];
+        auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
 
-    // FIXME: should check SAI_QOS_MAP_TYPE_DSCP_TO_TC
+        ASSERT_TRUE(meta != nullptr);
 
-    // ASSERT_TRUE(ret_val); // FIXME: should be true
+        sai_attribute_t new_attr = { 0 };
+        new_attr.id = attr.id;
 
-    // ASSERT_TRUE(AttrListEq(res->attr_list, exp_dscp_to_tc));
+        switch (meta->attrvaluetype) {
+        case SAI_ATTR_VALUE_TYPE_INT32:
+            new_attr.value.u32 = attr.value.u32;
+            break;
+        case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
+            new_attr.value.qosmap.list = attr.value.qosmap.list;
+            new_attr.value.qosmap.count = attr.value.qosmap.count;
+            break;
+        default:
+            std::cout << "";
+        }
+
+        act_attr.emplace_back(new_attr);
+    }
+
+    sai_object_id_t sai_object;
+    status = sai_qos_map_api->create_qos_map(&sai_object, gSwitchId, act_attr.size(), act_attr.data());
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+    ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+
+    Validate(&qosorch);
+
+    status = sai_switch_api->remove_switch(gSwitchId);
+    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    gSwitchId = 0;
+    // sai_api_uninitialize();
+
+    sai_switch_api = nullptr;
+    sai_qos_map_api = nullptr;
 }
 
 TEST_F(QosMapHandlerTest, TcToQueueMap)
@@ -727,6 +907,3 @@ TEST_F(QosMapHandlerTest, AddWredProfile)
 
 //     ASSERT_TRUE(res->ret_val == true);
 // }
-
-struct QosOrchTest : public TestBase {
-};
