@@ -207,7 +207,7 @@ target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon saimeta saimetadata orchagent saivs sairedis)
 
 target_link_libraries(coppTest ${GTEST_LIBRARIES})
-target_link_libraries(coppTest pthread hiredis swsscommon sairedis saimeta saimetadata orchagent saivs)
+target_link_libraries(coppTest pthread hiredis swsscommon saimeta saimetadata orchagent saivs sairedis)
 
 target_link_libraries(qosTest ${GTEST_LIBRARIES})
-target_link_libraries(qosTest pthread hiredis swsscommon sairedis saimeta saimetadata orchagent saivs)
+target_link_libraries(qosTest pthread hiredis swsscommon saimeta saimetadata orchagent saivs sairedis)
