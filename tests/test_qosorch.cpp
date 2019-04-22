@@ -46,12 +46,6 @@ struct QosOrchMock : public QosOrch {
         DscpToTcMapHandler dscp_tc_handler;
         return dscp_tc_handler.processWorkItem(consumer);
     }
-
-    type_map& getTypeMap()
-    {
-        //SWSS_LOG_ENTER();
-        return m_qos_maps;
-    }
 };
 
 size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>& entries)
@@ -139,6 +133,11 @@ static int profile_get_next_value(
     }
 
     return -1;
+}
+
+const type_map& getTypeMap(const QosOrch& orch)
+{
+    return orch.m_qos_maps;
 }
 
 struct SetQosResult {
@@ -585,7 +584,7 @@ struct QosOrchTest : public TestBase {
     {
         assert(orch != nullptr);
 
-        // const auto& qos_map = orch.getTypeMap();
+        const auto& qos_map = getTypeMap(*orch);
 
         ValidateQosMap();
 
@@ -755,7 +754,7 @@ TEST_F(QosOrchTest, DscpToTcMapViaVS)
     status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
     gSwitchId = 0;
-    // sai_api_uninitialize();
+    sai_api_uninitialize();
 
     sai_switch_api = nullptr;
     sai_qos_map_api = nullptr;
