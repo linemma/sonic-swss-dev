@@ -44,6 +44,14 @@ public:
     {
         CoppOrch::processCoppRule(consumer);
     }
+    object_map getTrapGroupMap()
+    {
+        return CoppOrch::m_trap_group_map;
+    }
+    TrapIdTrapGroupTable getTrapMap()
+    {
+        return CoppOrch::m_syncdTrapIds;
+    }
 };
 
 size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>& entries)
@@ -94,6 +102,43 @@ size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>&
         }
     }
     return entries.size();
+}
+
+const char* profile_get_value(
+    _In_ sai_switch_profile_id_t profile_id,
+    _In_ const char* variable)
+{
+    // UNREFERENCED_PARAMETER(profile_id);
+
+    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+        return "1000";
+    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+        return "2000";
+    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+        return "20:03:04:05:06:00";
+    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+        return "SAI_VS_SWITCH_TYPE_BCM56850";
+    }
+
+    return NULL;
+}
+
+static int profile_get_next_value(
+    _In_ sai_switch_profile_id_t profile_id,
+    _Out_ const char** variable,
+    _Out_ const char** value)
+{
+    if (value == NULL) {
+        return 0;
+    }
+
+    if (variable == NULL) {
+        return -1;
+    }
+
+    return -1;
 }
 
 struct CreateCoppResult {
@@ -230,7 +275,7 @@ struct TestBase : public ::testing::Test {
         return true;
     }
 
-    bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+    static bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
             return false;
@@ -290,73 +335,116 @@ struct CoppTest : public TestBase {
         sai_hostif_api = const_cast<sai_hostif_api_t*>(&vs_hostif_api);
         sai_policer_api = const_cast<sai_policer_api_t*>(&vs_policer_api);
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+
+        sai_service_method_table_t test_services = {
+            profile_get_value,
+            profile_get_next_value
+        };
+
+        auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        sai_attribute_t swattr;
+
+        swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+        swattr.value.booldata = true;
+
+        status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
     }
 
     void TearDown() override
     {
-        // delete sai_hostif_api;
-        // delete sai_switch_api;
-        // delete sai_policer_api;
+    }
+
+    bool ValidateTrapGroup(sai_object_id_t id, SaiAttributeList& exp_group_attr_list)
+    {
+        sai_object_type_t trapGroupObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP;
+        std::vector<sai_attribute_t> trap_group_act_attr;
+
+        for (int i = 0; i < exp_group_attr_list.get_attr_count(); ++i) {
+            const auto attr = exp_group_attr_list.get_attr_list()[i];
+            auto meta = sai_metadata_get_attr_metadata(trapGroupObjectType, attr.id);
+
+            if (meta == nullptr) {
+                return false;
+            }
+
+            sai_attribute_t new_attr = { 0 };
+            new_attr.id = attr.id;
+            trap_group_act_attr.emplace_back(new_attr);
+        }
+
+        auto status = sai_hostif_api->get_hostif_trap_group_attribute(id, trap_group_act_attr.size(), trap_group_act_attr.data());
+        if (status != SAI_STATUS_SUCCESS) {
+            return false;
+        }
+
+        auto b_attr_eq = AttrListEq(trapGroupObjectType, trap_group_act_attr, exp_group_attr_list);
+        if (!b_attr_eq) {
+            return false;
+        }
+    }
+
+    bool ValidateTrap(sai_object_id_t id, SaiAttributeList& exp_trap_attr_list)
+    {
+        sai_object_type_t trapObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP;
+        std::vector<sai_attribute_t> trap_act_attr;
+
+        for (int i = 0; i < exp_trap_attr_list.get_attr_count(); ++i) {
+            const auto attr = exp_trap_attr_list.get_attr_list()[i];
+            auto meta = sai_metadata_get_attr_metadata(trapObjectType, attr.id);
+
+            if (meta == nullptr) {
+                return false;
+            }
+
+            sai_attribute_t new_attr = { 0 };
+            new_attr.id = attr.id;
+            trap_act_attr.emplace_back(new_attr);
+        }
+
+        auto status = sai_hostif_api->get_hostif_trap_attribute(id, trap_act_attr.size(), trap_act_attr.data());
+        if (status != SAI_STATUS_SUCCESS) {
+            return false;
+        }
+
+        auto b_attr_eq = AttrListEq(trapObjectType, trap_act_attr, exp_trap_attr_list);
+        if (!b_attr_eq) {
+            return false;
+        }
+    }
+
+    bool Validate(CoppOrchMock& orch, const std::string groupName, sai_hostif_trap_type_t trapType, SaiAttributeList& exp_group_attr_list, SaiAttributeList& exp_trap_attr_list)
+    {
+        const auto& trapGroupTables = orch.getTrapGroupMap();
+        auto grpIt = trapGroupTables.find(groupName);
+        if (grpIt == trapGroupTables.end()) {
+            return false;
+        }
+
+        const auto& trapTables = orch.getTrapMap();
+        auto trapIt = trapTables.find(trapType);
+        if (trapIt == trapTables.end()) {
+            return false;
+        }
+
+        if (!ValidateTrapGroup(grpIt->second, exp_group_attr_list)) {
+            return false;
+        }
+
+        if (!ValidateTrap(trapIt->second, exp_trap_attr_list)) {
+            return false;
+        }
+
+        return true;
     }
 };
 
-const char* profile_get_value(
-    _In_ sai_switch_profile_id_t profile_id,
-    _In_ const char* variable)
-{
-    // UNREFERENCED_PARAMETER(profile_id);
-
-    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-        return "1000";
-    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-        return "2000";
-    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-        return "20:03:04:05:06:00";
-    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-        return "SAI_VS_SWITCH_TYPE_BCM56850";
-    }
-
-    return NULL;
-}
-
-static int profile_get_next_value(
-    _In_ sai_switch_profile_id_t profile_id,
-    _Out_ const char** variable,
-    _Out_ const char** value)
-{
-    if (value == NULL) {
-        return 0;
-    }
-
-    if (variable == NULL) {
-        return -1;
-    }
-
-    return -1;
-}
-
 TEST_F(CoppTest, create_copp_stp_rule_without_policer)
 {
-    sai_service_method_table_t test_services = {
-        profile_get_value,
-        profile_get_next_value
-    };
-
-    auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    sai_attribute_t swattr;
-
-    swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-    swattr.value.booldata = true;
-
-    status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
     auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-    auto coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
+    CoppOrchMock coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &coppMock, std::string(APP_COPP_TABLE_NAME)));
 
     KeyOpFieldsValuesTuple rule1Attr("coppRule1", "SET", { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
@@ -373,68 +461,9 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
     //call CoPP function
     coppMock.processCoppRule(*consumer);
 
-    sai_object_type_t trapGroupObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP;
-    sai_object_type_t trapObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP;
+    Validate(coppMock, "coppRule1", SAI_HOSTIF_TRAP_TYPE_STP, group_attr_list, trap_attr_list);
 
-    std::vector<sai_attribute_t> trap_group_act_attr;
-    std::vector<sai_attribute_t> trap_act_attr;
-
-    for (int i = 0; i < group_attr_list.get_attr_count(); ++i) {
-        const auto attr = group_attr_list.get_attr_list()[i];
-        auto meta = sai_metadata_get_attr_metadata(trapGroupObjectType, attr.id);
-
-        ASSERT_TRUE(meta != nullptr);
-
-        sai_attribute_t new_attr = { 0 };
-        new_attr.id = attr.id;
-
-        switch (meta->attrvaluetype) {
-        case SAI_ATTR_VALUE_TYPE_UINT32:
-            new_attr.value.u32 = attr.value.u32;
-            break;
-
-        default:
-            std::cout << "";
-            ;
-        }
-
-        trap_group_act_attr.emplace_back(new_attr);
-    }
-
-    for (int i = 0; i < trap_attr_list.get_attr_count(); ++i) {
-        const auto attr = trap_attr_list.get_attr_list()[i];
-        auto meta = sai_metadata_get_attr_metadata(trapObjectType, attr.id);
-
-        ASSERT_TRUE(meta != nullptr);
-
-        sai_attribute_t new_attr = { 0 };
-        new_attr.id = attr.id;
-
-        switch (meta->attrvaluetype) {
-        case SAI_ATTR_VALUE_TYPE_OBJECT_ID:
-            new_attr.value.oid = attr.value.oid;
-            break;
-
-        case SAI_ATTR_VALUE_TYPE_UINT32:
-            new_attr.value.u32 = attr.value.u32;
-            break;
-
-        default:
-            std::cout << "";
-            ;
-        }
-
-        trap_act_attr.emplace_back(new_attr);
-    }
-
-    //verify
-    // status = sai_acl_api->get_acl_table_attribute(id, act_attr.size(), act_attr.data());
-    // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    ASSERT_TRUE(AttrListEq(trapGroupObjectType, trap_group_act_attr, group_attr_list));
-    ASSERT_TRUE(AttrListEq(trapObjectType, trap_act_attr, trap_attr_list));
-
-    status = sai_switch_api->remove_switch(gSwitchId);
+    auto status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
     gSwitchId = 0;
 
