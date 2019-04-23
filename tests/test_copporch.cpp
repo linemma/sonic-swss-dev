@@ -96,6 +96,43 @@ size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>&
     return entries.size();
 }
 
+const char* profile_get_value(
+    _In_ sai_switch_profile_id_t profile_id,
+    _In_ const char* variable)
+{
+    // UNREFERENCED_PARAMETER(profile_id);
+
+    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+        return "1000";
+    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+        return "2000";
+    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+        return "20:03:04:05:06:00";
+    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+        return "SAI_VS_SWITCH_TYPE_BCM56850";
+    }
+
+    return NULL;
+}
+
+static int profile_get_next_value(
+    _In_ sai_switch_profile_id_t profile_id,
+    _Out_ const char** variable,
+    _Out_ const char** value)
+{
+    if (value == NULL) {
+        return 0;
+    }
+
+    if (variable == NULL) {
+        return -1;
+    }
+
+    return -1;
+}
+
 struct CreateCoppResult {
     bool ret_val;
 
@@ -290,6 +327,22 @@ struct CoppTest : public TestBase {
         sai_hostif_api = const_cast<sai_hostif_api_t*>(&vs_hostif_api);
         sai_policer_api = const_cast<sai_policer_api_t*>(&vs_policer_api);
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+
+        sai_service_method_table_t test_services = {
+            profile_get_value,
+            profile_get_next_value
+        };
+
+        auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        sai_attribute_t swattr;
+
+        swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+        swattr.value.booldata = true;
+
+        status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
     }
 
     void TearDown() override
@@ -300,61 +353,8 @@ struct CoppTest : public TestBase {
     }
 };
 
-const char* profile_get_value(
-    _In_ sai_switch_profile_id_t profile_id,
-    _In_ const char* variable)
-{
-    // UNREFERENCED_PARAMETER(profile_id);
-
-    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-        return "1000";
-    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-        return "2000";
-    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-        return "20:03:04:05:06:00";
-    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-        return "SAI_VS_SWITCH_TYPE_BCM56850";
-    }
-
-    return NULL;
-}
-
-static int profile_get_next_value(
-    _In_ sai_switch_profile_id_t profile_id,
-    _Out_ const char** variable,
-    _Out_ const char** value)
-{
-    if (value == NULL) {
-        return 0;
-    }
-
-    if (variable == NULL) {
-        return -1;
-    }
-
-    return -1;
-}
-
 TEST_F(CoppTest, create_copp_stp_rule_without_policer)
 {
-    sai_service_method_table_t test_services = {
-        profile_get_value,
-        profile_get_next_value
-    };
-
-    auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    sai_attribute_t swattr;
-
-    swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-    swattr.value.booldata = true;
-
-    status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
     auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     auto coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &coppMock, std::string(APP_COPP_TABLE_NAME)));
@@ -427,14 +427,10 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
         trap_act_attr.emplace_back(new_attr);
     }
 
-    //verify
-    // status = sai_acl_api->get_acl_table_attribute(id, act_attr.size(), act_attr.data());
-    // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
     ASSERT_TRUE(AttrListEq(trapGroupObjectType, trap_group_act_attr, group_attr_list));
     ASSERT_TRUE(AttrListEq(trapObjectType, trap_act_attr, trap_attr_list));
 
-    status = sai_switch_api->remove_switch(gSwitchId);
+    auto status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
     gSwitchId = 0;
 
