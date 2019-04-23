@@ -1880,6 +1880,64 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 // The order will be doAclTableTask => doAclRuleTask => AclTable => AclRule ....
 //
 
+// When received ACL table SET_COMMAND, orchagent can create corresponding ACL.
+// When received ACL table DEL_COMMAND, orchagent can delete corresponding ACL.
+//
+// Input by type = {L3, L3V6, PFCCMD ...}, stage = {INGRESS, EGRESS}.
+//
+// Using fixed ports = {"1,2"} for now.
+// The bind operations will be another separately test cases.
+TEST_F(AclOrchTest, Create_Delete_ACL_Table)
+{
+    auto orch = createAclOrch();
+
+    for (const auto& acl_table_type : { TABLE_TYPE_L3, TABLE_TYPE_L3V6 }) {
+        for (const auto& acl_table_stage : { TABLE_INGRESS /*, TABLE_EGRESS*/ }) {
+            std::string acl_table_id = "acl_table_1";
+
+            auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+                { { acl_table_id,
+                    SET_COMMAND,
+                    { { TABLE_DESCRIPTION, "filter source IP" },
+                        { TABLE_TYPE, acl_table_type },
+                        { TABLE_STAGE, acl_table_stage },
+                        { TABLE_PORTS, "1,2" } } } });
+            // FIXME:                  ^^^^^^^^^^^^^ fixed port
+
+            orch->doAclTableTask(kvfAclTable);
+
+            // FIXME: don't use gAclOrch
+            auto oid = gAclOrch->getTableById(acl_table_id);
+            ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
+
+            const auto& acl_tables = getAclTables(*gAclOrch);
+
+            auto it = acl_tables.find(oid);
+            ASSERT_TRUE(it != acl_tables.end());
+
+            const auto& acl_table = it->second;
+
+            validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
+            validateAsicDb(gAclOrch);
+
+            // delete acl table ...
+
+            kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+                { { acl_table_id,
+                    DEL_COMMAND,
+                    {} } });
+
+            orch->doAclTableTask(kvfAclTable);
+
+            // FIXME: don't use gAclOrch
+            oid = gAclOrch->getTableById(acl_table_id);
+            ASSERT_TRUE(oid == SAI_NULL_OBJECT_ID);
+
+            validateAsicDb(gAclOrch);
+        }
+    }
+}
+
 /* FIXME: test case pseudo code
 // 1. RULE_CTRL_UT_Apply_ACL()
 for (type : {MAC, IP_STD, IP_EXTEND, IPv6_STD, IPv6_EXT})
