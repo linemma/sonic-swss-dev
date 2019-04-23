@@ -1734,12 +1734,12 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
     ///////////////////////////////////////////////////////////////////////////
 
     static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-    auto id = gAclOrch->getTableById(acl_table_name);
-    ASSERT_TRUE(id != SAI_NULL_OBJECT_ID);
+    auto oid = gAclOrch->getTableById(acl_table_name);
+    ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
 
-    auto it = acl_tables.find(id);
+    auto it = acl_tables.find(oid);
     ASSERT_TRUE(it != acl_tables.end());
 
     const auto& acl_table = it->second;
@@ -1775,13 +1775,13 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     ///////////////////////////////////////////////////////////////////////////
 
     static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-    auto id = gAclOrch->getTableById(acl_table_name);
+    auto oid = gAclOrch->getTableById(acl_table_name);
 
-    ASSERT_TRUE(id != SAI_NULL_OBJECT_ID);
+    ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
 
-    auto it = acl_tables.find(id);
+    auto it = acl_tables.find(oid);
     ASSERT_TRUE(it != acl_tables.end());
 
     const auto& acl_table = it->second;
