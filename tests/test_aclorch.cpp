@@ -967,12 +967,44 @@ struct AclOrchTest : public AclTest {
     //     return ret;
     // }
 
+    struct MockAclOrch {
+        AclOrch* aclOrch; // FIXME: will change ....
+        swss::DBConnector* config_db;
+
+        MockAclOrch(swss::DBConnector* config_db)
+            : config_db(config_db)
+        {
+            aclOrch = gAclOrch; // FIXME: will change ....
+        }
+
+        void doAclTableTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
+        {
+            auto consumer = std::unique_ptr<Consumer>(new Consumer(
+                new swss::ConsumerStateTable(config_db, CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+
+            consumerAddToSync(consumer.get(), entries);
+
+            static_cast<Orch*>(aclOrch)->doTask(*consumer);
+        }
+
+        void doAclRuleTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
+        {
+            auto consumer = std::unique_ptr<Consumer>(new Consumer(
+                new swss::ConsumerStateTable(config_db, CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
+
+            consumerAddToSync(consumer.get(), entries);
+
+            static_cast<Orch*>(aclOrch)->doTask(*consumer);
+        }
+    };
+
     std::shared_ptr<swss::DBConnector> m_app_db;
     std::shared_ptr<swss::DBConnector> m_config_db;
     std::shared_ptr<swss::DBConnector> m_state_db;
 
     AclOrchTest()
     {
+        // FIXME: move out from constructor
         m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
         m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
         m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
@@ -1235,7 +1267,12 @@ struct AclOrchTest : public AclTest {
         sai_acl_api = nullptr;
     }
 
-    std::shared_ptr<SaiAttributeList> GetAclTableAttributeList(sai_object_type_t objecttype, const AclTable& acl_table)
+    std::shared_ptr<MockAclOrch> createAclOrch()
+    {
+        return std::make_shared<MockAclOrch>(m_config_db.get());
+    }
+
+    std::shared_ptr<SaiAttributeList> getAclTableAttributeList(sai_object_type_t objecttype, const AclTable& acl_table)
     {
         // const sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
         std::vector<swss::FieldValueTuple> fields;
@@ -1308,7 +1345,7 @@ struct AclOrchTest : public AclTest {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    std::shared_ptr<SaiAttributeList> GetAclRuleAttributeList(sai_object_type_t objecttype, const AclRule& acl_rule, sai_object_id_t acl_table_oid, const AclTable& acl_table)
+    std::shared_ptr<SaiAttributeList> getAclRuleAttributeList(sai_object_type_t objecttype, const AclRule& acl_rule, sai_object_id_t acl_table_oid, const AclTable& acl_table)
     {
         std::vector<swss::FieldValueTuple> fields;
 
@@ -1375,10 +1412,10 @@ struct AclOrchTest : public AclTest {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    bool ValidateAclRule(const std::string acl_rule_sid, const AclRule& acl_rule, sai_object_id_t acl_table_oid, const AclTable& acl_table)
+    bool validateAclRule(const std::string acl_rule_sid, const AclRule& acl_rule, sai_object_id_t acl_table_oid, const AclTable& acl_table)
     {
         sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
-        auto exp_attrlist_2 = GetAclRuleAttributeList(objecttype, acl_rule, acl_table_oid, acl_table);
+        auto exp_attrlist_2 = getAclRuleAttributeList(objecttype, acl_rule, acl_table_oid, acl_table);
 
         // auto it = acl_tables.find(acl_table_oid);
         // ASSERT_TRUE(it != acl_tables.end());
@@ -1453,10 +1490,10 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 
-    bool ValidateAclTable(sai_object_id_t acl_table_oid, const AclTable& acl_table)
+    bool validateAclTable(sai_object_id_t acl_table_oid, const AclTable& acl_table)
     {
         const sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
-        auto exp_attrlist_2 = GetAclTableAttributeList(objecttype, acl_table);
+        auto exp_attrlist_2 = getAclTableAttributeList(objecttype, acl_table);
 
         {
             //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
@@ -1518,7 +1555,7 @@ struct AclOrchTest : public AclTest {
         }
 
         for (const auto& sid_acl_rule : acl_table.rules) {
-            auto b_valid = ValidateAclRule(sid_acl_rule.first, *sid_acl_rule.second, acl_table_oid, acl_table);
+            auto b_valid = validateAclRule(sid_acl_rule.first, *sid_acl_rule.second, acl_table_oid, acl_table);
             if (!b_valid) {
                 return false;
             }
@@ -1527,14 +1564,14 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 
-    bool Validate(const AclOrch* orch)
+    bool validate(const AclOrch* orch)
     {
         assert(orch != nullptr);
 
         const auto& acl_tables = getAclTables(*gAclOrch);
 
         for (const auto& id_acl_table : acl_tables) {
-            if (!ValidateAclTable(id_acl_table.first, id_acl_table.second)) {
+            if (!validateAclTable(id_acl_table.first, id_acl_table.second)) {
                 return false;
             }
         }
@@ -1711,12 +1748,7 @@ struct AclOrchTest : public AclTest {
 
 TEST_F(AclOrchTest, Create_L3Acl_Table)
 {
-    ///////////////////////////////////////////////////////////////////////////
-    // TODO: vs create_default_acl_table_4
     std::string acl_table_id = "acl_table_1";
-
-    auto consumer = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
 
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_id,
@@ -1729,11 +1761,9 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
                 { TABLE_PORTS, "1,2" } } } });
     // FIXME:                  ^^^^^^^^^^^^^ fixed port
 
-    consumerAddToSync(consumer.get(), setData);
+    auto orch = createAclOrch();
+    orch->doAclTableTask(setData);
 
-    ///////////////////////////////////////////////////////////////////////////
-
-    static_cast<Orch*>(gAclOrch)->doTask(*consumer);
     auto oid = gAclOrch->getTableById(acl_table_id);
     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
@@ -1747,17 +1777,12 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
     ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
     ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
-    Validate(gAclOrch); // <----------
+    validate(gAclOrch);
 }
 
 TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 {
-    ///////////////////////////////////////////////////////////////////////////
-    // TODO: vs create_default_acl_table_4
     std::string acl_table_id = "acl_table_1";
-
-    auto consumer = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
 
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_id,
@@ -1770,11 +1795,9 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
                 { TABLE_PORTS, "1,2" } } } });
     // FIXME:                  ^^^^^^^^^^^^^ fixed port
 
-    consumerAddToSync(consumer.get(), setData);
+    auto orch = createAclOrch();
+    orch->doAclTableTask(setData);
 
-    ///////////////////////////////////////////////////////////////////////////
-
-    static_cast<Orch*>(gAclOrch)->doTask(*consumer);
     auto oid = gAclOrch->getTableById(acl_table_id);
 
     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
@@ -1789,62 +1812,42 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
     ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
-    Validate(gAclOrch); // <----------
+    validate(gAclOrch);
 }
 
 TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 {
-    ///////////////////////////////////////////////////////////////////////////
-    // TODO: vs create_default_acl_table_4
     std::string acl_table_id = "acl_table_1";
     std::string acl_rule_id = "acl_rule_1";
 
-    auto consumer_acl_table = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+    auto orch = createAclOrch();
+    orch->doAclTableTask({ { acl_table_id,
+        SET_COMMAND,
+        { { TABLE_DESCRIPTION, "filter source IP" },
+            { TABLE_TYPE, TABLE_TYPE_L3 },
+            //            ^^^^^^^^^^^^^ L3 ACL
+            { TABLE_STAGE, TABLE_INGRESS },
+            // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+            { TABLE_PORTS, "1,2" } } } });
+    // FIXME:              ^^^^^^^^^^^^^ fixed port
 
-    auto consumer_acl_rule = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
+    orch->doAclRuleTask({ { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
+        { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
 
-    ///////////////////////////////////////////////////////////////////////////
+            // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
+            // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
+            // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
+            // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
+            // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
+            // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
+            //
+            // TODO: required field (add new test cases for that ....)
+            //
 
-    auto acl_cfg = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_id,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3 },
-                //            ^^^^^^^^^^^^^ L3 ACL
-                { TABLE_STAGE, TABLE_INGRESS },
-                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-                { TABLE_PORTS, "1,2" } } } });
-    // FIXME:                  ^^^^^^^^^^^^^ fixed port
-
-    consumerAddToSync(consumer_acl_table.get(), acl_cfg);
-    consumerAddToSync(consumer_acl_rule.get(),
-        { { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
-            { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
-
-                // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
-                // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
-                // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
-                // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
-                // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
-                // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
-                //
-                // TODO: required field (add new test cases for that ....)
-                //
-
-                { MATCH_SRC_IP, "1.2.3.4" } } } });
+            { MATCH_SRC_IP, "1.2.3.4" } } } });
 
     // TODO: RULE_PRIORITY (important field)
     // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
-
-    ///////////////////////////////////////////////////////////////////////////
-    for (auto consumer : { consumer_acl_table.get(), consumer_acl_rule.get() }) {
-        static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-    }
-    // static_cast<Orch*>(gAclOrch)->doTask(*consumer_acl_table);
-
-    ///////////////////////////////////////////////////////////////////////////
 
     // validate acl table ...
 
@@ -1892,62 +1895,42 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
         ASSERT_TRUE(it_field->second.aclaction.parameter.u32 == SAI_PACKET_ACTION_FORWARD);
     }
 
-    Validate(gAclOrch); // <----------
+    validate(gAclOrch);
 }
 
 TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 {
-    ///////////////////////////////////////////////////////////////////////////
-    // TODO: vs create_default_acl_table_4
     std::string acl_table_id = "acl_table_1";
     std::string acl_rule_id = "acl_rule_1";
 
-    auto consumer_acl_table = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+    auto orch = createAclOrch();
+    orch->doAclTableTask({ { acl_table_id,
+        SET_COMMAND,
+        { { TABLE_DESCRIPTION, "filter source IP" },
+            { TABLE_TYPE, TABLE_TYPE_L3V6 },
+            //            ^^^^^^^^^^^^^^^ L3V6 ACL
+            { TABLE_STAGE, TABLE_INGRESS },
+            // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+            { TABLE_PORTS, "1,2" } } } });
+    // FIXME:              ^^^^^^^^^^^^^ fixed port
 
-    auto consumer_acl_rule = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
+    orch->doAclRuleTask({ { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
+        { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
 
-    ///////////////////////////////////////////////////////////////////////////
+            // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
+            // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
+            // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
+            // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
+            // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
+            // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
+            //
+            // TODO: required field (add new test cases for that ....)
+            //
 
-    auto acl_cfg = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_id,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3V6 },
-                //            ^^^^^^^^^^^^^^^ L3V6 ACL
-                { TABLE_STAGE, TABLE_INGRESS },
-                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-                { TABLE_PORTS, "1,2" } } } });
-    // FIXME:                  ^^^^^^^^^^^^^ fixed port
-
-    consumerAddToSync(consumer_acl_table.get(), acl_cfg);
-    consumerAddToSync(consumer_acl_rule.get(),
-        { { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
-            { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
-
-                // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
-                // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
-                // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
-                // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
-                // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
-                // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
-                //
-                // TODO: required field (add new test cases for that ....)
-                //
-
-                { MATCH_SRC_IPV6, "::1.2.3.4" } } } });
+            { MATCH_SRC_IPV6, "::1.2.3.4" } } } });
 
     // TODO: RULE_PRIORITY (important field)
     // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
-
-    ///////////////////////////////////////////////////////////////////////////
-    for (auto consumer : { consumer_acl_table.get(), consumer_acl_rule.get() }) {
-        static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-    }
-    // static_cast<Orch*>(gAclOrch)->doTask(*consumer_acl_table);
-
-    ///////////////////////////////////////////////////////////////////////////
 
     // validate acl table ...
 
@@ -1995,7 +1978,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
         ASSERT_TRUE(it_field->second.aclaction.parameter.u32 == SAI_PACKET_ACTION_FORWARD);
     }
 
-    Validate(gAclOrch); // <----------
+    validate(gAclOrch);
 }
 
 /* FIXME: test case pseudo code
