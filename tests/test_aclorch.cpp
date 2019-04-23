@@ -1738,8 +1738,14 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
     ASSERT_TRUE(id != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
-    ASSERT_TRUE(acl_tables.at(id).type == ACL_TABLE_L3); // FIXME: using find() instead at()
-    ASSERT_TRUE(acl_tables.at(id).stage == ACL_STAGE_INGRESS);
+
+    auto it = acl_tables.find(id);
+    ASSERT_TRUE(it != acl_tables.end());
+
+    const auto& acl_table = it->second;
+
+    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
+    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     Validate(gAclOrch); // <----------
 }
@@ -1774,8 +1780,14 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     ASSERT_TRUE(id != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
-    ASSERT_TRUE(acl_tables.at(id).type == ACL_TABLE_L3V6); // FIXME: using find() instead at()
-    ASSERT_TRUE(acl_tables.at(id).stage == ACL_STAGE_INGRESS);
+
+    auto it = acl_tables.find(id);
+    ASSERT_TRUE(it != acl_tables.end());
+
+    const auto& acl_table = it->second;
+
+    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
+    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     Validate(gAclOrch); // <----------
 }
@@ -1834,20 +1846,23 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     ///////////////////////////////////////////////////////////////////////////
 
+    // validate acl table ...
+
     auto acl_table_oid = gAclOrch->getTableById(acl_table_name);
     const auto& acl_tables = getAclTables(*gAclOrch);
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
-    ASSERT_TRUE(acl_tables.at(acl_table_oid).type == ACL_TABLE_L3); // FIXME: using find() instead at()
-    ASSERT_TRUE(acl_tables.at(acl_table_oid).stage == ACL_STAGE_INGRESS);
+    auto it_table = acl_tables.find(acl_table_oid);
+    ASSERT_TRUE(it_table != acl_tables.end());
 
-    // acl_table->rules[acl_rule_oid??];
-    auto it = acl_tables.find(acl_table_oid);
-    ASSERT_TRUE(it != acl_tables.end());
+    const auto& acl_table = it_table->second;
+
+    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
+    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     // validate acl rule ...
-    const auto& acl_table = it->second;
+
     auto it_rule = acl_table.rules.find(acl_rule_id);
     ASSERT_TRUE(it_rule != acl_table.rules.end());
 
@@ -1934,20 +1949,23 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     ///////////////////////////////////////////////////////////////////////////
 
+    // validate acl table ...
+
     auto acl_table_oid = gAclOrch->getTableById(acl_table_name);
     const auto& acl_tables = getAclTables(*gAclOrch);
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
-    ASSERT_TRUE(acl_tables.at(acl_table_oid).type == ACL_TABLE_L3V6); // FIXME: using find() instead at()
-    ASSERT_TRUE(acl_tables.at(acl_table_oid).stage == ACL_STAGE_INGRESS);
+    auto it_table = acl_tables.find(acl_table_oid);
+    ASSERT_TRUE(it_table != acl_tables.end());
 
-    // acl_table->rules[acl_rule_oid??];
-    auto it = acl_tables.find(acl_table_oid);
-    ASSERT_TRUE(it != acl_tables.end());
+    const auto& acl_table = it_table->second;
+
+    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
+    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     // validate acl rule ...
-    const auto& acl_table = it->second;
+
     auto it_rule = acl_table.rules.find(acl_rule_id);
     ASSERT_TRUE(it_rule != acl_table.rules.end());
 
