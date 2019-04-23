@@ -48,7 +48,7 @@ struct QosOrchMock : public QosOrch {
     }
 };
 
-size_t consumerAddToSync(Consumer* consumer, std::deque<KeyOpFieldsValuesTuple>& entries)
+size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
 {
     // SWSS_LOG_ENTER();
 
@@ -580,19 +580,173 @@ struct QosMapHandlerTest : public TestBase {
 };
 
 struct QosOrchTest : public TestBase {
+
+    std::shared_ptr<swss::DBConnector> m_config_db;
+
+    vector<string> qos_tables = {
+        CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
+        CFG_SCHEDULER_TABLE_NAME,
+        CFG_DSCP_TO_TC_MAP_TABLE_NAME,
+        CFG_QUEUE_TABLE_NAME,
+        CFG_PORT_QOS_MAP_TABLE_NAME,
+        CFG_WRED_PROFILE_TABLE_NAME,
+        CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+        CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+        CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
+    };
+
+    QosOrchTest()
+    {
+        // FIXME: move out from constructor
+        m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    }
+
+    struct MockQosOrch : public QosOrch {
+        QosOrch* qosOrch; // FIXME: will change ....
+        swss::DBConnector* config_db;
+
+        MockQosOrch(swss::DBConnector* db, vector<string>& tableNames)
+            : QosOrch(db, tableNames)
+        {
+            // qosOrch =
+        }
+
+        void doQosMapTask(const std::deque<KeyOpFieldsValuesTuple>& entries, std::string tableName)
+        {
+            auto consumer = std::unique_ptr<Consumer>(new Consumer(
+                new swss::ConsumerStateTable(config_db, tableName, 1, 1), qosOrch, tableName));
+
+            consumerAddToSync(consumer.get(), entries);
+
+            static_cast<Orch*>(qosOrch)->doTask(*consumer);
+        }
+    };
+
+    void SetUp() override
+    {
+        sai_service_method_table_t test_services = {
+            profile_get_value,
+            profile_get_next_value
+        };
+
+        auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        // FIXME: using clone not just assign
+        sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
+
+        // FIXME: using clone not just assign
+        sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
+
+        sai_attribute_t swattr;
+
+        swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+        swattr.value.booldata = true;
+
+        status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    }
+
+    void TearDown() override
+    {
+        auto status = sai_switch_api->remove_switch(gSwitchId);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        gSwitchId = 0;
+
+        sai_api_uninitialize();
+
+        sai_switch_api = nullptr;
+        sai_qos_map_api = nullptr;
+    }
+
+    std::shared_ptr<MockQosOrch> createQosOrch()
+    {
+        return std::make_shared<MockQosOrch>(m_config_db.get(), qos_tables);
+    }
+
+    std::shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, std::string qos_map_id, object_map* map)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+
+        if (qos_map_id == CFG_DSCP_TO_TC_MAP_TABLE_NAME) {
+            fields.push_back({ "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" });
+            fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
+                \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+                \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
+                \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+                \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
+                \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+                \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" });
+        }
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
+    }
+
     bool Validate(const QosOrch* orch)
     {
         assert(orch != nullptr);
 
-        const auto& qos_map = getTypeMap(*orch);
+        const auto& qos_maps = getTypeMap(*orch);
 
-        ValidateQosMap();
+        for (const auto& qos_map : qos_maps) {
+            if (!ValidateQosMap(qos_map.first, qos_map.second)) {
+                return false;
+            }
+        }
 
         return true;
     }
 
-    bool ValidateQosMap()
+    bool ValidateQosMap(std::string qos_map_id, object_map* map)
     {
+        const sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
+        auto exp_attrlist_2 = getQosMapAttributeList(objecttype, qos_map_id, map);
+
+        {
+            auto& exp_attrlist = *exp_attrlist_2;
+
+            std::vector<sai_attribute_t> act_attr;
+
+            for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+                const auto attr = exp_attrlist.get_attr_list()[i];
+                auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+
+                if (meta == nullptr) {
+                    return false;
+                }
+
+                sai_attribute_t new_attr = { 0 };
+                new_attr.id = attr.id;
+
+                switch (meta->attrvaluetype) {
+                case SAI_ATTR_VALUE_TYPE_INT32:
+                    new_attr.value.u32 = attr.value.u32;
+                    break;
+                case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
+                    new_attr.value.qosmap.count = attr.value.qosmap.count;
+                    new_attr.value.qosmap.list = (sai_qos_map_t*)malloc(sizeof(sai_qos_map_t) * attr.value.qosmap.count);
+                    break;
+                default:
+                    std::cout << "";
+                }
+
+                act_attr.emplace_back(new_attr);
+            }
+
+            sai_object_id_t sai_object;
+            auto status = sai_qos_map_api->create_qos_map(&sai_object, gSwitchId, act_attr.size(), act_attr.data());
+            // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+            if (status != SAI_STATUS_SUCCESS) {
+                return false;
+            }
+
+            // ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+            auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
+            if (!b_attr_eq) {
+                return false;
+            }
+        }
+
         return true;
     }
 };
@@ -663,25 +817,6 @@ TEST_F(QosMapHandlerTest, DscpToTcMapViaProcessWorkItem)
 
 TEST_F(QosOrchTest, DscpToTcMapViaVS)
 {
-    sai_service_method_table_t test_services = {
-        profile_get_value,
-        profile_get_next_value
-    };
-
-    auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
-    sai_attribute_t swattr;
-
-    swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-    swattr.value.booldata = true;
-
-    status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
-
     auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
 
     vector<string> qos_tables = {
@@ -744,20 +879,33 @@ TEST_F(QosOrchTest, DscpToTcMapViaVS)
     }
 
     sai_object_id_t sai_object;
-    status = sai_qos_map_api->create_qos_map(&sai_object, gSwitchId, act_attr.size(), act_attr.data());
+    auto status = sai_qos_map_api->create_qos_map(&sai_object, gSwitchId, act_attr.size(), act_attr.data());
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
     ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
 
     Validate(&qosorch);
+    // KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
+    //     { { "1", "0" }, { "2", "0" }, { "3", "3" } });
+    // std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
-    status = sai_switch_api->remove_switch(gSwitchId);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-    gSwitchId = 0;
-    sai_api_uninitialize();
+    // auto orch = createQosOrch();
+    // orch->doQosMapTask(setData, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
 
-    sai_switch_api = nullptr;
-    sai_qos_map_api = nullptr;
+    // auto oid = orch->getTypeMap(acl_table_id);
+    // ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
+
+    // const auto& acl_tables = getAclTables(*gAclOrch);
+
+    // auto it = acl_tables.find(oid);
+    // ASSERT_TRUE(it != acl_tables.end());
+
+    // const auto& acl_table = it->second;
+
+    // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
+    // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
+
+    // Validate(orch.get());
 }
 
 TEST_F(QosMapHandlerTest, TcToQueueMap)
