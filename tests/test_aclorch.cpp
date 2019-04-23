@@ -1713,13 +1713,13 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
 {
     ///////////////////////////////////////////////////////////////////////////
     // TODO: vs create_default_acl_table_4
-    std::string acl_table_name = "acl_table_1";
+    std::string acl_table_id = "acl_table_1";
 
     auto consumer = std::unique_ptr<Consumer>(new Consumer(
         new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
 
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
+        { { acl_table_id,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
                 { TABLE_TYPE, TABLE_TYPE_L3 },
@@ -1734,7 +1734,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
     ///////////////////////////////////////////////////////////////////////////
 
     static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-    auto oid = gAclOrch->getTableById(acl_table_name);
+    auto oid = gAclOrch->getTableById(acl_table_id);
     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
     const auto& acl_tables = getAclTables(*gAclOrch);
@@ -1754,13 +1754,13 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 {
     ///////////////////////////////////////////////////////////////////////////
     // TODO: vs create_default_acl_table_4
-    std::string acl_table_name = "acl_table_1";
+    std::string acl_table_id = "acl_table_1";
 
     auto consumer = std::unique_ptr<Consumer>(new Consumer(
         new swss::ConsumerStateTable(m_config_db.get(), CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
 
     auto setData = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
+        { { acl_table_id,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
                 { TABLE_TYPE, TABLE_TYPE_L3V6 },
@@ -1775,7 +1775,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     ///////////////////////////////////////////////////////////////////////////
 
     static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-    auto oid = gAclOrch->getTableById(acl_table_name);
+    auto oid = gAclOrch->getTableById(acl_table_id);
 
     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
@@ -1796,7 +1796,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 {
     ///////////////////////////////////////////////////////////////////////////
     // TODO: vs create_default_acl_table_4
-    std::string acl_table_name = "acl_table_1";
+    std::string acl_table_id = "acl_table_1";
     std::string acl_rule_id = "acl_rule_1";
 
     auto consumer_acl_table = std::unique_ptr<Consumer>(new Consumer(
@@ -1808,7 +1808,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     ///////////////////////////////////////////////////////////////////////////
 
     auto acl_cfg = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
+        { { acl_table_id,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
                 { TABLE_TYPE, TABLE_TYPE_L3 },
@@ -1820,7 +1820,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     consumerAddToSync(consumer_acl_table.get(), acl_cfg);
     consumerAddToSync(consumer_acl_rule.get(),
-        { { acl_table_name + "|" + acl_rule_id, SET_COMMAND,
+        { { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
             { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
 
                 // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
@@ -1848,7 +1848,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     // validate acl table ...
 
-    auto acl_table_oid = gAclOrch->getTableById(acl_table_name);
+    auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
     const auto& acl_tables = getAclTables(*gAclOrch);
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
@@ -1899,7 +1899,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 {
     ///////////////////////////////////////////////////////////////////////////
     // TODO: vs create_default_acl_table_4
-    std::string acl_table_name = "acl_table_1";
+    std::string acl_table_id = "acl_table_1";
     std::string acl_rule_id = "acl_rule_1";
 
     auto consumer_acl_table = std::unique_ptr<Consumer>(new Consumer(
@@ -1911,7 +1911,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
     ///////////////////////////////////////////////////////////////////////////
 
     auto acl_cfg = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_name,
+        { { acl_table_id,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
                 { TABLE_TYPE, TABLE_TYPE_L3V6 },
@@ -1923,7 +1923,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     consumerAddToSync(consumer_acl_table.get(), acl_cfg);
     consumerAddToSync(consumer_acl_rule.get(),
-        { { acl_table_name + "|" + acl_rule_id, SET_COMMAND,
+        { { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
             { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
 
                 // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
@@ -1951,7 +1951,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     // validate acl table ...
 
-    auto acl_table_oid = gAclOrch->getTableById(acl_table_name);
+    auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
     const auto& acl_tables = getAclTables(*gAclOrch);
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
