@@ -1454,7 +1454,8 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 
-    bool validate(const AclOrch* orch)
+    // validate consistency between aclOrch and mock data (via SAI)
+    bool validateAsicDb(const AclOrch* orch)
     {
         assert(orch != nullptr);
 
@@ -1469,7 +1470,7 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 
-    bool validateAclTableByFields(const AclTable& acl_table, const std::vector<swss::FieldValueTuple>& values)
+    bool validateAclTableByConfOp(const AclTable& acl_table, const std::vector<swss::FieldValueTuple>& values)
     {
         // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
         // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
@@ -1600,7 +1601,7 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 
-    bool validateAclRuleByFields(const AclRule& acl_rule, const std::vector<swss::FieldValueTuple>& values)
+    bool validateAclRuleByConfOp(const AclRule& acl_rule, const std::vector<swss::FieldValueTuple>& values)
     {
         for (const auto& fv : values) {
             auto attr_name = fv.first;
@@ -1652,9 +1653,9 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
 
     const auto& acl_table = it->second;
 
-    validateAclTableByFields(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
 
-    validate(gAclOrch);
+    validateAsicDb(gAclOrch);
 }
 
 TEST_F(AclOrchTest, Create_L3v6Acl_Table)
@@ -1687,9 +1688,9 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 
     const auto& acl_table = it->second;
 
-    validateAclTableByFields(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
 
-    validate(gAclOrch);
+    validateAsicDb(gAclOrch);
 }
 
 TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
@@ -1746,14 +1747,14 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     const auto& acl_table = it_table->second;
 
-    validateAclTableByFields(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
 
     // validate acl rule ...
 
     auto it_rule = acl_table.rules.find(acl_rule_id);
     ASSERT_TRUE(it_rule != acl_table.rules.end());
 
-    validateAclRuleByFields(*it_rule->second, kfvFieldsValues(kvfAclRule.front()));
+    validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front()));
 
     // config === orchagent === mock_data(libvs)
     //                 |-------validate---|
@@ -1761,7 +1762,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     //
     // config        ===        mock_data
 
-    validate(gAclOrch);
+    validateAsicDb(gAclOrch);
 }
 
 TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
@@ -1818,17 +1819,66 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     const auto& acl_table = it_table->second;
 
-    validateAclTableByFields(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
 
     // validate acl rule ...
 
     auto it_rule = acl_table.rules.find(acl_rule_id);
     ASSERT_TRUE(it_rule != acl_table.rules.end());
 
-    validateAclRuleByFields(*it_rule->second, kfvFieldsValues(kvfAclRule.front()));
+    validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front()));
 
-    validate(gAclOrch);
+    validateAsicDb(gAclOrch);
 }
+
+// AclTable::create
+// validate the attribute list of each type {L3, L3V6 ....}, gCrmOrch will increase if create success
+
+// AclTable::... not function to handler remove just call sai
+
+// AclRule::create
+// validate the attribute list will eq matchs + SAI_ACL_ENTRY_ATTR_TABLE_ID + SAI_ACL_ENTRY_ATTR_PRIORITY + SAI_ACL_ENTRY_ATTR_ACTION_COUNTER
+// support SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE
+// call sai_acl_api->create_acl_entry to create and incCrmAclTableUsedCounter
+
+// AclTable::remove => remove rule, that will call AclRule::remove => sai_acl_api->remove_acl_entry
+
+//
+// doAclTableTask
+//
+// using op=set_command to create acl table
+//      passing TABLE_DESCRIPTION / TABLE_TYPE / TABLE_PORTS / TABLE_STAGE to create acl_table
+//          TABLE_TYPE / TABLE_PORTS / TABLE_STAGE is required
+//      ignore if command include TABLE_SERVICES that is for COPP only
+//      type = ACL_TABLE_CTRLPLANE <= what's that ?
+//      if acl_table_is exist => remove then create new
+//      if op successed, the acl will be create in m_AclTables (ref: AclTable::create) and lower layer (SAI, ref: sai->create_acl_table), and bind to ports (TABLE_PORTS ? aclTable.ports)
+//
+// using op=del_command to delete acl table
+//      if acl_table_id is not exist => do nothing
+//      if acl_table_id will be remove from internal table and sai, (unbind port before remove)
+//
+// unknow op will be ignored
+//
+//
+// PS: m_AclTables keep controlplan acl too
+//
+// doAclRuleTask
+//
+// using op=set_command to create acl rule
+//    ignore is acl_id is Skip the control plane rules
+//    using AclRule::makeShared to create tmpl rule object
+//    fill priority / match / action then add rule to acl table (ref: AclTable::add() and AclRule::create())
+//                    (json to matchs and action convert)
+//
+// using op=del_command to delete acl rule
+//
+// unknow op will be ignored
+//
+
+//
+// The order will be doAclTableTask => doAclRuleTask => AclTable => AclRule ....
+//
 
 /* FIXME: test case pseudo code
 // 1. RULE_CTRL_UT_Apply_ACL()
