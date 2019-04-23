@@ -2023,7 +2023,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     auto it = acl_tables.find(acl_table_oid);
     ASSERT_TRUE(it != acl_tables.end());
 
-    // validate acl rule
+    // validate acl rule ...
     const auto& acl_table = it->second;
     auto it_rule = acl_table.rules.find(acl_rule_id);
     ASSERT_TRUE(it_rule != acl_table.rules.end());
@@ -2031,6 +2031,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     const auto& rule_matches = getAclRuleMatches(*it_rule->second);
     const auto& rule_actions = getAclRuleActions(*it_rule->second);
 
+    // matchs
     // sip
     {
         auto it_field = rule_matches.find(SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP); // <----------
@@ -2045,7 +2046,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
         ASSERT_STREQ(mask, "255.255.255.255");
     }
 
-    // action
+    // actions
     {
         auto it_field = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION); // <----------
         ASSERT_TRUE(it_field != rule_matches.end());
@@ -2053,10 +2054,10 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
         ASSERT_TRUE(it_field->second.aclaction.parameter.u32 == SAI_PACKET_ACTION_FORWARD);
     }
 
-    //auto acl_rule_oid = it->second.rules.begin()->first;
-    auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
-    auto acl_rule_oid = getAclRuleOid(*acl_rule.get());
-
+    // //auto acl_rule_oid = it->second.rules.begin()->first;
+    // auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
+    // auto acl_rule_oid = getAclRuleOid(*acl_rule.get());
+    //
     // ///////////////////////////////////////////////////////////////////////////
     // {
     //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
@@ -2105,59 +2106,59 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     //
     //     ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
     // }
-    ///////////////////////////////////////////////////////////////////////////
-    {
-        auto table_id = sai_serialize_object_id(acl_table_oid);
-        auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
-
-        sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
-        auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
-            {
-                { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
-                { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-                { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-                { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
-
-                // cfg fields
-                { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" },
-                { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
-                //                                            SAI_PACKET_ACTION_FORWARD
-
-            });
-        SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
-
-        std::vector<sai_attribute_t> act_attr;
-
-        for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
-            const auto attr = exp_attrlist.get_attr_list()[i];
-            auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
-
-            ASSERT_TRUE(meta != nullptr);
-
-            sai_attribute_t new_attr = { 0 };
-            new_attr.id = attr.id;
-
-            switch (meta->attrvaluetype) {
-            case SAI_ATTR_VALUE_TYPE_INT32_LIST:
-                new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
-                new_attr.value.s32list.count = attr.value.s32list.count;
-                m_s32list_pool.emplace_back(new_attr.value.s32list.list);
-                break;
-
-            default:
-                std::cout << "";
-                ;
-            }
-
-            act_attr.emplace_back(new_attr);
-        }
-
-        auto status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-        ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
-    }
-    ///////////////////////////////////////////////////////////////////////////
+    // ///////////////////////////////////////////////////////////////////////////
+    // {
+    //     auto table_id = sai_serialize_object_id(acl_table_oid);
+    //     auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
+    //
+    //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
+    //     auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+    //         {
+    //             { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
+    //             { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+    //             { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+    //             { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
+    //
+    //             // cfg fields
+    //             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" },
+    //             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
+    //             //                                            SAI_PACKET_ACTION_FORWARD
+    //
+    //         });
+    //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+    //
+    //     std::vector<sai_attribute_t> act_attr;
+    //
+    //     for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+    //         const auto attr = exp_attrlist.get_attr_list()[i];
+    //         auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+    //
+    //         ASSERT_TRUE(meta != nullptr);
+    //
+    //         sai_attribute_t new_attr = { 0 };
+    //         new_attr.id = attr.id;
+    //
+    //         switch (meta->attrvaluetype) {
+    //         case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+    //             new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+    //             new_attr.value.s32list.count = attr.value.s32list.count;
+    //             m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+    //             break;
+    //
+    //         default:
+    //             std::cout << "";
+    //             ;
+    //         }
+    //
+    //         act_attr.emplace_back(new_attr);
+    //     }
+    //
+    //     auto status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
+    //     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    //
+    //     ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+    // }
+    // ///////////////////////////////////////////////////////////////////////////
 
     Validate(gAclOrch); // <----------
 
@@ -2241,7 +2242,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
     ///////////////////////////////////////////////////////////////////////////
     for (auto consumer : { consumer_acl_table.get(), consumer_acl_rule.get() }) {
         static_cast<Orch*>(gAclOrch)->doTask(*consumer);
-        Logger::setMinPrio(Logger::SWSS_DEBUG);
+        // Logger::setMinPrio(Logger::SWSS_DEBUG);
     }
     // static_cast<Orch*>(gAclOrch)->doTask(*consumer_acl_table);
 
@@ -2259,10 +2260,41 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
     auto it = acl_tables.find(acl_table_oid);
     ASSERT_TRUE(it != acl_tables.end());
 
-    //auto acl_rule_oid = it->second.rules.begin()->first;
-    auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
-    auto acl_rule_oid = getAclRuleOid(*acl_rule.get());
+    // validate acl rule ...
+    const auto& acl_table = it->second;
+    auto it_rule = acl_table.rules.find(acl_rule_id);
+    ASSERT_TRUE(it_rule != acl_table.rules.end());
 
+    const auto& rule_matches = getAclRuleMatches(*it_rule->second);
+    const auto& rule_actions = getAclRuleActions(*it_rule->second);
+
+    // matchs
+    // sip
+    {
+        auto it_field = rule_matches.find(SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6); // <----------
+        ASSERT_TRUE(it_field != rule_matches.end());
+
+        char addr[46];
+        sai_serialize_ip6(addr, it_field->second.aclfield.data.ip6);
+        ASSERT_STREQ(addr, "::1.2.3.4");
+
+        char mask[46];
+        sai_serialize_ip6(mask, it_field->second.aclfield.mask.ip6);
+        ASSERT_STREQ(mask, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+    }
+
+    // actions
+    {
+        auto it_field = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION); // <----------
+        ASSERT_TRUE(it_field != rule_matches.end());
+
+        ASSERT_TRUE(it_field->second.aclaction.parameter.u32 == SAI_PACKET_ACTION_FORWARD);
+    }
+
+    // //auto acl_rule_oid = it->second.rules.begin()->first;
+    // auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
+    // auto acl_rule_oid = getAclRuleOid(*acl_rule.get());
+    //
     // ///////////////////////////////////////////////////////////////////////////
     // {
     //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
@@ -2313,59 +2345,59 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
     //
     //     ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
     // }
-    ///////////////////////////////////////////////////////////////////////////
-    {
-        auto table_id = sai_serialize_object_id(acl_table_oid);
-        auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
-
-        sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
-        auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
-            {
-                { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
-                { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-                { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-                { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
-
-                // cfg fields
-                { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" },
-                { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
-                //                                            SAI_PACKET_ACTION_FORWARD
-
-            });
-        SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
-
-        std::vector<sai_attribute_t> act_attr;
-
-        for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
-            const auto attr = exp_attrlist.get_attr_list()[i];
-            auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
-
-            ASSERT_TRUE(meta != nullptr);
-
-            sai_attribute_t new_attr = { 0 };
-            new_attr.id = attr.id;
-
-            switch (meta->attrvaluetype) {
-            case SAI_ATTR_VALUE_TYPE_INT32_LIST:
-                new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
-                new_attr.value.s32list.count = attr.value.s32list.count;
-                m_s32list_pool.emplace_back(new_attr.value.s32list.list);
-                break;
-
-            default:
-                std::cout << "";
-                ;
-            }
-
-            act_attr.emplace_back(new_attr);
-        }
-
-        auto status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-        ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
-    }
-    ///////////////////////////////////////////////////////////////////////////
+    // ///////////////////////////////////////////////////////////////////////////
+    // {
+    //     auto table_id = sai_serialize_object_id(acl_table_oid);
+    //     auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
+    //
+    //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
+    //     auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
+    //         {
+    //             { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
+    //             { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
+    //             { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
+    //             { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
+    //
+    //             // cfg fields
+    //             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" },
+    //             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
+    //             //                                            SAI_PACKET_ACTION_FORWARD
+    //
+    //         });
+    //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+    //
+    //     std::vector<sai_attribute_t> act_attr;
+    //
+    //     for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
+    //         const auto attr = exp_attrlist.get_attr_list()[i];
+    //         auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+    //
+    //         ASSERT_TRUE(meta != nullptr);
+    //
+    //         sai_attribute_t new_attr = { 0 };
+    //         new_attr.id = attr.id;
+    //
+    //         switch (meta->attrvaluetype) {
+    //         case SAI_ATTR_VALUE_TYPE_INT32_LIST:
+    //             new_attr.value.s32list.list = (int32_t*)malloc(sizeof(int32_t) * attr.value.s32list.count);
+    //             new_attr.value.s32list.count = attr.value.s32list.count;
+    //             m_s32list_pool.emplace_back(new_attr.value.s32list.list);
+    //             break;
+    //
+    //         default:
+    //             std::cout << "";
+    //             ;
+    //         }
+    //
+    //         act_attr.emplace_back(new_attr);
+    //     }
+    //
+    //     auto status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
+    //     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+    //
+    //     ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
+    // }
+    // ///////////////////////////////////////////////////////////////////////////
 
     Validate(gAclOrch); // <----------
 
