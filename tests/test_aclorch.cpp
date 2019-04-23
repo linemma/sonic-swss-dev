@@ -1578,6 +1578,40 @@ struct AclOrchTest : public AclTest {
 
         return true;
     }
+
+    bool validateAclTableByFieldsValues(const AclTable& acl_table, const std::vector<swss::FieldValueTuple>& fields_values)
+    {
+        // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
+        // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
+        for (const auto& field : fields_values) {
+            if (field.first == TABLE_DESCRIPTION) {
+
+            } else if (field.first == TABLE_TYPE) {
+                if (field.second == TABLE_TYPE_L3) {
+                    if (acl_table.type != ACL_TABLE_L3) {
+                        return false;
+                    }
+                } else if (field.second == TABLE_TYPE_L3V6) {
+                    if (acl_table.type != ACL_TABLE_L3V6) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            } else if (field.first == TABLE_STAGE) {
+                if (field.second == TABLE_INGRESS) {
+                    if (acl_table.stage != ACL_STAGE_INGRESS) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            } else if (field.first == TABLE_PORTS) {
+            }
+        }
+
+        return true;
+    }
 };
 
 // TEST_F(AclTest, create_l3_rule_filter_sip)
@@ -1750,7 +1784,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
 {
     std::string acl_table_id = "acl_table_1";
 
-    auto setData = std::deque<KeyOpFieldsValuesTuple>(
+    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_id,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
@@ -1762,8 +1796,9 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
     // FIXME:                  ^^^^^^^^^^^^^ fixed port
 
     auto orch = createAclOrch();
-    orch->doAclTableTask(setData);
+    orch->doAclTableTask(kvfAclTable);
 
+    // FIXME: don't use gAclOrch
     auto oid = gAclOrch->getTableById(acl_table_id);
     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
@@ -1774,8 +1809,9 @@ TEST_F(AclOrchTest, Create_L3Acl_Table)
 
     const auto& acl_table = it->second;
 
-    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
-    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
+    validateAclTableByFieldsValues(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
+    // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     validate(gAclOrch);
 }
@@ -1784,7 +1820,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 {
     std::string acl_table_id = "acl_table_1";
 
-    auto setData = std::deque<KeyOpFieldsValuesTuple>(
+    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
         { { acl_table_id,
             SET_COMMAND,
             { { TABLE_DESCRIPTION, "filter source IP" },
@@ -1796,8 +1832,9 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
     // FIXME:                  ^^^^^^^^^^^^^ fixed port
 
     auto orch = createAclOrch();
-    orch->doAclTableTask(setData);
+    orch->doAclTableTask(kvfAclTable);
 
+    // FIXME: don't use gAclOrch
     auto oid = gAclOrch->getTableById(acl_table_id);
 
     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
@@ -1809,8 +1846,9 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 
     const auto& acl_table = it->second;
 
-    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
-    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
+    validateAclTableByFieldsValues(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
+    // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     validate(gAclOrch);
 }
@@ -1821,15 +1859,28 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
     std::string acl_rule_id = "acl_rule_1";
 
     auto orch = createAclOrch();
-    orch->doAclTableTask({ { acl_table_id,
-        SET_COMMAND,
-        { { TABLE_DESCRIPTION, "filter source IP" },
-            { TABLE_TYPE, TABLE_TYPE_L3 },
-            //            ^^^^^^^^^^^^^ L3 ACL
-            { TABLE_STAGE, TABLE_INGRESS },
-            // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-            { TABLE_PORTS, "1,2" } } } });
-    // FIXME:              ^^^^^^^^^^^^^ fixed port
+
+    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+        { { acl_table_id,
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3 },
+                //            ^^^^^^^^^^^^^ L3 ACL
+                { TABLE_STAGE, TABLE_INGRESS },
+                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+                { TABLE_PORTS, "1,2" } } } });
+    // FIXME:                  ^^^^^^^^^^^^^ fixed port
+
+    orch->doAclTableTask(kvfAclTable);
+    // orch->doAclTableTask({ { acl_table_id,
+    //     SET_COMMAND,
+    //     { { TABLE_DESCRIPTION, "filter source IP" },
+    //         { TABLE_TYPE, TABLE_TYPE_L3 },
+    //         //            ^^^^^^^^^^^^^ L3 ACL
+    //         { TABLE_STAGE, TABLE_INGRESS },
+    //         // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+    //         { TABLE_PORTS, "1,2" } } } });
+    // // FIXME:              ^^^^^^^^^^^^^ fixed port
 
     orch->doAclRuleTask({ { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
         { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
@@ -1851,6 +1902,7 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     // validate acl table ...
 
+    // FIXME: don't use gAclOrch
     auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
     const auto& acl_tables = getAclTables(*gAclOrch);
 
@@ -1861,8 +1913,9 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 
     const auto& acl_table = it_table->second;
 
-    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
-    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
+    validateAclTableByFieldsValues(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
+    // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     // validate acl rule ...
 
@@ -1895,6 +1948,12 @@ TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
         ASSERT_TRUE(it_field->second.aclaction.parameter.u32 == SAI_PACKET_ACTION_FORWARD);
     }
 
+    // config === orchagent === mock_data(libvs)
+    //                 |-------validate---|
+    //   |----kfv -----|
+    //
+    // config        ===        mock_data
+
     validate(gAclOrch);
 }
 
@@ -1904,15 +1963,28 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
     std::string acl_rule_id = "acl_rule_1";
 
     auto orch = createAclOrch();
-    orch->doAclTableTask({ { acl_table_id,
-        SET_COMMAND,
-        { { TABLE_DESCRIPTION, "filter source IP" },
-            { TABLE_TYPE, TABLE_TYPE_L3V6 },
-            //            ^^^^^^^^^^^^^^^ L3V6 ACL
-            { TABLE_STAGE, TABLE_INGRESS },
-            // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-            { TABLE_PORTS, "1,2" } } } });
-    // FIXME:              ^^^^^^^^^^^^^ fixed port
+
+    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+        { { acl_table_id,
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3V6 },
+                //            ^^^^^^^^^^^^^^^ L3V6 ACL
+                { TABLE_STAGE, TABLE_INGRESS },
+                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+                { TABLE_PORTS, "1,2" } } } });
+    // FIXME:                  ^^^^^^^^^^^^^ fixed port
+
+    // orch->doAclTableTask({ { acl_table_id,
+    //     SET_COMMAND,
+    //     { { TABLE_DESCRIPTION, "filter source IP" },
+    //         { TABLE_TYPE, TABLE_TYPE_L3V6 },
+    //         //            ^^^^^^^^^^^^^^^ L3V6 ACL
+    //         { TABLE_STAGE, TABLE_INGRESS },
+    //         // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+    //         { TABLE_PORTS, "1,2" } } } });
+    // // FIXME:              ^^^^^^^^^^^^^ fixed port
+    orch->doAclTableTask(kvfAclTable);
 
     orch->doAclRuleTask({ { acl_table_id + "|" + acl_rule_id, SET_COMMAND,
         { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
@@ -1934,6 +2006,7 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     // validate acl table ...
 
+    // FIXME: don't use gAclOrch
     auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
     const auto& acl_tables = getAclTables(*gAclOrch);
 
@@ -1944,8 +2017,9 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
 
     const auto& acl_table = it_table->second;
 
-    ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
-    ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
+    validateAclTableByFieldsValues(acl_table, kfvFieldsValues(kvfAclTable.front()));
+    // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3V6);
+    // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
 
     // validate acl rule ...
 
