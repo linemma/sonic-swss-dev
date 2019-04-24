@@ -635,6 +635,66 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
+TEST_F(CoppTest, create_copp_lacp_rule_without_policer)
+{
+    auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    CoppOrchMock copp_mock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
+    auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &copp_mock, std::string(APP_COPP_TABLE_NAME)));
+
+    std::string trap_group_id = "coppRule1";
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    KeyOpFieldsValuesTuple add_action_values(trap_group_id, "SET", rule_values);
+    std::deque<KeyOpFieldsValuesTuple> setData = { add_action_values };
+    consumerAddToSync(consumer.get(), setData);
+
+    //call CoPP function
+    copp_mock.processCoppRule(*consumer);
+
+    ASSERT_TRUE(Validate(copp_mock, trap_group_id, rule_values));
+
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // setData = { delActionAttr };
+    // consumerAddToSync(consumer.get(), setData);
+
+    // //call CoPP function
+    // coppMock.processCoppRule(*consumer);
+
+    // const auto& trapGroupTables = coppMock.getTrapGroupMap();
+    // auto grpIt = trapGroupTables.find(groupName);
+
+    // ASSERT_TRUE(grpIt == trapGroupTables.end());
+}
+
+TEST_F(CoppTest, create_copp_eapol_rule_without_policer)
+{
+    auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+    CoppOrchMock copp_mock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
+    auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &copp_mock, std::string(APP_COPP_TABLE_NAME)));
+
+    std::string trap_group_id = "coppRule1";
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    KeyOpFieldsValuesTuple add_action_values(trap_group_id, "SET", rule_values);
+    std::deque<KeyOpFieldsValuesTuple> setData = { add_action_values };
+    consumerAddToSync(consumer.get(), setData);
+
+    //call CoPP function
+    copp_mock.processCoppRule(*consumer);
+
+    ASSERT_TRUE(Validate(copp_mock, trap_group_id, rule_values));
+
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // setData = { delActionAttr };
+    // consumerAddToSync(consumer.get(), setData);
+
+    // //call CoPP function
+    // coppMock.processCoppRule(*consumer);
+
+    // const auto& trapGroupTables = coppMock.getTrapGroupMap();
+    // auto grpIt = trapGroupTables.find(groupName);
+
+    // ASSERT_TRUE(grpIt == trapGroupTables.end());
+}
+
 // TEST_F(CoppTest, delete_copp_eapol_rule_without_policer)
 // {
 //     sai_hostif_api->create_hostif_trap_group = sai_create_hostif_trap_group_;
