@@ -448,6 +448,15 @@ struct CoppTest : public TestBase {
 
     void TearDown() override
     {
+        auto status = sai_switch_api->remove_switch(gSwitchId);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        gSwitchId = 0;
+
+        sai_api_uninitialize();
+
+        sai_hostif_api = nullptr;
+        sai_policer_api = nullptr;
+        sai_switch_api = nullptr;
     }
 
     std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> ruleAttr)
@@ -604,9 +613,8 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
 
     std::string groupName = "coppRule1";
     vector<FieldValueTuple> ruleAttr = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
-    KeyOpFieldsValuesTuple actionAttr(groupName, "SET", ruleAttr);
-    std::deque<KeyOpFieldsValuesTuple> setData = { actionAttr };
-
+    KeyOpFieldsValuesTuple addActionAttr(groupName, "SET", ruleAttr);
+    std::deque<KeyOpFieldsValuesTuple> setData = { addActionAttr };
     consumerAddToSync(consumer.get(), setData);
 
     //call CoPP function
@@ -614,11 +622,17 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
 
     ASSERT_TRUE(Validate(coppMock, groupName, ruleAttr));
 
-    auto status = sai_switch_api->remove_switch(gSwitchId);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-    gSwitchId = 0;
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // setData = { delActionAttr };
+    // consumerAddToSync(consumer.get(), setData);
 
-    sai_api_uninitialize();
+    // //call CoPP function
+    // coppMock.processCoppRule(*consumer);
+
+    // const auto& trapGroupTables = coppMock.getTrapGroupMap();
+    // auto grpIt = trapGroupTables.find(groupName);
+
+    // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
 // TEST_F(CoppTest, delete_copp_stp_rule_without_policer)
