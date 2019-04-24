@@ -1916,7 +1916,7 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
 
             const auto& acl_table = it->second;
 
-            validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
+            ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
             ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
 
             // delete acl table ...
