@@ -52,47 +52,47 @@ extern sai_vlan_api_t* sai_vlan_api;
 extern sai_bridge_api_t* sai_bridge_api;
 extern sai_route_api_t* sai_route_api;
 
-size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
-{
-    /* Nothing popped */
-    if (entries.empty()) {
-        return 0;
-    }
-
-    for (auto& entry : entries) {
-        string key = kfvKey(entry);
-        string op = kfvOp(entry);
-
-        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-            consumer->m_toSync[key] = entry;
-        }
-        /* If an old task is still there, we combine the old task with new task */
-        else {
-            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
-
-            auto new_values = kfvFieldsValues(entry);
-            auto existing_values = kfvFieldsValues(existing_data);
-
-            for (auto it : new_values) {
-                string field = fvField(it);
-                string value = fvValue(it);
-
-                auto iu = existing_values.begin();
-                while (iu != existing_values.end()) {
-                    string ofield = fvField(*iu);
-                    if (field == ofield)
-                        iu = existing_values.erase(iu);
-                    else
-                        iu++;
-                }
-                existing_values.push_back(FieldValueTuple(field, value));
-            }
-            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
-        }
-    }
-    return entries.size();
-}
+// size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+// {
+//     /* Nothing popped */
+//     if (entries.empty()) {
+//         return 0;
+//     }
+//
+//     for (auto& entry : entries) {
+//         string key = kfvKey(entry);
+//         string op = kfvOp(entry);
+//
+//         /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+//         if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+//             consumer->m_toSync[key] = entry;
+//         }
+//         /* If an old task is still there, we combine the old task with new task */
+//         else {
+//             KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+//
+//             auto new_values = kfvFieldsValues(entry);
+//             auto existing_values = kfvFieldsValues(existing_data);
+//
+//             for (auto it : new_values) {
+//                 string field = fvField(it);
+//                 string value = fvValue(it);
+//
+//                 auto iu = existing_values.begin();
+//                 while (iu != existing_values.end()) {
+//                     string ofield = fvField(*iu);
+//                     if (field == ofield)
+//                         iu = existing_values.erase(iu);
+//                     else
+//                         iu++;
+//                 }
+//                 existing_values.push_back(FieldValueTuple(field, value));
+//             }
+//             consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+//         }
+//     }
+//     return entries.size();
+// }
 
 // FIXME: chnage to lambda function in SetUp()
 const char* profile_get_value(
@@ -867,6 +867,48 @@ struct AclOrchTest : public AclTest {
             aclOrch = gAclOrch; // FIXME: will change ....
         }
 
+        static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+        {
+            /* Nothing popped */
+            if (entries.empty()) {
+                return 0;
+            }
+
+            for (auto& entry : entries) {
+                string key = kfvKey(entry);
+                string op = kfvOp(entry);
+
+                /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+                if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+                    consumer->m_toSync[key] = entry;
+                }
+                /* If an old task is still there, we combine the old task with new task */
+                else {
+                    KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+                    auto new_values = kfvFieldsValues(entry);
+                    auto existing_values = kfvFieldsValues(existing_data);
+
+                    for (auto it : new_values) {
+                        string field = fvField(it);
+                        string value = fvValue(it);
+
+                        auto iu = existing_values.begin();
+                        while (iu != existing_values.end()) {
+                            string ofield = fvField(*iu);
+                            if (field == ofield)
+                                iu = existing_values.erase(iu);
+                            else
+                                iu++;
+                        }
+                        existing_values.push_back(FieldValueTuple(field, value));
+                    }
+                    consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+                }
+            }
+            return entries.size();
+        }
+
         void doAclTableTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
         {
             auto consumer = std::unique_ptr<Consumer>(new Consumer(
@@ -1455,7 +1497,7 @@ struct AclOrchTest : public AclTest {
     }
 
     // validate consistency between aclOrch and mock data (via SAI)
-    bool validateAsicDb(const AclOrch* orch)
+    bool validateLowerLayerDb(const AclOrch* orch)
     {
         assert(orch != nullptr);
 
@@ -1623,75 +1665,75 @@ struct AclOrchTest : public AclTest {
     }
 };
 
-TEST_F(AclOrchTest, Create_L3Acl_Table)
-{
-    std::string acl_table_id = "acl_table_1";
-
-    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_id,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3 },
-                //            ^^^^^^^^^^^^^ L3 ACL
-                { TABLE_STAGE, TABLE_INGRESS },
-                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-                { TABLE_PORTS, "1,2" } } } });
-    // FIXME:                  ^^^^^^^^^^^^^ fixed port
-
-    auto orch = createAclOrch();
-    orch->doAclTableTask(kvfAclTable);
-
-    // FIXME: don't use gAclOrch
-    auto oid = gAclOrch->getTableById(acl_table_id);
-    ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
-
-    const auto& acl_tables = getAclTables(*gAclOrch);
-
-    auto it = acl_tables.find(oid);
-    ASSERT_TRUE(it != acl_tables.end());
-
-    const auto& acl_table = it->second;
-
-    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
-
-    validateAsicDb(gAclOrch);
-}
-
-TEST_F(AclOrchTest, Create_L3v6Acl_Table)
-{
-    std::string acl_table_id = "acl_table_1";
-
-    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_id,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3V6 },
-                //            ^^^^^^^^^^^^^^^ L3V6 ACL
-                { TABLE_STAGE, TABLE_INGRESS },
-                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-                { TABLE_PORTS, "1,2" } } } });
-    // FIXME:                  ^^^^^^^^^^^^^ fixed port
-
-    auto orch = createAclOrch();
-    orch->doAclTableTask(kvfAclTable);
-
-    // FIXME: don't use gAclOrch
-    auto oid = gAclOrch->getTableById(acl_table_id);
-
-    ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
-
-    const auto& acl_tables = getAclTables(*gAclOrch);
-
-    auto it = acl_tables.find(oid);
-    ASSERT_TRUE(it != acl_tables.end());
-
-    const auto& acl_table = it->second;
-
-    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
-
-    validateAsicDb(gAclOrch);
-}
-
+// TEST_F(AclOrchTest, Create_L3Acl_Table)
+// {
+//     std::string acl_table_id = "acl_table_1";
+//
+//     auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_id,
+//             SET_COMMAND,
+//             { { TABLE_DESCRIPTION, "filter source IP" },
+//                 { TABLE_TYPE, TABLE_TYPE_L3 },
+//                 //            ^^^^^^^^^^^^^ L3 ACL
+//                 { TABLE_STAGE, TABLE_INGRESS },
+//                 // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+//                 { TABLE_PORTS, "1,2" } } } });
+//     // FIXME:                  ^^^^^^^^^^^^^ fixed port
+//
+//     auto orch = createAclOrch();
+//     orch->doAclTableTask(kvfAclTable);
+//
+//     // FIXME: don't use gAclOrch
+//     auto oid = gAclOrch->getTableById(acl_table_id);
+//     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
+//
+//     const auto& acl_tables = getAclTables(*gAclOrch);
+//
+//     auto it = acl_tables.find(oid);
+//     ASSERT_TRUE(it != acl_tables.end());
+//
+//     const auto& acl_table = it->second;
+//
+//     validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
+//
+//     validateLowerLayerDb(gAclOrch);
+// }
+//
+// TEST_F(AclOrchTest, Create_L3v6Acl_Table)
+// {
+//     std::string acl_table_id = "acl_table_1";
+//
+//     auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_id,
+//             SET_COMMAND,
+//             { { TABLE_DESCRIPTION, "filter source IP" },
+//                 { TABLE_TYPE, TABLE_TYPE_L3V6 },
+//                 //            ^^^^^^^^^^^^^^^ L3V6 ACL
+//                 { TABLE_STAGE, TABLE_INGRESS },
+//                 // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+//                 { TABLE_PORTS, "1,2" } } } });
+//     // FIXME:                  ^^^^^^^^^^^^^ fixed port
+//
+//     auto orch = createAclOrch();
+//     orch->doAclTableTask(kvfAclTable);
+//
+//     // FIXME: don't use gAclOrch
+//     auto oid = gAclOrch->getTableById(acl_table_id);
+//
+//     ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
+//
+//     const auto& acl_tables = getAclTables(*gAclOrch);
+//
+//     auto it = acl_tables.find(oid);
+//     ASSERT_TRUE(it != acl_tables.end());
+//
+//     const auto& acl_table = it->second;
+//
+//     validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
+//
+//     validateLowerLayerDb(gAclOrch);
+// }
+//
 // TEST_F(AclOrchTest, Create_L3Acl_Table_and_then_Add_L3Rule)
 // {
 //     std::string acl_table_id = "acl_table_1";
@@ -1761,74 +1803,74 @@ TEST_F(AclOrchTest, Create_L3v6Acl_Table)
 //     //
 //     // config        ===        mock_data
 //
-//     validateAsicDb(gAclOrch);
+//     validateLowerLayerDb(gAclOrch);
 // }
-
-TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
-{
-    std::string acl_table_id = "acl_table_1";
-    std::string acl_rule_id = "acl_rule_1";
-
-    auto orch = createAclOrch();
-
-    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
-        { { acl_table_id,
-            SET_COMMAND,
-            { { TABLE_DESCRIPTION, "filter source IP" },
-                { TABLE_TYPE, TABLE_TYPE_L3V6 },
-                //            ^^^^^^^^^^^^^^^ L3V6 ACL
-                { TABLE_STAGE, TABLE_INGRESS },
-                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
-                { TABLE_PORTS, "1,2" } } } });
-    // FIXME:                  ^^^^^^^^^^^^^ fixed port
-
-    orch->doAclTableTask(kvfAclTable);
-
-    auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
-        SET_COMMAND,
-        { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
-
-            // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
-            // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
-            // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
-            // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
-            // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
-            // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
-            //
-            // TODO: required field (add new test cases for that ....)
-            //
-
-            { MATCH_SRC_IPV6, "::1.2.3.4" } } } });
-
-    // TODO: RULE_PRIORITY (important field)
-    // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
-
-    orch->doAclRuleTask(kvfAclRule);
-
-    // validate acl table ...
-
-    // FIXME: don't use gAclOrch
-    auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
-    const auto& acl_tables = getAclTables(*gAclOrch);
-
-    ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
-
-    auto it_table = acl_tables.find(acl_table_oid);
-    ASSERT_TRUE(it_table != acl_tables.end());
-
-    const auto& acl_table = it_table->second;
-
-    validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
-
-    // validate acl rule ...
-
-    auto it_rule = acl_table.rules.find(acl_rule_id);
-    ASSERT_TRUE(it_rule != acl_table.rules.end());
-
-    validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front()));
-
-    validateAsicDb(gAclOrch);
-}
+//
+// TEST_F(AclOrchTest, Create_L3v6Acl_Table_and_then_Add_L3Rule)
+// {
+//     std::string acl_table_id = "acl_table_1";
+//     std::string acl_rule_id = "acl_rule_1";
+//
+//     auto orch = createAclOrch();
+//
+//     auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+//         { { acl_table_id,
+//             SET_COMMAND,
+//             { { TABLE_DESCRIPTION, "filter source IP" },
+//                 { TABLE_TYPE, TABLE_TYPE_L3V6 },
+//                 //            ^^^^^^^^^^^^^^^ L3V6 ACL
+//                 { TABLE_STAGE, TABLE_INGRESS },
+//                 // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+//                 { TABLE_PORTS, "1,2" } } } });
+//     // FIXME:                  ^^^^^^^^^^^^^ fixed port
+//
+//     orch->doAclTableTask(kvfAclTable);
+//
+//     auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
+//         SET_COMMAND,
+//         { { ACTION_PACKET_ACTION, PACKET_ACTION_FORWARD },
+//
+//             // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
+//             // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
+//             // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
+//             // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
+//             // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
+//             // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
+//             //
+//             // TODO: required field (add new test cases for that ....)
+//             //
+//
+//             { MATCH_SRC_IPV6, "::1.2.3.4" } } } });
+//
+//     // TODO: RULE_PRIORITY (important field)
+//     // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
+//
+//     orch->doAclRuleTask(kvfAclRule);
+//
+//     // validate acl table ...
+//
+//     // FIXME: don't use gAclOrch
+//     auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
+//     const auto& acl_tables = getAclTables(*gAclOrch);
+//
+//     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
+//
+//     auto it_table = acl_tables.find(acl_table_oid);
+//     ASSERT_TRUE(it_table != acl_tables.end());
+//
+//     const auto& acl_table = it_table->second;
+//
+//     validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
+//
+//     // validate acl rule ...
+//
+//     auto it_rule = acl_table.rules.find(acl_rule_id);
+//     ASSERT_TRUE(it_rule != acl_table.rules.end());
+//
+//     validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front()));
+//
+//     validateLowerLayerDb(gAclOrch);
+// }
 
 // AclTable::create
 // validate the attribute list of each type {L3, L3V6 ....}, gCrmOrch will increase if create success
@@ -1916,8 +1958,8 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
 
             const auto& acl_table = it->second;
 
-            validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front()));
-            ASSERT_TRUE(validateAsicDb(gAclOrch)); // FIXME: don't use gAclOrch
+            ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
+            ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
 
             // delete acl table ...
 
@@ -1932,7 +1974,7 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
             oid = gAclOrch->getTableById(acl_table_id);
             ASSERT_TRUE(oid == SAI_NULL_OBJECT_ID);
 
-            ASSERT_TRUE(validateAsicDb(gAclOrch)); // FIXME: don't use gAclOrch
+            ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
         }
     }
 }
@@ -1977,7 +2019,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
     const auto& acl_table = it_table->second;
 
     ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
-    ASSERT_TRUE(validateAsicDb(gAclOrch)); // FIXME: don't use gAclOrch
+    ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
 
     // add rule ...
     for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD }) {
@@ -2010,7 +2052,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
         ASSERT_TRUE(it_rule != acl_table.rules.end());
 
         ASSERT_TRUE(validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front())));
-        ASSERT_TRUE(validateAsicDb(gAclOrch)); // FIXME: don't use gAclOrch
+        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
 
         // delete acl rule ...
 
@@ -2024,7 +2066,98 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
 
         it_rule = acl_table.rules.find(acl_rule_id);
         ASSERT_TRUE(it_rule == acl_table.rules.end());
-        ASSERT_TRUE(validateAsicDb(gAclOrch)); // FIXME: don't use gAclOrch
+        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+    }
+}
+
+// When received ACL rule SET_COMMAND, orchagent can create corresponding ACL rule.
+// When received ACL rule DEL_COMMAND, orchagent can delete corresponding ACL rule.
+//
+// Verify ACL table type = { L3V6 }, stage = { INGRESS, ENGRESS }
+// Input by matchs = { SIP, DIP ...}, pkg:actions = { FORWARD, DROP ... }
+//
+TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
+{
+    std::string acl_table_id = "acl_table_1";
+    std::string acl_rule_id = "acl_rule_1";
+
+    auto orch = createAclOrch();
+
+    auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
+        { { acl_table_id,
+            SET_COMMAND,
+            { { TABLE_DESCRIPTION, "filter source IP" },
+                { TABLE_TYPE, TABLE_TYPE_L3V6 },
+                //            ^^^^^^^^^^^^^ L3V6 ACL
+                { TABLE_STAGE, TABLE_INGRESS },
+                // FIXME:      ^^^^^^^^^^^^^ only support / test for ingress ?
+                { TABLE_PORTS, "1,2" } } } });
+    // FIXME:                  ^^^^^^^^^^^^^ fixed port
+
+    orch->doAclTableTask(kvfAclTable);
+
+    // validate acl table ...
+
+    // FIXME: don't use gAclOrch
+    auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
+    const auto& acl_tables = getAclTables(*gAclOrch);
+
+    ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
+
+    auto it_table = acl_tables.find(acl_table_oid);
+    ASSERT_TRUE(it_table != acl_tables.end());
+
+    const auto& acl_table = it_table->second;
+
+    ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
+    ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+
+    // add rule ...
+    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD }) {
+
+        auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
+            SET_COMMAND,
+            { { ACTION_PACKET_ACTION, acl_rule_pkg_action },
+
+                // if (attr_name == ACTION_PACKET_ACTION || attr_name == ACTION_MIRROR_ACTION ||
+                // attr_name == ACTION_DTEL_FLOW_OP || attr_name == ACTION_DTEL_INT_SESSION ||
+                // attr_name == ACTION_DTEL_DROP_REPORT_ENABLE ||
+                // attr_name == ACTION_DTEL_TAIL_DROP_REPORT_ENABLE ||
+                // attr_name == ACTION_DTEL_FLOW_SAMPLE_PERCENT ||
+                // attr_name == ACTION_DTEL_REPORT_ALL_PACKETS)
+                //
+                // TODO: required field (add new test cases for that ....)
+                //
+
+                { MATCH_SRC_IPV6, "::1.2.3.4" },
+                /*{ MATCH_DST_IP, "4.3.2.1" }*/ } } });
+
+        // TODO: RULE_PRIORITY (important field)
+        // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
+
+        orch->doAclRuleTask(kvfAclRule);
+
+        // validate acl rule ...
+
+        auto it_rule = acl_table.rules.find(acl_rule_id);
+        ASSERT_TRUE(it_rule != acl_table.rules.end());
+
+        ASSERT_TRUE(validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front())));
+        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+
+        // delete acl rule ...
+
+        kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
+            DEL_COMMAND,
+            {} } });
+
+        orch->doAclRuleTask(kvfAclRule);
+
+        // validate acl rule ...
+
+        it_rule = acl_table.rules.find(acl_rule_id);
+        ASSERT_TRUE(it_rule == acl_table.rules.end());
+        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
     }
 }
 
