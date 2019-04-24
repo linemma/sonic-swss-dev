@@ -135,11 +135,6 @@ static int profile_get_next_value(
     return -1;
 }
 
-const type_map& getTypeMap(const QosOrch& orch)
-{
-    return orch.m_qos_maps;
-}
-
 struct SetQosResult {
     bool ret_val;
     sai_object_id_t sai_object_id;
@@ -590,6 +585,7 @@ struct QosMapHandlerTest : public TestBase {
 struct QosOrchTest : public TestBase {
 
     std::shared_ptr<swss::DBConnector> m_config_db;
+    std::vector<sai_qos_map_t*> m_qos_map_list_pool;
 
     vector<string> qos_tables = {
         CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
@@ -609,6 +605,13 @@ struct QosOrchTest : public TestBase {
         m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     }
 
+    virtual ~QosOrchTest()
+    {
+        for (auto p : m_qos_map_list_pool) {
+            free(p);
+        }
+    }
+
     struct MockQosOrch : public QosOrch {
         QosOrch* qosOrch; // FIXME: will change ....
         swss::DBConnector* config_db;
@@ -617,6 +620,12 @@ struct QosOrchTest : public TestBase {
             : QosOrch(db, tableNames)
         {
             // qosOrch =
+        }
+
+        type_map& getTypeMap()
+        {
+            //SWSS_LOG_ENTER();
+            return m_qos_maps;
         }
 
         void doQosMapTask(const std::deque<KeyOpFieldsValuesTuple>& entries, std::string tableName)
@@ -672,45 +681,48 @@ struct QosOrchTest : public TestBase {
         return std::make_shared<MockQosOrch>(m_config_db.get(), qos_tables);
     }
 
-    std::shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, std::string qos_map_id, object_map* map)
+    std::shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, std::string qos_table_name, sai_object_id_t object_id)
     {
         std::vector<swss::FieldValueTuple> fields;
 
-        if (qos_map_id == CFG_DSCP_TO_TC_MAP_TABLE_NAME) {
+        if (qos_table_name == CFG_DSCP_TO_TC_MAP_TABLE_NAME) {
             fields.push_back({ "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" });
             fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-                \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+                \"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
                 \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-                \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+                \"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
                 \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-                \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+                \"key\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
                 \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" });
         }
 
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    bool Validate(const QosOrch* orch, const std::string tableName)
+    bool Validate(const QosOrch& orch, const std::string table_name)
     {
-        assert(orch != nullptr);
-
-        const auto& qos_maps = getTypeMap(*orch);
-        auto tableIt = qos_maps.find(tableName);
-        if (tableIt == qos_maps.end()) {
+        auto qos_maps = orch.getTypeMap();
+        auto qos_map = qos_maps.find(table_name);
+        if (qos_map == qos_maps.end()) {
             return false;
         }
 
-        if (!ValidateQosMap(tableIt->first, tableIt->second)) {
+        auto obj_map = *(qos_map->second)->find(table_name);
+        if (obj_map == *(qos_map->second)->end()) {
+            return false;
+        }
+
+        if (!ValidateQosMap(obj_map.first, obj_map.second)) {
             return false;
         }
 
         return true;
     }
 
-    bool ValidateQosMap(std::string qos_map_id, object_map* map)
+    bool ValidateQosMap(std::string qos_table_name, sai_object_id_t object_id)
     {
         const sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
-        auto exp_attrlist_2 = getQosMapAttributeList(objecttype, qos_map_id, map);
+        auto exp_attrlist_2 = getQosMapAttributeList(objecttype, qos_table_name, object_id);
 
         {
             auto& exp_attrlist = *exp_attrlist_2;
@@ -734,7 +746,8 @@ struct QosOrchTest : public TestBase {
                     break;
                 case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
                     new_attr.value.qosmap.count = attr.value.qosmap.count;
-                    new_attr.value.qosmap.list = attr.value.qosmap.list; //(sai_qos_map_t*)malloc(sizeof(sai_qos_map_t) * attr.value.qosmap.count);
+                    new_attr.value.qosmap.list = (sai_qos_map_t*)malloc(sizeof(sai_qos_map_t) * attr.value.qosmap.count);
+                    m_qos_map_list_pool.emplace_back(new_attr.value.qosmap.list);
                     break;
                 default:
                     std::cout << "";
@@ -743,14 +756,11 @@ struct QosOrchTest : public TestBase {
                 act_attr.emplace_back(new_attr);
             }
 
-            sai_object_id_t sai_object;
-            auto status = sai_qos_map_api->create_qos_map(&sai_object, gSwitchId, act_attr.size(), act_attr.data());
-            // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+            auto status = sai_qos_map_api->get_qos_map_attribute(object_id, act_attr.size(), act_attr.data());
             if (status != SAI_STATUS_SUCCESS) {
                 return false;
             }
 
-            // ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
             auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
             if (!b_attr_eq) {
                 return false;
@@ -854,7 +864,7 @@ TEST_F(QosOrchTest, DscpToTcMapViaVS)
     auto status = qosorch.handleDscpToTcTable(*consumer);
     ASSERT_TRUE(status == task_process_status::task_success);
 
-    Validate(&qosorch, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
+    ASSERT_TRUE(Validate(qosorch, CFG_DSCP_TO_TC_MAP_TABLE_NAME));
 }
 
 TEST_F(QosMapHandlerTest, TcToQueueMap)
