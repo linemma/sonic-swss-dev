@@ -34,6 +34,93 @@ extern sai_hostif_api_t* sai_hostif_api;
 extern sai_policer_api_t* sai_policer_api;
 extern sai_switch_api_t* sai_switch_api;
 
+map<string, string> trapTypeMap = {
+    { "stp", "SAI_HOSTIF_TRAP_TYPE_STP" },
+    { "lacp", "SAI_HOSTIF_TRAP_TYPE_LACP" },
+    { "eapol", "SAI_HOSTIF_TRAP_TYPE_EAPOL" },
+    { "lldp", "SAI_HOSTIF_TRAP_TYPE_LLDP" },
+    { "pvrst", "SAI_HOSTIF_TRAP_TYPE_PVRST" },
+    { "igmp_query", "SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_QUERY" },
+    { "igmp_leave", "SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_LEAVE" },
+    { "igmp_v1_report", "SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_V1_REPORT" },
+    { "igmp_v2_report", "SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_V2_REPORT" },
+    { "igmp_v3_report", "SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_V3_REPORT" },
+    { "sample_packet", "SAI_HOSTIF_TRAP_TYPE_SAMPLEPACKET" },
+    { "switch_cust_range", "SAI_HOSTIF_TRAP_TYPE_SWITCH_CUSTOM_RANGE_BASE" },
+    { "arp_req", "SAI_HOSTIF_TRAP_TYPE_ARP_REQUEST" },
+    { "arp_resp", "SAI_HOSTIF_TRAP_TYPE_ARP_RESPONSE" },
+    { "dhcp", "SAI_HOSTIF_TRAP_TYPE_DHCP" },
+    { "ospf", "SAI_HOSTIF_TRAP_TYPE_OSPF" },
+    { "pim", "SAI_HOSTIF_TRAP_TYPE_PIM" },
+    { "vrrp", "SAI_HOSTIF_TRAP_TYPE_VRRP" },
+    { "bgp", "SAI_HOSTIF_TRAP_TYPE_BGP" },
+    { "dhcpv6", "SAI_HOSTIF_TRAP_TYPE_DHCPV6" },
+    { "ospfv6", "SAI_HOSTIF_TRAP_TYPE_OSPFV6" },
+    { "vrrpv6", "SAI_HOSTIF_TRAP_TYPE_VRRPV6" },
+    { "bgpv6", "SAI_HOSTIF_TRAP_TYPE_BGPV6" },
+    { "neigh_discovery", "SAI_HOSTIF_TRAP_TYPE_IPV6_NEIGHBOR_DISCOVERY" },
+    { "mld_v1_v2", "SAI_HOSTIF_TRAP_TYPE_IPV6_MLD_V1_V2" },
+    { "mld_v1_report", "SAI_HOSTIF_TRAP_TYPE_IPV6_MLD_V1_REPORT" },
+    { "mld_v2_done", "SAI_HOSTIF_TRAP_TYPE_IPV6_MLD_V1_DONE" },
+    { "mld_v2_report", "SAI_HOSTIF_TRAP_TYPE_MLD_V2_REPORT" },
+    { "ip2me", "SAI_HOSTIF_TRAP_TYPE_IP2ME" },
+    { "ssh", "SAI_HOSTIF_TRAP_TYPE_SSH" },
+    { "snmp", "SAI_HOSTIF_TRAP_TYPE_SNMP" },
+    { "router_custom_range", "SAI_HOSTIF_TRAP_TYPE_ROUTER_CUSTOM_RANGE_BASE" },
+    { "l3_mtu_error", "SAI_HOSTIF_TRAP_TYPE_L3_MTU_ERROR" },
+    { "ttl_error", "SAI_HOSTIF_TRAP_TYPE_TTL_ERROR" },
+    { "udld", "SAI_HOSTIF_TRAP_TYPE_UDLD" }
+};
+
+map<string, sai_hostif_trap_type_t> trapIdMap = {
+    { "stp", SAI_HOSTIF_TRAP_TYPE_STP },
+    { "lacp", SAI_HOSTIF_TRAP_TYPE_LACP },
+    { "eapol", SAI_HOSTIF_TRAP_TYPE_EAPOL },
+    { "lldp", SAI_HOSTIF_TRAP_TYPE_LLDP },
+    { "pvrst", SAI_HOSTIF_TRAP_TYPE_PVRST },
+    { "igmp_query", SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_QUERY },
+    { "igmp_leave", SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_LEAVE },
+    { "igmp_v1_report", SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_V1_REPORT },
+    { "igmp_v2_report", SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_V2_REPORT },
+    { "igmp_v3_report", SAI_HOSTIF_TRAP_TYPE_IGMP_TYPE_V3_REPORT },
+    { "sample_packet", SAI_HOSTIF_TRAP_TYPE_SAMPLEPACKET },
+    { "switch_cust_range", SAI_HOSTIF_TRAP_TYPE_SWITCH_CUSTOM_RANGE_BASE },
+    { "arp_req", SAI_HOSTIF_TRAP_TYPE_ARP_REQUEST },
+    { "arp_resp", SAI_HOSTIF_TRAP_TYPE_ARP_RESPONSE },
+    { "dhcp", SAI_HOSTIF_TRAP_TYPE_DHCP },
+    { "ospf", SAI_HOSTIF_TRAP_TYPE_OSPF },
+    { "pim", SAI_HOSTIF_TRAP_TYPE_PIM },
+    { "vrrp", SAI_HOSTIF_TRAP_TYPE_VRRP },
+    { "bgp", SAI_HOSTIF_TRAP_TYPE_BGP },
+    { "dhcpv6", SAI_HOSTIF_TRAP_TYPE_DHCPV6 },
+    { "ospfv6", SAI_HOSTIF_TRAP_TYPE_OSPFV6 },
+    { "vrrpv6", SAI_HOSTIF_TRAP_TYPE_VRRPV6 },
+    { "bgpv6", SAI_HOSTIF_TRAP_TYPE_BGPV6 },
+    { "neigh_discovery", SAI_HOSTIF_TRAP_TYPE_IPV6_NEIGHBOR_DISCOVERY },
+    { "mld_v1_v2", SAI_HOSTIF_TRAP_TYPE_IPV6_MLD_V1_V2 },
+    { "mld_v1_report", SAI_HOSTIF_TRAP_TYPE_IPV6_MLD_V1_REPORT },
+    { "mld_v2_done", SAI_HOSTIF_TRAP_TYPE_IPV6_MLD_V1_DONE },
+    { "mld_v2_report", SAI_HOSTIF_TRAP_TYPE_MLD_V2_REPORT },
+    { "ip2me", SAI_HOSTIF_TRAP_TYPE_IP2ME },
+    { "ssh", SAI_HOSTIF_TRAP_TYPE_SSH },
+    { "snmp", SAI_HOSTIF_TRAP_TYPE_SNMP },
+    { "router_custom_range", SAI_HOSTIF_TRAP_TYPE_ROUTER_CUSTOM_RANGE_BASE },
+    { "l3_mtu_error", SAI_HOSTIF_TRAP_TYPE_L3_MTU_ERROR },
+    { "ttl_error", SAI_HOSTIF_TRAP_TYPE_TTL_ERROR },
+    { "udld", SAI_HOSTIF_TRAP_TYPE_UDLD }
+};
+
+map<string, string> packetActionMap = {
+    { "drop", "SAI_PACKET_ACTION_DROP" },
+    { "forward", "SAI_PACKET_ACTION_FORWARD" },
+    { "copy", "SAI_PACKET_ACTION_COPY" },
+    { "copy_cancel", "SAI_PACKET_ACTION_COPY_CANCEL" },
+    { "trap", "SAI_PACKET_ACTION_TRAP" },
+    { "log", "SAI_PACKET_ACTION_LOG" },
+    { "deny", "SAI_PACKET_ACTION_DENY" },
+    { "transit", "SAI_PACKET_ACTION_TRANSIT" }
+};
+
 class CoppOrchMock : public CoppOrch {
 public:
     CoppOrchMock(DBConnector* db, string tableName)
@@ -357,6 +444,53 @@ struct CoppTest : public TestBase {
     {
     }
 
+    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> ruleAttr)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+        for (auto it : ruleAttr) {
+            if (kfvKey(it) == copp_queue_field)
+                fields.push_back({ "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", fvValue(it) });
+        }
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, fields, false));
+    }
+
+    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const vector<FieldValueTuple> ruleAttr)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+        for (auto it : ruleAttr) {
+            if (kfvKey(it) == copp_trap_action_field) {
+                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", packetActionMap.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_trap_action_field) {
+                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", fvValue(it) });
+            } else if (kfvKey(it) == copp_trap_id_list) {
+                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", trapTypeMap.at(fvValue(it)) });
+            }
+        }
+        fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" });
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
+    }
+
+    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple> ruleAttr)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_POLICER, fields, false));
+    }
+
+    vector<sai_hostif_trap_type_t> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
+    {
+        std::vector<sai_hostif_trap_type_t> types;
+        for (auto it : ruleAttr) {
+            if (kfvKey(it) == copp_trap_id_list) {
+                types.push_back({ trapIdMap.at(fvValue(it)) });
+            }
+        }
+
+        return types;
+    }
+
     bool ValidateTrapGroup(sai_object_id_t id, SaiAttributeList& exp_group_attr_list)
     {
         sai_object_type_t trapGroupObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP;
@@ -384,6 +518,8 @@ struct CoppTest : public TestBase {
         if (!b_attr_eq) {
             return false;
         }
+
+        return true;
     }
 
     bool ValidateTrap(sai_object_id_t id, SaiAttributeList& exp_trap_attr_list)
@@ -413,28 +549,41 @@ struct CoppTest : public TestBase {
         if (!b_attr_eq) {
             return false;
         }
+
+        return true;
     }
 
-    bool Validate(CoppOrchMock& orch, const std::string groupName, sai_hostif_trap_type_t trapType, SaiAttributeList& exp_group_attr_list, SaiAttributeList& exp_trap_attr_list)
+    bool Validate(CoppOrchMock& orch, std::string groupName, vector<FieldValueTuple> ruleAttr)
     {
-        const auto& trapGroupTables = orch.getTrapGroupMap();
+        auto exp_group_attr_list = getTrapGroupAttributeList(ruleAttr);
+        auto exp_trap_attr_list = getTrapAttributeList(ruleAttr);
+        vector<sai_hostif_trap_type_t> type_list = getTrapTypeList(ruleAttr);
+        auto exp_police_attr_list = getPoliceAttributeList(ruleAttr);
+
+        //valid trap group
+        const auto& trapGroupTables
+            = orch.getTrapGroupMap();
         auto grpIt = trapGroupTables.find(groupName);
         if (grpIt == trapGroupTables.end()) {
             return false;
         }
 
-        const auto& trapTables = orch.getTrapMap();
-        auto trapIt = trapTables.find(trapType);
-        if (trapIt == trapTables.end()) {
+        if (!ValidateTrapGroup(grpIt->second, *exp_group_attr_list.get())) {
             return false;
         }
 
-        if (!ValidateTrapGroup(grpIt->second, exp_group_attr_list)) {
-            return false;
-        }
+        //valid trap
+        const auto& trapTables
+            = orch.getTrapMap();
+        for (auto trap_type : type_list) {
+            auto trapIt = trapTables.find(trap_type);
+            if (trapIt == trapTables.end()) {
+                return false;
+            }
 
-        if (!ValidateTrap(trapIt->second, exp_trap_attr_list)) {
-            return false;
+            if (!ValidateTrap(trapIt->second, *exp_trap_attr_list.get())) {
+                return false;
+            }
         }
 
         return true;
@@ -447,21 +596,17 @@ TEST_F(CoppTest, create_copp_stp_rule_without_policer)
     CoppOrchMock coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &coppMock, std::string(APP_COPP_TABLE_NAME)));
 
-    KeyOpFieldsValuesTuple rule1Attr("coppRule1", "SET", { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
-    std::deque<KeyOpFieldsValuesTuple> setData = { rule1Attr };
+    std::string groupName = "coppRule1";
+    vector<FieldValueTuple> ruleAttr = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    KeyOpFieldsValuesTuple actionAttr(groupName, "SET", ruleAttr);
+    std::deque<KeyOpFieldsValuesTuple> setData = { actionAttr };
 
     consumerAddToSync(consumer.get(), setData);
-
-    auto groupValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", "3" } });
-    SaiAttributeList group_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, groupValue, false);
-
-    auto trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "0" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
-    SaiAttributeList trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
 
     //call CoPP function
     coppMock.processCoppRule(*consumer);
 
-    Validate(coppMock, "coppRule1", SAI_HOSTIF_TRAP_TYPE_STP, group_attr_list, trap_attr_list);
+    ASSERT_TRUE(Validate(coppMock, groupName, ruleAttr));
 
     auto status = sai_switch_api->remove_switch(gSwitchId);
     ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
