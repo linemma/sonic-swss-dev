@@ -541,8 +541,16 @@ struct TestBase : public ::testing::Test {
             char act_buf[0x4000];
             char exp_buf[0x4000];
 
-            auto act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
-            auto exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
+            int act_len;
+            int exp_len;
+
+            if (meta->attrvaluetype != _sai_attr_value_type_t::SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST) {
+                act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
+                exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
+            } else {
+                act_len = sai_serialize_qos_map_list(act_buf, &act_attr_list[i].value.qosmap);
+                exp_len = sai_serialize_qos_map_list(exp_buf, &exp_attr_list.get_attr_list()[i].value.qosmap);
+            }
 
             // auto act = sai_serialize_attr_value(*meta, act_attr_list[i].value, false);
             // auto exp = sai_serialize_attr_value(*meta, &exp_attr_list.get_attr_list()[i].value, false);
@@ -682,16 +690,18 @@ struct QosOrchTest : public TestBase {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    bool Validate(const QosOrch* orch)
+    bool Validate(const QosOrch* orch, const std::string tableName)
     {
         assert(orch != nullptr);
 
         const auto& qos_maps = getTypeMap(*orch);
+        auto tableIt = qos_maps.find(tableName);
+        if (tableIt == qos_maps.end()) {
+            return false;
+        }
 
-        for (const auto& qos_map : qos_maps) {
-            if (!ValidateQosMap(qos_map.first, qos_map.second)) {
-                return false;
-            }
+        if (!ValidateQosMap(tableIt->first, tableIt->second)) {
+            return false;
         }
 
         return true;
@@ -724,7 +734,7 @@ struct QosOrchTest : public TestBase {
                     break;
                 case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
                     new_attr.value.qosmap.count = attr.value.qosmap.count;
-                    new_attr.value.qosmap.list = (sai_qos_map_t*)malloc(sizeof(sai_qos_map_t) * attr.value.qosmap.count);
+                    new_attr.value.qosmap.list = attr.value.qosmap.list; //(sai_qos_map_t*)malloc(sizeof(sai_qos_map_t) * attr.value.qosmap.count);
                     break;
                 default:
                     std::cout << "";
@@ -774,46 +784,46 @@ TEST_F(QosMapHandlerTest, DscpToTcMap)
     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
 }
 
-TEST_F(QosMapHandlerTest, DscpToTcMapViaProcessWorkItem)
-{
-    auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
+// TEST_F(QosMapHandlerTest, DscpToTcMapViaProcessWorkItem)
+// {
+//     auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
 
-    vector<string> qos_tables = {
-        CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
-        CFG_SCHEDULER_TABLE_NAME,
-        CFG_DSCP_TO_TC_MAP_TABLE_NAME,
-        CFG_QUEUE_TABLE_NAME,
-        CFG_PORT_QOS_MAP_TABLE_NAME,
-        CFG_WRED_PROFILE_TABLE_NAME,
-        CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-        CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-        CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
-    };
-    auto qosorch = QosOrchMock(&configDb, qos_tables);
+//     vector<string> qos_tables = {
+//         CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
+//         CFG_SCHEDULER_TABLE_NAME,
+//         CFG_DSCP_TO_TC_MAP_TABLE_NAME,
+//         CFG_QUEUE_TABLE_NAME,
+//         CFG_PORT_QOS_MAP_TABLE_NAME,
+//         CFG_WRED_PROFILE_TABLE_NAME,
+//         CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+//         CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+//         CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
+//     };
+//     auto qosorch = QosOrchMock(&configDb, qos_tables);
 
-    auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&configDb, std::string(CFG_DSCP_TO_TC_MAP_TABLE_NAME), 1, 1), &qosorch, std::string(CFG_DSCP_TO_TC_MAP_TABLE_NAME)));
+//     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&configDb, std::string(CFG_DSCP_TO_TC_MAP_TABLE_NAME), 1, 1), &qosorch, std::string(CFG_DSCP_TO_TC_MAP_TABLE_NAME)));
 
-    KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
-        { { "1", "0" }, { "2", "0" }, { "3", "3" } });
-    std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
+//     KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
+//         { { "1", "0" }, { "2", "0" }, { "3", "3" } });
+//     std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
-    consumerAddToSync(consumer.get(), setData);
-    auto res = setDscp2TcViaProcessWorkItem(qosorch, *consumer);
+//     consumerAddToSync(consumer.get(), setData);
+//     auto res = setDscp2TcViaProcessWorkItem(qosorch, *consumer);
 
-    ASSERT_TRUE(res->ret_val == true);
+//     ASSERT_TRUE(res->ret_val == true);
 
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
-    SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
+//     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
+//         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
+//         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+//         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
+//         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+//         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
+//         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
+//         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
+//     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
-}
+//     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+// }
 
 TEST_F(QosOrchTest, DscpToTcMapViaVS)
 {
@@ -841,71 +851,10 @@ TEST_F(QosOrchTest, DscpToTcMapViaVS)
 
     consumerAddToSync(consumer.get(), setData);
 
-    sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
-    auto exp_fields = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-        \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
-    SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
+    auto status = qosorch.handleDscpToTcTable(*consumer);
+    ASSERT_TRUE(status == task_process_status::task_success);
 
-    std::vector<sai_attribute_t> act_attr;
-
-    for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
-        const auto attr = exp_attrlist.get_attr_list()[i];
-        auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
-
-        ASSERT_TRUE(meta != nullptr);
-
-        sai_attribute_t new_attr = { 0 };
-        new_attr.id = attr.id;
-
-        switch (meta->attrvaluetype) {
-        case SAI_ATTR_VALUE_TYPE_INT32:
-            new_attr.value.u32 = attr.value.u32;
-            break;
-        case SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST:
-            new_attr.value.qosmap.list = attr.value.qosmap.list;
-            new_attr.value.qosmap.count = attr.value.qosmap.count;
-            break;
-        default:
-            std::cout << "";
-        }
-
-        act_attr.emplace_back(new_attr);
-    }
-
-    sai_object_id_t sai_object;
-    auto status = sai_qos_map_api->create_qos_map(&sai_object, gSwitchId, act_attr.size(), act_attr.data());
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
-
-    Validate(&qosorch);
-    // KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
-    //     { { "1", "0" }, { "2", "0" }, { "3", "3" } });
-    // std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
-
-    // auto orch = createQosOrch();
-    // orch->doQosMapTask(setData, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
-
-    // auto oid = orch->getTypeMap(acl_table_id);
-    // ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
-
-    // const auto& acl_tables = getAclTables(*gAclOrch);
-
-    // auto it = acl_tables.find(oid);
-    // ASSERT_TRUE(it != acl_tables.end());
-
-    // const auto& acl_table = it->second;
-
-    // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
-    // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
-
-    // Validate(orch.get());
+    Validate(&qosorch, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
 }
 
 TEST_F(QosMapHandlerTest, TcToQueueMap)
@@ -922,7 +871,7 @@ TEST_F(QosMapHandlerTest, TcToQueueMap)
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\
+        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":1,\"tc\":0}},{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
@@ -945,7 +894,7 @@ TEST_F(QosMapHandlerTest, TcToPgMap)
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\
+        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":1,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
@@ -968,7 +917,7 @@ TEST_F(QosMapHandlerTest, PfcPrioToPgMap)
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":1,\"qidx\":0,\"tc\":0},\
+        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":1,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":1,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":3,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":0,\"tc\":0}}]}" } });
@@ -991,7 +940,7 @@ TEST_F(QosMapHandlerTest, PfcToQueueMap)
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":1,\"qidx\":0,\"tc\":0},\
+        \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":1,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":1,\"tc\":0}},{\
         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":3,\"qidx\":0,\"tc\":0},\
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
