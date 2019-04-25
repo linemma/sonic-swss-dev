@@ -490,80 +490,80 @@ TEST_F(AclTest, create_default_acl_table_4)
 //     sai_api_uninitialize();
 // }
 
-struct AclOrchTest : public AclTest {
+struct MockAclOrch {
+    AclOrch* m_aclOrch;
+    swss::DBConnector* config_db;
 
-    struct MockAclOrch {
-        AclOrch* aclOrch; // FIXME: will change ....
-        swss::DBConnector* config_db;
+    MockAclOrch(AclOrch* aclOrch, swss::DBConnector* config_db)
+        : m_aclOrch(aclOrch)
+        , config_db(config_db)
+    {
+    }
 
-        MockAclOrch(swss::DBConnector* config_db)
-            : config_db(config_db)
-        {
-            aclOrch = gAclOrch; // FIXME: will change ....
+    static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+    {
+        /* Nothing popped */
+        if (entries.empty()) {
+            return 0;
         }
 
-        static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
-        {
-            /* Nothing popped */
-            if (entries.empty()) {
-                return 0;
+        for (auto& entry : entries) {
+            string key = kfvKey(entry);
+            string op = kfvOp(entry);
+
+            /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+            if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+                consumer->m_toSync[key] = entry;
             }
+            /* If an old task is still there, we combine the old task with new task */
+            else {
+                KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
 
-            for (auto& entry : entries) {
-                string key = kfvKey(entry);
-                string op = kfvOp(entry);
+                auto new_values = kfvFieldsValues(entry);
+                auto existing_values = kfvFieldsValues(existing_data);
 
-                /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-                if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-                    consumer->m_toSync[key] = entry;
-                }
-                /* If an old task is still there, we combine the old task with new task */
-                else {
-                    KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+                for (auto it : new_values) {
+                    string field = fvField(it);
+                    string value = fvValue(it);
 
-                    auto new_values = kfvFieldsValues(entry);
-                    auto existing_values = kfvFieldsValues(existing_data);
-
-                    for (auto it : new_values) {
-                        string field = fvField(it);
-                        string value = fvValue(it);
-
-                        auto iu = existing_values.begin();
-                        while (iu != existing_values.end()) {
-                            string ofield = fvField(*iu);
-                            if (field == ofield)
-                                iu = existing_values.erase(iu);
-                            else
-                                iu++;
-                        }
-                        existing_values.push_back(FieldValueTuple(field, value));
+                    auto iu = existing_values.begin();
+                    while (iu != existing_values.end()) {
+                        string ofield = fvField(*iu);
+                        if (field == ofield)
+                            iu = existing_values.erase(iu);
+                        else
+                            iu++;
                     }
-                    consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+                    existing_values.push_back(FieldValueTuple(field, value));
                 }
+                consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
             }
-            return entries.size();
         }
+        return entries.size();
+    }
 
-        void doAclTableTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
-        {
-            auto consumer = std::unique_ptr<Consumer>(new Consumer(
-                new swss::ConsumerStateTable(config_db, CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+    void doAclTableTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
+    {
+        auto consumer = std::unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(config_db, CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
 
-            consumerAddToSync(consumer.get(), entries);
+        consumerAddToSync(consumer.get(), entries);
 
-            static_cast<Orch*>(aclOrch)->doTask(*consumer);
-        }
+        static_cast<Orch*>(m_aclOrch)->doTask(*consumer);
+    }
 
-        void doAclRuleTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
-        {
-            auto consumer = std::unique_ptr<Consumer>(new Consumer(
-                new swss::ConsumerStateTable(config_db, CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
+    void doAclRuleTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
+    {
+        auto consumer = std::unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(config_db, CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
 
-            consumerAddToSync(consumer.get(), entries);
+        consumerAddToSync(consumer.get(), entries);
 
-            static_cast<Orch*>(aclOrch)->doTask(*consumer);
-        }
-    };
+        static_cast<Orch*>(m_aclOrch)->doTask(*consumer);
+    }
+};
+
+struct AclOrchTest : public AclTest {
 
     std::shared_ptr<swss::DBConnector> m_app_db;
     std::shared_ptr<swss::DBConnector> m_config_db;
@@ -677,133 +677,40 @@ struct AclOrchTest : public AclTest {
         auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
-        // FIXME: using clone not just assign
+#if WITH_SAI == LIBVS
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
-
-        // FIXME: using clone not just assign
         sai_acl_api = const_cast<sai_acl_api_t*>(&vs_acl_api);
+        sai_port_api = const_cast<sai_port_api_t*>(&vs_port_api);
+        sai_vlan_api = const_cast<sai_vlan_api_t*>(&vs_vlan_api);
+        sai_bridge_api = const_cast<sai_bridge_api_t*>(&vs_bridge_api);
+        sai_route_api = const_cast<sai_route_api_t*>(&vs_route_api);
+#endif
 
-        sai_attribute_t swattr;
+        sai_attribute_t attr;
 
-        swattr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
-        swattr.value.booldata = true;
+        attr.id = SAI_SWITCH_ATTR_INIT_SWITCH;
+        attr.value.booldata = true;
 
-        status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
+        status = sai_switch_api->create_switch(&gSwitchId, 1, &attr);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        // Get switch source MAC address
+        attr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
+        status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
+
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        gMacAddress = attr.value.mac;
+
+        // Get the default virtual router ID
+        attr.id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
+        status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
+
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        gVirtualRouterId = attr.value.oid;
+
         ///////////////////////////////////////////////////////////////////////
-
-        // assert(sai_switch_api == nullptr);
-        assert(sai_port_api == nullptr);
-        assert(sai_vlan_api == nullptr);
-        assert(sai_bridge_api == nullptr);
-        assert(sai_route_api == nullptr);
-
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        // auto sai_switch = std::shared_ptr<sai_switch_api_t>(new sai_switch_api_t(), [](sai_switch_api_t* p) {
-        //     delete p;
-        //     sai_switch_api = nullptr;
-        // });
-
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_port = std::shared_ptr<sai_port_api_t>(new sai_port_api_t(), [](sai_port_api_t* p) {
-            delete p;
-            sai_port_api = nullptr;
-        });
-
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_vlan = std::shared_ptr<sai_vlan_api_t>(new sai_vlan_api_t(), [](sai_vlan_api_t* p) {
-            delete p;
-            sai_vlan_api = nullptr;
-        });
-
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_bridge = std::shared_ptr<sai_bridge_api_t>(new sai_bridge_api_t(), [](sai_bridge_api_t* p) {
-            delete p;
-            sai_bridge_api = nullptr;
-        });
-
-        // FIXME: BUG ! the scope is not correct ! why not error ?
-        auto sai_route = std::shared_ptr<sai_route_api_t>(new sai_route_api_t(), [](sai_route_api_t* p) {
-            delete p;
-            sai_route_api = nullptr;
-        });
-
-        // FIXME: Change the following function to "stub" or "dummy" (just return fixed value), just interact with AclTable / AclRule
-        // sai_switch_api = sai_switch.get();
-        sai_port_api = sai_port.get();
-        sai_vlan_api = sai_vlan.get();
-        sai_bridge_api = sai_bridge.get();
-        sai_route_api = sai_route.get();
-
-        // TODO: change these functions .... for init only ??
-        // sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
-        sai_port_api->get_port_attribute = sai_get_port_attribute_;
-        sai_vlan_api->get_vlan_attribute = sai_get_vlan_attribute_;
-        sai_vlan_api->remove_vlan_member = sai_remove_vlan_member_;
-        sai_bridge_api->get_bridge_attribute = sai_get_bridge_attribute_;
-        sai_bridge_api->get_bridge_port_attribute = sai_get_bridge_port_attribute_;
-        sai_bridge_api->remove_bridge_port = sai_remove_bridge_port_;
-        sai_route_api->create_route_entry = sai_create_route_entry_;
-        that = this;
-
-        sai_create_switch_fn =
-            [](_Out_ sai_object_id_t* switch_id,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_get_switch_attribute_fn =
-            [](_In_ sai_object_id_t switch_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_get_port_attribute_fn =
-            [](_In_ sai_object_id_t port_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_get_vlan_attribute_fn =
-            [](_In_ sai_object_id_t vlan_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_remove_vlan_member_fn =
-            [](_In_ sai_object_id_t vlan_member_id) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_get_bridge_attribute_fn =
-            [](_In_ sai_object_id_t bridge_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_get_bridge_port_attribute_fn =
-            [](_In_ sai_object_id_t bridge_port_id,
-                _In_ uint32_t attr_count,
-                _Inout_ sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_remove_bridge_port_fn =
-            [](_In_ sai_object_id_t bridge_port_id) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
-
-        sai_create_route_entry_fn =
-            [](_In_ const sai_route_entry_t* route_entry,
-                _In_ uint32_t attr_count,
-                _In_ const sai_attribute_t* attr_list) -> sai_status_t {
-            return SAI_STATUS_SUCCESS;
-        };
 
         TableConnector confDbAclTable(m_config_db.get(), CFG_ACL_TABLE_NAME);
         TableConnector confDbAclRuleTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME);
@@ -913,7 +820,7 @@ struct AclOrchTest : public AclTest {
 
     std::shared_ptr<MockAclOrch> createAclOrch()
     {
-        return std::make_shared<MockAclOrch>(m_config_db.get());
+        return std::make_shared<MockAclOrch>(gAclOrch, m_config_db.get());
     }
 
     std::shared_ptr<SaiAttributeList> getAclTableAttributeList(sai_object_type_t objecttype, const AclTable& acl_table)
