@@ -60,9 +60,11 @@ apply_patch() {
     sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp"
     
     # patch swss-orch
-    # original cmd: `patch aclorch.h < aclorch-PatchFile.diff`
+    # original cmd: `patch (acl/crm)orch.h < swss-(acl/crm)orch.diff`
     patch -N "${SRC_PATH}/sonic-swss/orchagent/aclorch.h" < "${SRC_PATH}/patch/swss-aclorch.diff"
     rm aclorch.h.rej
+    patch -N "${SRC_PATH}/sonic-swss/orchagent/crmorch.h" < "${SRC_PATH}/patch/swss-crmorch.diff"
+    rm crmorch.h.rej
     
 }
 
