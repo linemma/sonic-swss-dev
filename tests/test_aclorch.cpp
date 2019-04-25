@@ -1,14 +1,13 @@
-#include "gtest/gtest.h"
+#include "ut_helper.h"
 
 #include "converter.h"
 #include "hiredis.h"
 #include "orchdaemon.h"
-#include "sai_vs.h"
+
 #include "saihelper.h"
 
 //#include "aclorch.h"
 #include "saiattributelist.h"
-#include "spec_auto_config.h"
 
 void syncd_apply_view() {}
 
@@ -93,89 +92,125 @@ extern sai_route_api_t* sai_route_api;
 //     }
 //     return entries.size();
 // }
-
-// FIXME: chnage to lambda function in SetUp()
-const char* profile_get_value(
-    _In_ sai_switch_profile_id_t profile_id,
-    _In_ const char* variable)
-{
-    // UNREFERENCED_PARAMETER(profile_id);
-
-    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-        return "20:03:04:05:06:00";
-    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-        return "1000";
-    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-        return "2000";
-    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-        return "SAI_VS_SWITCH_TYPE_BCM56850";
-    }
-
-    return NULL;
-}
-
-// FIXME: chnage to lambda function in SetUp()
-static int profile_get_next_value(
-    _In_ sai_switch_profile_id_t profile_id,
-    _Out_ const char** variable,
-    _Out_ const char** value)
-{
-    if (value == NULL) {
-        return 0;
-    }
-
-    if (variable == NULL) {
-        return -1;
-    }
-
-    return -1;
-}
-
-// TODO: move to separted file ?
-const map<sai_object_id_t, AclTable>& getAclTables(const AclOrch& orch)
-{
-    return orch.m_AclTables;
-}
-
-sai_object_id_t getAclRuleOid(const AclRule& aclrule)
-{
-    return aclrule.m_ruleOid;
-}
-
-const map<sai_acl_entry_attr_t, sai_attribute_value_t>& getAclRuleMatches(const AclRule& aclrule)
-{
-    return aclrule.m_matches;
-}
-
-const map<sai_acl_entry_attr_t, sai_attribute_value_t>& getAclRuleActions(const AclRule& aclrule)
-{
-    return aclrule.m_actions;
-}
-
-// Portal
-struct AccessOrch {
-    //map<CrmResourceType, CrmResourceEntry> m_resourcesMap;
-    static struct {
-        static const map<CrmResourceType, CrmOrch::CrmResourceEntry>& getResourceMap(const CrmOrch* crmOrch)
-        {
-            return crmOrch->m_resourcesMap;
-        }
-
-        // string getCrmAclKey(sai_acl_stage_t stage, sai_acl_bind_point_type_t bindPoint);
-        // string getCrmAclTableKey(sai_object_id_t id);
-        static std::string getCrmAclKey(CrmOrch* crmOrch, sai_acl_stage_t stage, sai_acl_bind_point_type_t bindPoint)
-        {
-            return crmOrch->getCrmAclKey(stage, bindPoint);
-        }
-
-        static std::string getCrmAclTableKey(CrmOrch* crmOrch, sai_object_id_t id)
-        {
-            return crmOrch->getCrmAclTableKey(id);
-        }
-    } crmOrch;
-};
+//
+// std::map<std::string, std::string> gProfileMap;
+// std::map<std::string, std::string>::iterator gProfileIter = gProfileMap.begin();
+//
+// // FIXME: chnage to lambda function in SetUp()
+// const char* profile_get_value(
+//     _In_ sai_switch_profile_id_t profile_id,
+//     _In_ const char* variable)
+// {
+//     // // UNREFERENCED_PARAMETER(profile_id);
+//     //
+//     // if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+//     //     return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+//     // } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+//     //     return "20:03:04:05:06:00";
+//     // } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+//     //     return "1000";
+//     // } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+//     //     return "2000";
+//     // } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+//     //     return "SAI_VS_SWITCH_TYPE_BCM56850";
+//     // }
+//     //
+//     // return NULL;
+//     std::map<std::string, std::string>::const_iterator it = gProfileMap.find(variable);
+//     if (it == gProfileMap.end()) {
+//         printf("%s: NULL\n", variable);
+//         return NULL;
+//     }
+//
+//     return it->second.c_str();
+// }
+//
+// // FIXME: chnage to lambda function in SetUp()
+// static int profile_get_next_value(
+//     _In_ sai_switch_profile_id_t profile_id,
+//     _Out_ const char** variable,
+//     _Out_ const char** value)
+// {
+//     // if (value == NULL) {
+//     //     return 0;
+//     // }
+//     //
+//     // if (variable == NULL) {
+//     //     return -1;
+//     // }
+//     //
+//     // return -1;
+//     if (value == NULL) {
+//         printf("resetting profile map iterator");
+//
+//         gProfileIter = gProfileMap.begin();
+//         return 0;
+//     }
+//
+//     if (variable == NULL) {
+//         printf("variable is null");
+//         return -1;
+//     }
+//
+//     if (gProfileIter == gProfileMap.end()) {
+//         printf("iterator reached end");
+//         return -1;
+//     }
+//
+//     *variable = gProfileIter->first.c_str();
+//     *value = gProfileIter->second.c_str();
+//
+//     printf("key: %s:%s", *variable, *value);
+//
+//     gProfileIter++;
+//
+//     return 0;
+// }
+//
+// // TODO: move to separted file ?
+// const map<sai_object_id_t, AclTable>& getAclTables(const AclOrch& orch)
+// {
+//     return orch.m_AclTables;
+// }
+//
+// sai_object_id_t getAclRuleOid(const AclRule& aclrule)
+// {
+//     return aclrule.m_ruleOid;
+// }
+//
+// const map<sai_acl_entry_attr_t, sai_attribute_value_t>& getAclRuleMatches(const AclRule& aclrule)
+// {
+//     return aclrule.m_matches;
+// }
+//
+// const map<sai_acl_entry_attr_t, sai_attribute_value_t>& getAclRuleActions(const AclRule& aclrule)
+// {
+//     return aclrule.m_actions;
+// }
+//
+// struct Portal {
+//     struct CrmOrchInternal {
+//         static const map<CrmResourceType, CrmOrch::CrmResourceEntry>& getResourceMap(const CrmOrch* crmOrch)
+//         {
+//             return crmOrch->m_resourcesMap;
+//         }
+//
+//         static std::string getCrmAclKey(CrmOrch* crmOrch, sai_acl_stage_t stage, sai_acl_bind_point_type_t bindPoint)
+//         {
+//             return crmOrch->getCrmAclKey(stage, bindPoint);
+//         }
+//
+//         static std::string getCrmAclTableKey(CrmOrch* crmOrch, sai_object_id_t id)
+//         {
+//             return crmOrch->getCrmAclTableKey(id);
+//         }
+//
+//         static void getResAvailableCounters(CrmOrch* crmOrch)
+//         {
+//             crmOrch->getResAvailableCounters();
+//         }
+//     };
+// };
 
 TEST(ConvertTest, field_value_to_attribute)
 {
@@ -965,6 +1000,68 @@ struct AclOrchTest : public AclTest {
         m_state_db = std::make_shared<swss::DBConnector>(STATE_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     }
 
+    static std::map<std::string, std::string> gProfileMap;
+    static std::map<std::string, std::string>::iterator gProfileIter;
+
+    static const char* profile_get_value(
+        sai_switch_profile_id_t profile_id,
+        const char* variable)
+    {
+        if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+            return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+        } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+            return "20:03:04:05:06:00";
+        } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+            return "1000";
+        } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+            return "2000";
+        } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+            return "SAI_VS_SWITCH_TYPE_BCM56850";
+        }
+
+        return NULL;
+
+        // std::map<std::string, std::string>::const_iterator it = gProfileMap.find(variable);
+        // if (it == gProfileMap.end()) {
+        //     printf("%s: NULL\n", variable);
+        //     return NULL;
+        // }
+        //
+        // return it->second.c_str();
+    }
+
+    static int profile_get_next_value(
+        sai_switch_profile_id_t profile_id,
+        const char** variable,
+        const char** value)
+    {
+        if (value == NULL) {
+            printf("resetting profile map iterator");
+
+            gProfileIter = gProfileMap.begin();
+            return 0;
+        }
+
+        if (variable == NULL) {
+            printf("variable is null");
+            return -1;
+        }
+
+        if (gProfileIter == gProfileMap.end()) {
+            printf("iterator reached end");
+            return -1;
+        }
+
+        *variable = gProfileIter->first.c_str();
+        *value = gProfileIter->second.c_str();
+
+        printf("key: %s:%s", *variable, *value);
+
+        gProfileIter++;
+
+        return 0;
+    }
+
     void SetUp() override
     {
         AclTestBase::SetUp();
@@ -980,9 +1077,24 @@ struct AclOrchTest : public AclTest {
         assert(gPortsOrch == nullptr);
 
         ///////////////////////////////////////////////////////////////////////
+        // if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+        //     return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+        // } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+        //     return "20:03:04:05:06:00";
+        // } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+        //     return "1000";
+        // } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+        //     return "2000";
+        // } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+        //     return "SAI_VS_SWITCH_TYPE_BCM56850";
+        // }
+
+        gProfileMap.emplace("SAI_VS_SWITCH_TYPE", "SAI_VS_SWITCH_TYPE_BCM56850");
+        gProfileMap.emplace("KV_DEVICE_MAC_ADDRESS", "20:03:04:05:06:00");
+
         sai_service_method_table_t test_services = {
-            profile_get_value,
-            profile_get_next_value
+            AclOrchTest::profile_get_value,
+            AclOrchTest::profile_get_next_value
         };
 
         auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
@@ -1377,7 +1489,7 @@ struct AclOrchTest : public AclTest {
 
         // //auto acl_rule_oid = it->second.rules.begin()->first;
         // auto acl_rule = it->second.rules.begin()->second; // FIXME: assumpt only one rule inside
-        auto acl_rule_oid = getAclRuleOid(acl_rule);
+        auto acl_rule_oid = Portal::AclRuleInternal::getRuleOid(&acl_rule);
 
         {
             //     auto table_id = sai_serialize_object_id(acl_table_oid);
@@ -1519,23 +1631,33 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 
+    // consistency validation with CRM
     bool validateResourceCountWithCrm(const AclOrch* aclOrch, CrmOrch* crmOrch)
     {
         // AclTable::create
         // gCrmOrch->incCrmAclUsedCounter(CrmResourceType::CRM_ACL_TABLE, acl_stage, SAI_ACL_BIND_POINT_TYPE_PORT);
         // m_resourcesMap.at(resource).countersMap[getCrmAclKey(stage, point)].usedCounter++;
-        auto resourceMap = AccessOrch::crmOrch.getResourceMap(crmOrch);
-        auto ingressKey = AccessOrch::crmOrch.getCrmAclKey(crmOrch, SAI_ACL_STAGE_INGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
-        auto egressKey = AccessOrch::crmOrch.getCrmAclKey(crmOrch, SAI_ACL_STAGE_EGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
+        auto resourceMap = Portal::CrmOrchInternal::getResourceMap(crmOrch);
+        auto ifpPortKey = Portal::CrmOrchInternal::getCrmAclKey(crmOrch, SAI_ACL_STAGE_INGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
+        auto efpPortKey = Portal::CrmOrchInternal::getCrmAclKey(crmOrch, SAI_ACL_STAGE_EGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
 
-        auto ingressPortAclTableInCrm = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[ingressKey].usedCounter;
-        auto egressPortAclTableInCrm = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[egressKey].usedCounter;
+        auto ifpPortAclTableCount = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[ifpPortKey].usedCounter;
+        auto efpPortAclTableCount = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[efpPortKey].usedCounter;
 
-        return ingressPortAclTableInCrm + egressPortAclTableInCrm == getAclTables(*aclOrch).size();
+        return ifpPortAclTableCount + efpPortAclTableCount == Portal::AclOrchInternal::getAclTables(aclOrch).size();
     }
 
+    // leakage check
     bool validateResourceCountWithLowerLayerDb(const AclOrch* aclOrch)
     {
+#if WITH_SAI == LIBVS
+        {
+            auto& aclTableHash = g_switch_state_map.at(gSwitchId)->objectHash.at(SAI_OBJECT_TYPE_ACL_TABLE);
+
+            return aclTableHash.size() == Portal::AclOrchInternal::getAclTables(aclOrch).size();
+        }
+#endif
+
         return true;
     }
 
@@ -1552,7 +1674,7 @@ struct AclOrchTest : public AclTest {
             return false;
         }
 
-        const auto& acl_tables = getAclTables(*gAclOrch);
+        const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
 
         for (const auto& id_acl_table : acl_tables) {
             if (!validateAclTable(id_acl_table.first, id_acl_table.second)) {
@@ -1599,7 +1721,7 @@ struct AclOrchTest : public AclTest {
 
     bool validateAclRuleAction(const AclRule& acl_rule, const std::string& attr_name, const std::string& attr_value)
     {
-        const auto& rule_actions = getAclRuleActions(acl_rule);
+        const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
 
         // if (attr_value == PACKET_ACTION_FORWARD) {
         //     value.aclaction.parameter.s32 = SAI_PACKET_ACTION_FORWARD;
@@ -1642,7 +1764,7 @@ struct AclOrchTest : public AclTest {
 
     bool validateAclRuleMatch(const AclRule& acl_rule, const std::string& attr_name, const std::string& attr_value)
     {
-        const auto& rule_matches = getAclRuleMatches(acl_rule);
+        const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
 
         if (attr_name == MATCH_SRC_IP | attr_name == MATCH_DST_IP) {
             auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP); // <----------
@@ -1715,6 +1837,9 @@ struct AclOrchTest : public AclTest {
         return true;
     }
 };
+
+std::map<std::string, std::string> AclOrchTest::gProfileMap;
+std::map<std::string, std::string>::iterator AclOrchTest::gProfileIter = AclOrchTest::gProfileMap.begin();
 
 // TEST_F(AclOrchTest, Create_L3Acl_Table)
 // {
@@ -2002,7 +2127,7 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
             auto oid = gAclOrch->getTableById(acl_table_id);
             ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
-            const auto& acl_tables = getAclTables(*gAclOrch);
+            const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
 
             auto it = acl_tables.find(oid);
             ASSERT_TRUE(it != acl_tables.end());
@@ -2060,7 +2185,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
 
     // FIXME: don't use gAclOrch
     auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
-    const auto& acl_tables = getAclTables(*gAclOrch);
+    const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
@@ -2151,7 +2276,7 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
 
     // FIXME: don't use gAclOrch
     auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
-    const auto& acl_tables = getAclTables(*gAclOrch);
+    const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
 
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
