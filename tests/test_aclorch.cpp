@@ -66,34 +66,6 @@ TEST(ConvertTest, field_value_to_attribute)
     ASSERT_TRUE(c == 11);
 }
 
-struct CreateAclResult {
-    bool ret_val;
-
-    std::vector<sai_attribute_t> attr_list;
-};
-
-struct AclTableResult {
-    bool ret_val;
-
-    sai_object_id_t acl_table_id;
-    std::vector<sai_attribute_t> attr_list;
-};
-
-struct CreateRuleResult {
-    bool ret_val;
-
-    std::vector<sai_attribute_t> counter_attr_list;
-    std::vector<sai_attribute_t> rule_attr_list;
-};
-
-struct AclRuleResult {
-    bool ret_val;
-    sai_object_id_t acl_counter_id;
-    sai_object_id_t acl_entry_id;
-    std::vector<sai_attribute_t> counter_attr_list;
-    std::vector<sai_attribute_t> rule_attr_list;
-};
-
 class ConsumerExtend_Dont_Use : public Consumer {
 public:
     ConsumerExtend_Dont_Use(ConsumerTableBase* select, Orch* orch, const string& name)
@@ -344,6 +316,12 @@ struct AclTestBase : public TestBase {
 };
 
 struct AclTest : public AclTestBase {
+
+    struct CreateAclResult {
+        bool ret_val;
+
+        std::vector<sai_attribute_t> attr_list;
+    };
 
     std::shared_ptr<swss::DBConnector> m_config_db;
 
@@ -1117,7 +1095,6 @@ struct AclOrchTest : public AclTest {
                 const auto attr = exp_attrlist.get_attr_list()[i];
                 auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
 
-                // ASSERT_TRUE(meta != nullptr);
                 if (meta == nullptr) {
                     return false;
                 }
@@ -1141,12 +1118,10 @@ struct AclOrchTest : public AclTest {
             }
 
             auto status = sai_acl_api->get_acl_entry_attribute(acl_rule_oid, act_attr.size(), act_attr.data()); // <----------
-            // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
             if (status != SAI_STATUS_SUCCESS) {
                 return false;
             }
 
-            // ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
             auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
             if (!b_attr_eq) {
                 return false;
@@ -1207,13 +1182,11 @@ struct AclOrchTest : public AclTest {
                 act_attr.emplace_back(new_attr);
             }
 
-            auto status = sai_acl_api->get_acl_table_attribute(acl_table_oid, act_attr.size(), act_attr.data()); // <----------
-            // ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+            auto status = sai_acl_api->get_acl_table_attribute(acl_table_oid, act_attr.size(), act_attr.data());
             if (status != SAI_STATUS_SUCCESS) {
                 return false;
             }
 
-            // ASSERT_TRUE(AttrListEq(objecttype, act_attr, exp_attrlist));
             auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
             if (!b_attr_eq) {
                 return false;
@@ -1287,8 +1260,6 @@ struct AclOrchTest : public AclTest {
 
     bool validateAclTableByConfOp(const AclTable& acl_table, const std::vector<swss::FieldValueTuple>& values)
     {
-        // ASSERT_TRUE(acl_table.type == ACL_TABLE_L3);
-        // ASSERT_TRUE(acl_table.stage == ACL_STAGE_INGRESS);
         for (const auto& fv : values) {
             if (fv.first == TABLE_DESCRIPTION) {
 
@@ -1322,15 +1293,6 @@ struct AclOrchTest : public AclTest {
     bool validateAclRuleAction(const AclRule& acl_rule, const std::string& attr_name, const std::string& attr_value)
     {
         const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
-
-        // if (attr_value == PACKET_ACTION_FORWARD) {
-        //     value.aclaction.parameter.s32 = SAI_PACKET_ACTION_FORWARD;
-        // } else if (attr_value == PACKET_ACTION_DROP) {
-        //     value.aclaction.parameter.s32 = SAI_PACKET_ACTION_DROP;
-        // }
-        // value.aclaction.enable = true;
-        //
-        // m_actions[aclL3ActionLookup[attr_value]] = value;
 
         if (attr_name == ACTION_PACKET_ACTION) {
             auto it = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION);
@@ -1367,7 +1329,7 @@ struct AclOrchTest : public AclTest {
         const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
 
         if (attr_name == MATCH_SRC_IP | attr_name == MATCH_DST_IP) {
-            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP); // <----------
+            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP);
             if (it_field == rule_matches.end()) {
                 return false;
             }
@@ -1384,7 +1346,7 @@ struct AclOrchTest : public AclTest {
                 return false;
             }
         } else if (attr_name == MATCH_SRC_IPV6) {
-            auto it_field = rule_matches.find(SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6); // <----------
+            auto it_field = rule_matches.find(SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6);
             if (it_field == rule_matches.end()) {
                 return false;
             }
