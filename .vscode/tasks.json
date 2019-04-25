@@ -37,7 +37,7 @@
                 "command": "ubuntu.exe",
                 "args": [
                     "-c",
-                    "(cd /mnt/e/build.swss.wsl && ./tests.out --gtest_filter=*.*) 2>&1 | sed -e 's/\\/mnt\\/\\(.\\)/\\U\\1:/g'"
+                    "(cd /mnt/e/build.swss.wsl && source packages/.env && ./tests.out --gtest_filter=*.*) 2>&1 | sed -e 's/\\/mnt\\/\\(.\\)/\\U\\1:/g'"
                 ],
             },
             "group": {
