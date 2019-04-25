@@ -1,20 +1,18 @@
-@@ -218,6 +218,10 @@
+@@ -218,6 +218,8 @@
  
      vector<sai_object_id_t> m_inPorts;
      vector<sai_object_id_t> m_outPorts;
 +	
-+	friend sai_object_id_t getAclRuleOid(const AclRule &aclrule);
-+	friend const map<sai_acl_entry_attr_t, sai_attribute_value_t> &getAclRuleMatches(const AclRule &aclrule);
-+	friend const map<sai_acl_entry_attr_t, sai_attribute_value_t> &getAclRuleActions(const AclRule &aclrule);
++	friend class Portal;
  };
  
  class AclRuleL3: public AclRule
-@@ -413,6 +417,8 @@
+@@ -413,6 +415,8 @@
      static bool m_bCollectCounters;
      static swss::DBConnector m_db;
      static swss::Table m_countersTable;
 +	
-+	friend const map<sai_object_id_t, AclTable> &getAclTables(const AclOrch &orch);
++	friend class Portal;
  };
  
  #endif /* SWSS_ACLORCH_H */
