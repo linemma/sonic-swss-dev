@@ -84,15 +84,39 @@ public:
     }
 };
 
-template <int n, int objtype, typename... arglist>
-struct SaiSpyFn {
-    void* orig_fn;
+// Spy C functin pointer to std::function to access closure
+// Internal using static `spy` function pointer to invoke std::function `fake`
+// To make sure the convert work for multiple function in the same or different API table.
+// The caller shall passing <n/objtype> to create unique SaiSpyFunction class.
+//
+// Almost use cases will like the follow, pass n=0 and objecttype/offset to use.
+//     auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_1.get()->create_acl_table);
+//     auto y = SpyOn<0, SAI_OBJECT_TYPE_ACL_ENTRY>(&acl_api_1.get()->create_acl_entry);
+// or
+//     auto x = SpyOn<0, offsetof(sai_acl_api_t, create_acl_table)>(&acl_api.get()->create_acl_table);
+//     auto x = SpyOn<0, offsetof(sai_acl_api_t, create_acl_entry)>(&acl_api.get()->create_acl_entry);
+//
+// or pass n=api_api for different API table
+//    auto x = SpyOn<SAI_API_ACL, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api.get()->create_acl_table);
+//    auto y = SpyOn<SAI_API_SWITCH, SAI_OBJECT_TYPE_SWITCH>(&switch_api.get()->create_switch);
+//
+// The rest rare case is spy same function in different API table. Using differnt n value for that.
+//     auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_1.get()->create_acl_table);
+//     auto y = SpyOn<1, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_2.get()->create_acl_table);
+//
+template <int n, int objtype, typename R, typename... arglist>
+struct SaiSpyFunctor {
 
-    static std::function<sai_status_t(arglist...)> fake;
+    using original_fn_t = R (*)(arglist...);
+    using original_fn_ptr_t = R (**)(arglist...);
 
-    SaiSpyFn(void* orig_fn)
-        : orig_fn(orig_fn)
+    original_fn_t original_fn;
+    static std::function<R(arglist...)> fake;
+
+    SaiSpyFunctor(original_fn_ptr_t fn_ptr)
+        : original_fn(*fn_ptr)
     {
+        *fn_ptr = spy;
     }
 
     void callFake(std::function<sai_status_t(arglist...)> fn)
@@ -102,95 +126,62 @@ struct SaiSpyFn {
 
     static sai_status_t spy(arglist... args)
     {
-        // TODO: pass this into fake. Inside fake() it can call orig_fn
+        // TODO: pass this into fake. Inside fake() it can call original_fn
         return fake(args...);
     }
 };
 
-template <int n, int objtype, typename... arglist>
-std::function<sai_status_t(arglist...)> SaiSpyFn<n, objtype, arglist...>::fake;
-
-template <int n, int objtype>
-std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>>
-SpyOn(sai_acl_api_t* sai_api)
-{
-    auto that = new SaiSpyFn<n, objtype, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>((void*)sai_api->create_acl_table);
-
-    auto ret = std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>>(that);
-
-    sai_api->create_acl_table = that->spy;
-
-    return ret;
-}
+template <int n, int objtype, typename R, typename... arglist>
+std::function<R(arglist...)> SaiSpyFunctor<n, objtype, R, arglist...>::fake;
 
 // create entry
 template <int n, int objtype>
-std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn)(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*))
+std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>>
+    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*))
 {
-    auto that = new SaiSpyFn<n, objtype, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>((void*)*fn);
+    using SaiSpyCreateFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>;
 
-    auto ret = std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>>(that);
-
-    *fn = that->spy;
-
-    return ret;
+    return std::make_shared<SaiSpyCreateFunctor>(fn_ptr);
 }
 
-// create without input oid
+// create entry without input oid
 template <int n, int objtype>
-std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t*, uint32_t, const sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn)(sai_object_id_t*, uint32_t, const sai_attribute_t*))
+std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, uint32_t, const sai_attribute_t*>>
+    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t*, uint32_t, const sai_attribute_t*))
 {
-    auto that = new SaiSpyFn<n, objtype, sai_object_id_t*, uint32_t, const sai_attribute_t*>((void*)*fn);
+    using SaiSpyCreateFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, uint32_t, const sai_attribute_t*>;
 
-    auto ret = std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t*, uint32_t, const sai_attribute_t*>>(that);
-
-    *fn = that->spy;
-
-    return ret;
+    return std::make_shared<SaiSpyCreateFunctor>(fn_ptr);
 }
 
 // remove entry
 template <int n, int objtype>
-std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t>>
-    SpyOn(sai_status_t (**fn)(sai_object_id_t))
+std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t>>
+    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t))
 {
-    auto that = new SaiSpyFn<n, objtype, sai_object_id_t>((void*)*fn);
+    using SaiSpyRemoveFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t>;
 
-    auto ret = std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t>>(that);
-
-    *fn = that->spy;
-
-    return ret;
+    return std::make_shared<SaiSpyRemoveFunctor>(fn_ptr);
 }
 
-// set attribute
+// set entry attribute
 template <int n, int objtype>
-std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t, const sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn)(sai_object_id_t, const sai_attribute_t*))
+std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, const sai_attribute_t*>>
+    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t, const sai_attribute_t*))
 {
-    auto that = new SaiSpyFn<n, objtype, sai_object_id_t, const sai_attribute_t*>((void*)*fn);
+    using SaiSpySetAttrFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, const sai_attribute_t*>;
 
-    auto ret = std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t, const sai_attribute_t*>>(that);
-
-    *fn = that->spy;
-
-    return ret;
+    return std::make_shared<SaiSpySetAttrFunctor>(fn_ptr);
 }
 
-// get attribute
+// get entry attribute
 template <int n, int objtype>
-std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t, uint32_t, sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn)(sai_object_id_t, uint32_t, sai_attribute_t*))
+std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, uint32_t, sai_attribute_t*>>
+    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t, uint32_t, sai_attribute_t*))
 {
-    auto that = new SaiSpyFn<n, objtype, sai_object_id_t, uint32_t, sai_attribute_t*>((void*)*fn);
+    using SaiSpyGetAttrFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, uint32_t, sai_attribute_t*>;
 
-    auto ret = std::shared_ptr<SaiSpyFn<n, objtype, sai_object_id_t, uint32_t, sai_attribute_t*>>(that);
-
-    *fn = that->spy;
-
-    return ret;
+    return std::make_shared<SaiSpyGetAttrFunctor>(fn_ptr);
 }
 
 TEST(SaiSpy, CURD)
@@ -406,13 +397,13 @@ TEST(SaiSpy, create_switch_and_acl_table)
     sai_object_id_t exp_oid_1 = 100;
     sai_object_id_t exp_oid_2 = 200;
 
-    auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api.get()->create_acl_table);
+    auto x = SpyOn<SAI_API_ACL, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api.get()->create_acl_table);
     x->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
         *oid = exp_oid_1;
         return (sai_status_t)SAI_STATUS_SUCCESS;
     });
 
-    auto y = SpyOn<0, SAI_OBJECT_TYPE_SWITCH>(&switch_api.get()->create_switch);
+    auto y = SpyOn<SAI_API_SWITCH, SAI_OBJECT_TYPE_SWITCH>(&switch_api.get()->create_switch);
     y->callFake([&](sai_object_id_t* oid, uint32_t, const sai_attribute_t*) -> sai_status_t {
         *oid = exp_oid_2;
         return (sai_status_t)SAI_STATUS_SUCCESS;
@@ -424,91 +415,6 @@ TEST(SaiSpy, create_switch_and_acl_table)
     switch_api->create_switch(&oid, 0, nullptr);
     ASSERT_TRUE(oid == exp_oid_2);
 }
-
-struct SaiLambda : public ::testing::Test {
-    //
-    // spy functions
-    //
-
-    //
-    // acl ...
-    //
-    static sai_status_t sai_create_acl_table_(sai_object_id_t* acl_table_id,
-        sai_object_id_t switch_id,
-        uint32_t attr_count,
-        const sai_attribute_t* attr_list)
-    {
-        return that->sai_create_acl_table_fn(acl_table_id, switch_id, attr_count,
-            attr_list);
-    }
-
-    // static std::unordered_set<SaiXX*> thats;
-
-    // static std::shared_ptr<SaiXX> register_sai_create_acl_table_callback(sai_acl_api_t* sai_api,
-    //     std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)> fn)
-    // {
-    //     assert(sai_api != nullptr);
-    //
-    //     void* orig_fn = (void*)sai_api->create_acl_table;
-    //
-    //     auto saiXX = new SaiXX(orig_fn);
-    //
-    //     // template <typename T>
-    //     // static sai_status_t sai_create_acl_table_____(sai_object_id_t * acl_table_id,
-    //     //     sai_object_id_t switch_id,
-    //     //     uint32_t attr_count,
-    //     //     const sai_attribute_t* attr_list)
-    //     // {
-    //     //     return T->sai_create_acl_table_fn;
-    //     // }
-    //     //
-    //     // sai_api->create_acl_table = sai_create_acl_table_____<(unsigned)saiXX>;
-    //     sai_api->create_acl_table = SaiXX::create_acl_table;
-    //     sai_create_acl_table_fn = fn; // <---- only one !
-    //
-    //     return std::shared_ptr<SaiXX>(saiXX);
-    // }
-
-    static sai_status_t sai_remove_acl_table_(_In_ sai_object_id_t acl_table_id)
-    {
-        return that->sai_remove_acl_table_fn(acl_table_id);
-    }
-
-    static sai_status_t sai_create_acl_counter_(_Out_ sai_object_id_t* acl_counter_id,
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t* attr_list)
-    {
-        return that->sai_create_acl_counter_fn(acl_counter_id, switch_id, attr_count, attr_list);
-    }
-
-    static sai_status_t sai_create_acl_entry_(_Out_ sai_object_id_t* acl_entry_id,
-        _In_ sai_object_id_t switch_id,
-        _In_ uint32_t attr_count,
-        _In_ const sai_attribute_t* attr_list)
-    {
-        return that->sai_create_acl_entry_fn(acl_entry_id, switch_id, attr_count, attr_list);
-    }
-
-    static SaiLambda* that;
-
-    std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t,
-        const sai_attribute_t*)>
-        sai_create_acl_table_fn;
-
-    std::function<sai_status_t(sai_object_id_t)>
-        sai_remove_acl_table_fn;
-
-    std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)>
-        sai_create_acl_counter_fn;
-
-    std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)>
-        sai_create_acl_entry_fn;
-};
-
-// std::unordered_set<SaiXX*> SaiLambda::thats;
-SaiLambda* SaiLambda::that = nullptr;
-// std::function<sai_status_t(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*)> SaiLambda::sai_create_acl_table_fn;
 
 struct Check {
     static bool AttrListEq_Miss_objecttype_Dont_Use(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
@@ -591,7 +497,7 @@ struct Check {
     }
 };
 
-struct AclTestBase : public SaiLambda {
+struct AclTestBase : public ::testing::Test {
     std::vector<int32_t*> m_s32list_pool;
 
     virtual ~AclTestBase()
@@ -640,23 +546,15 @@ struct AclTest : public AclTestBase {
             sai_acl_api = nullptr;
         });
 
-        sai_acl_api->create_acl_table = sai_create_acl_table_;
-        that = this;
-
         auto ret = std::make_shared<CreateAclResult>();
 
-        sai_create_acl_table_fn =
-            [&](sai_object_id_t* acl_table_id, sai_object_id_t switch_id,
-                uint32_t attr_count,
-                const sai_attribute_t* attr_list) -> sai_status_t {
+        auto spy = SpyOn<SAI_API_ACL, SAI_OBJECT_TYPE_ACL_TABLE>(&sai_acl_api->create_acl_table);
+        spy->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t attr_count, const sai_attribute_t* attr_list) -> sai_status_t {
             for (auto i = 0; i < attr_count; ++i) {
                 ret->attr_list.emplace_back(attr_list[i]);
             }
-            // return SAI_STATUS_FAILURE;
             return SAI_STATUS_SUCCESS;
-        };
-
-        // register_sai_create_acl_table_callback(sai_acl_api, sai_create_acl_table_fn);
+        });
 
         ret->ret_val = acl.create();
         return ret;
