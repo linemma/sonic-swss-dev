@@ -7,32 +7,16 @@
 #include "saiattributelist.h"
 #include "saihelper.h"
 
-void syncd_apply_view()
-{
-}
-
-using namespace std;
-
-/* Global variables */
-sai_object_id_t gVirtualRouterId;
-sai_object_id_t gUnderlayIfId;
-sai_object_id_t gSwitchId = SAI_NULL_OBJECT_ID;
-MacAddress gMacAddress;
-MacAddress gVxlanMacAddress;
-
-#define DEFAULT_BATCH_SIZE 128
-int gBatchSize = DEFAULT_BATCH_SIZE;
-
-bool gSairedisRecord = true;
-bool gSwssRecord = true;
-bool gLogRotate = false;
-ofstream gRecordOfs;
-string gRecordFile;
+extern sai_object_id_t gSwitchId;
 
 extern sai_switch_api_t* sai_switch_api;
 extern sai_qos_map_api_t* sai_qos_map_api;
-sai_qos_map_api_t* vs_sai_qos_map_api;
+sai_qos_map_api_t* vs_sai_qos_map_api; // FIXME: don't define local var like from libvs !! exactly, do need to define this ? don't define it as global var
 extern sai_wred_api_t* sai_wred_api;
+
+namespace nsQosOrchTest {
+
+using namespace std;
 
 struct QosOrchMock : public QosOrch {
     QosOrchMock(swss::DBConnector* db, vector<string>& tableNames)
@@ -98,7 +82,7 @@ size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesT
     return entries.size();
 }
 
-const char* profile_get_value(
+const char* profile_get_value_qos_move_in(
     _In_ sai_switch_profile_id_t profile_id,
     _In_ const char* variable)
 {
@@ -119,7 +103,7 @@ const char* profile_get_value(
     return NULL;
 }
 
-static int profile_get_next_value(
+static int profile_get_next_value_qos_move_in(
     _In_ sai_switch_profile_id_t profile_id,
     _Out_ const char** variable,
     _Out_ const char** value)
@@ -642,8 +626,8 @@ struct QosOrchTest : public TestBase {
     void SetUp() override
     {
         sai_service_method_table_t test_services = {
-            profile_get_value,
-            profile_get_next_value
+            profile_get_value_qos_move_in,
+            profile_get_next_value_qos_move_in
         };
 
         auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
@@ -1032,3 +1016,4 @@ TEST_F(QosMapHandlerTest, AddWredProfile)
 
 //     ASSERT_TRUE(res->ret_val == true);
 // }
+}

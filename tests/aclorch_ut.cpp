@@ -2,8 +2,6 @@
 
 #include "orchdaemon.h"
 
-using namespace std;
-
 extern sai_object_id_t gSwitchId;
 
 extern CrmOrch* gCrmOrch;
@@ -22,6 +20,10 @@ extern sai_port_api_t* sai_port_api;
 extern sai_vlan_api_t* sai_vlan_api;
 extern sai_bridge_api_t* sai_bridge_api;
 extern sai_route_api_t* sai_route_api;
+
+namespace nsAclOrchTest {
+
+using namespace std;
 
 TEST(ConvertTest, field_value_to_attribute)
 {
@@ -1422,3 +1424,4 @@ while true
 
 check the acl_count == max_number_acl
 */
+}

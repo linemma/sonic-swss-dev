@@ -8,31 +8,15 @@
 #include "consumertablebase.h"
 #include "saiattributelist.h"
 
-void syncd_apply_view()
-{
-}
-
-using namespace std;
-
-/* Global variables */
-sai_object_id_t gVirtualRouterId;
-sai_object_id_t gUnderlayIfId;
-sai_object_id_t gSwitchId = SAI_NULL_OBJECT_ID;
-MacAddress gMacAddress;
-MacAddress gVxlanMacAddress;
-
-#define DEFAULT_BATCH_SIZE 128
-int gBatchSize = DEFAULT_BATCH_SIZE;
-
-bool gSairedisRecord = true;
-bool gSwssRecord = true;
-bool gLogRotate = false;
-ofstream gRecordOfs;
-string gRecordFile;
+extern sai_object_id_t gSwitchId;
 
 extern sai_hostif_api_t* sai_hostif_api;
 extern sai_policer_api_t* sai_policer_api;
 extern sai_switch_api_t* sai_switch_api;
+
+namespace nsCoppOrchTest {
+
+using namespace std;
 
 map<string, string> m_trap_type_map = {
     { "stp", "SAI_HOSTIF_TRAP_TYPE_STP" },
@@ -1024,3 +1008,4 @@ TEST_F(CoppTest, create_copp_eapol_rule_without_policer)
 //     sai_policer_api->remove_policer = NULL;
 //     sai_switch_api->get_switch_attribute = NULL;
 // }
+}
