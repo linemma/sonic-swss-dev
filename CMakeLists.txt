@@ -147,18 +147,18 @@ configure_file (
 file(GLOB TESTS
     main.cpp
     tests/fake_main.cpp
-    tests/test_aclorch.cpp
+    tests/aclorch_ut.cpp
     tests/saispy_ut.cpp
 )
 
 file(GLOB COPP_TESTS
     main.cpp    
-    tests/test_copporch.cpp
+    tests/copporch_ut.cpp
 )
 
 file(GLOB QOS_TESTS
     main.cpp    
-    tests/test_qosorch.cpp
+    tests/qosorch_ut.cpp
 )
 
 file(GLOB SRCS
