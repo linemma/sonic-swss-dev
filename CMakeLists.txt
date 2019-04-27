@@ -147,6 +147,7 @@ configure_file (
 file(GLOB TESTS
     main.cpp
     tests/test_aclorch.cpp
+    tests/saispy_ut.cpp
 )
 
 file(GLOB COPP_TESTS

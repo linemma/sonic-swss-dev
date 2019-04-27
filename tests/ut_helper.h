@@ -6,6 +6,9 @@
 
 #include "gtest/gtest.h"
 #include "portal.h"
+#include "saispy.h"
+
+#include "check.h"
 
 #if WITH_SAI == LIBVS
 #include "sai_vs.h"

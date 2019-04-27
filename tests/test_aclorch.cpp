@@ -84,418 +84,86 @@ public:
     }
 };
 
-// Spy C functin pointer to std::function to access closure
-// Internal using static `spy` function pointer to invoke std::function `fake`
-// To make sure the convert work for multiple function in the same or different API table.
-// The caller shall passing <n/objtype> to create unique SaiSpyFunction class.
-//
-// Almost use cases will like the follow, pass n=0 and objecttype/offset to use.
-//     auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_1.get()->create_acl_table);
-//     auto y = SpyOn<0, SAI_OBJECT_TYPE_ACL_ENTRY>(&acl_api_1.get()->create_acl_entry);
-// or
-//     auto x = SpyOn<0, offsetof(sai_acl_api_t, create_acl_table)>(&acl_api.get()->create_acl_table);
-//     auto x = SpyOn<0, offsetof(sai_acl_api_t, create_acl_entry)>(&acl_api.get()->create_acl_entry);
-//
-// or pass n=api_api for different API table
-//    auto x = SpyOn<SAI_API_ACL, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api.get()->create_acl_table);
-//    auto y = SpyOn<SAI_API_SWITCH, SAI_OBJECT_TYPE_SWITCH>(&switch_api.get()->create_switch);
-//
-// The rest rare case is spy same function in different API table. Using differnt n value for that.
-//     auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_1.get()->create_acl_table);
-//     auto y = SpyOn<1, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_2.get()->create_acl_table);
-//
-template <int n, int objtype, typename R, typename... arglist>
-struct SaiSpyFunctor {
-
-    using original_fn_t = R (*)(arglist...);
-    using original_fn_ptr_t = R (**)(arglist...);
-
-    original_fn_t original_fn;
-    static std::function<R(arglist...)> fake;
-
-    SaiSpyFunctor(original_fn_ptr_t fn_ptr)
-        : original_fn(*fn_ptr)
-    {
-        *fn_ptr = spy;
-    }
-
-    void callFake(std::function<sai_status_t(arglist...)> fn)
-    {
-        fake = fn;
-    }
-
-    static sai_status_t spy(arglist... args)
-    {
-        // TODO: pass this into fake. Inside fake() it can call original_fn
-        return fake(args...);
-    }
-};
-
-template <int n, int objtype, typename R, typename... arglist>
-std::function<R(arglist...)> SaiSpyFunctor<n, objtype, R, arglist...>::fake;
-
-// create entry
-template <int n, int objtype>
-std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*))
-{
-    using SaiSpyCreateFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, sai_object_id_t, uint32_t, const sai_attribute_t*>;
-
-    return std::make_shared<SaiSpyCreateFunctor>(fn_ptr);
-}
-
-// create entry without input oid
-template <int n, int objtype>
-std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, uint32_t, const sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t*, uint32_t, const sai_attribute_t*))
-{
-    using SaiSpyCreateFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t*, uint32_t, const sai_attribute_t*>;
-
-    return std::make_shared<SaiSpyCreateFunctor>(fn_ptr);
-}
-
-// remove entry
-template <int n, int objtype>
-std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t>>
-    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t))
-{
-    using SaiSpyRemoveFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t>;
-
-    return std::make_shared<SaiSpyRemoveFunctor>(fn_ptr);
-}
-
-// set entry attribute
-template <int n, int objtype>
-std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, const sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t, const sai_attribute_t*))
-{
-    using SaiSpySetAttrFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, const sai_attribute_t*>;
-
-    return std::make_shared<SaiSpySetAttrFunctor>(fn_ptr);
-}
-
-// get entry attribute
-template <int n, int objtype>
-std::shared_ptr<SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, uint32_t, sai_attribute_t*>>
-    SpyOn(sai_status_t (**fn_ptr)(sai_object_id_t, uint32_t, sai_attribute_t*))
-{
-    using SaiSpyGetAttrFunctor = SaiSpyFunctor<n, objtype, sai_status_t, sai_object_id_t, uint32_t, sai_attribute_t*>;
-
-    return std::make_shared<SaiSpyGetAttrFunctor>(fn_ptr);
-}
-
-TEST(SaiSpy, CURD)
-{
-    auto acl_api = std::make_shared<sai_acl_api_t>();
-    auto raw = acl_api.get();
-
-    acl_api->create_acl_table = [](sai_object_id_t* oid, sai_object_id_t, uint32_t,
-                                    const sai_attribute_t*) {
-        *oid = 1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    acl_api->remove_acl_table = [](sai_object_id_t oid) {
-        return (sai_status_t)(oid == 2 ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE);
-    };
-
-    acl_api->set_acl_table_attribute = [](sai_object_id_t oid,
-                                           const sai_attribute_t*) {
-        return (sai_status_t)(oid == 3 ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE);
-    };
-
-    acl_api->get_acl_table_attribute = [](sai_object_id_t oid, uint32_t,
-                                           sai_attribute_t*) {
-        return (sai_status_t)(oid == 4 ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE);
-    };
-
-    sai_object_id_t oid;
-
-    auto status = acl_api->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == 1);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    status = acl_api->remove_acl_table(2);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    status = acl_api->set_acl_table_attribute(3, nullptr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    status = acl_api->get_acl_table_attribute(4, 0, nullptr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    sai_object_id_t exp_oid_1 = 100;
-    sai_object_id_t exp_oid_2 = 200;
-
-    auto x = SpyOn<0, offsetof(sai_acl_api_t, create_acl_table)>(&acl_api.get()->create_acl_table);
-    x->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    auto y = SpyOn<0, offsetof(sai_acl_api_t, remove_acl_table)>(&acl_api.get()->remove_acl_table);
-    y->callFake([&](sai_object_id_t oid) -> sai_status_t {
-        return (sai_status_t)(oid == exp_oid_2 ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE);
-    });
-
-    auto w = SpyOn<0, offsetof(sai_acl_api_t, set_acl_table_attribute)>(&acl_api.get()->set_acl_table_attribute);
-    w->callFake([&](sai_object_id_t oid, const sai_attribute_t*) -> sai_status_t {
-        return (sai_status_t)(oid == exp_oid_2 ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE);
-    });
-
-    auto z = SpyOn<0, offsetof(sai_acl_api_t, get_acl_table_attribute)>(&acl_api.get()->get_acl_table_attribute);
-    z->callFake([&](sai_object_id_t oid, uint32_t, sai_attribute_t*) -> sai_status_t {
-        return (sai_status_t)(oid == exp_oid_2 ? SAI_STATUS_SUCCESS : SAI_STATUS_FAILURE);
-    });
-
-    auto x_fake = x->fake;
-    auto x_spy = x->spy;
-    auto x_spy_ref = &x->spy;
-
-    auto y_fake = y->fake;
-    auto y_spy = y->spy;
-    auto y_spy_ref = &y->spy;
-
-    auto w_fake = w->fake;
-    auto w_spy = w->spy;
-    auto w_spy_ref = &w->spy;
-
-    auto z_fake = z->fake;
-    auto z_spy = z->spy;
-    auto z_spy_ref = &z->spy;
-
-    acl_api->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_1);
-
-    status = acl_api->remove_acl_table(exp_oid_2);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    status = acl_api->set_acl_table_attribute(exp_oid_2, nullptr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-
-    status = acl_api->get_acl_table_attribute(exp_oid_2, 0, nullptr);
-    ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
-}
-
-TEST(SaiSpy, Same_Function_Signature_In_Same_API_Table)
-{
-    auto acl_api_1 = std::make_shared<sai_acl_api_t>();
-    acl_api_1->create_acl_table = [](sai_object_id_t* oid, sai_object_id_t, uint32_t,
-                                      const sai_attribute_t*) {
-        *oid = 1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    acl_api_1->create_acl_entry = [](sai_object_id_t* oid, sai_object_id_t, uint32_t,
-                                      const sai_attribute_t*) {
-        *oid = 2;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    sai_object_id_t oid;
-
-    acl_api_1->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == 1);
-
-    acl_api_1->create_acl_entry(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == 2);
-
-    sai_object_id_t exp_oid_1 = 100;
-    sai_object_id_t exp_oid_2 = 200;
-
-    auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_1.get()->create_acl_table);
-    x->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    auto y = SpyOn<0, SAI_OBJECT_TYPE_ACL_ENTRY>(&acl_api_1.get()->create_acl_entry);
-    y->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_2;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    acl_api_1->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_1);
-
-    acl_api_1->create_acl_entry(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_2);
-}
-
-TEST(SaiSpy, Same_Function_Signature_In_Different_API_Table)
-{
-    auto acl_api_1 = std::make_shared<sai_acl_api_t>(); //std::shared_ptr<sai_acl_api_t>(new sai_acl_api_t());
-    auto acl_api_2 = std::make_shared<sai_acl_api_t>();
-    acl_api_1->create_acl_table = [](sai_object_id_t* oid, sai_object_id_t, uint32_t,
-                                      const sai_attribute_t*) {
-        *oid = 1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    acl_api_2->create_acl_table = [](sai_object_id_t* oid, sai_object_id_t, uint32_t,
-                                      const sai_attribute_t*) {
-        *oid = 2;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    sai_object_id_t oid;
-
-    acl_api_1->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == 1);
-
-    acl_api_2->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == 2);
-
-    sai_object_id_t exp_oid_1 = 100;
-    sai_object_id_t exp_oid_2 = 200;
-
-    auto x = SpyOn<0, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_1.get()->create_acl_table);
-    //             ^ using different number for same api table type with different instance
-    x->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    auto y = SpyOn<1, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api_2.get()->create_acl_table);
-    //             ^ using different number for same api table type with different instance
-    y->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_2;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    acl_api_1->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_1);
-
-    acl_api_2->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_2);
-}
-
-TEST(SaiSpy, create_switch_and_acl_table)
-{
-    auto acl_api = std::make_shared<sai_acl_api_t>();
-    auto switch_api = std::make_shared<sai_switch_api_t>();
-    acl_api->create_acl_table = [](sai_object_id_t* oid, sai_object_id_t, uint32_t,
-                                    const sai_attribute_t*) {
-        *oid = 1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    switch_api->create_switch = [](sai_object_id_t* oid, uint32_t,
-                                    const sai_attribute_t*) {
-        *oid = 2;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    };
-
-    sai_object_id_t oid;
-
-    acl_api->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == 1);
-
-    switch_api->create_switch(&oid, 0, nullptr);
-    ASSERT_TRUE(oid == 2);
-
-    sai_object_id_t exp_oid_1 = 100;
-    sai_object_id_t exp_oid_2 = 200;
-
-    auto x = SpyOn<SAI_API_ACL, SAI_OBJECT_TYPE_ACL_TABLE>(&acl_api.get()->create_acl_table);
-    x->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_1;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    auto y = SpyOn<SAI_API_SWITCH, SAI_OBJECT_TYPE_SWITCH>(&switch_api.get()->create_switch);
-    y->callFake([&](sai_object_id_t* oid, uint32_t, const sai_attribute_t*) -> sai_status_t {
-        *oid = exp_oid_2;
-        return (sai_status_t)SAI_STATUS_SUCCESS;
-    });
-
-    acl_api->create_acl_table(&oid, 1, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_1);
-
-    switch_api->create_switch(&oid, 0, nullptr);
-    ASSERT_TRUE(oid == exp_oid_2);
-}
-
-struct Check {
-    static bool AttrListEq_Miss_objecttype_Dont_Use(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
-    {
-        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
-            return false;
-        }
-
-        auto l = exp_attr_list.get_attr_list();
-        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
-            // sai_attribute_t* ptr = &l[i];
-            // sai_attribute_t& ref = l[i];
-            auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t& attr) {
-                if (attr.id != l[i].id) {
-                    return false;
-                }
-
-                // FIXME: find a way to conver attribute id to type
-                // type = idToType(attr.id) // metadata ..
-                // switch (type) {
-                //     case SAI_ATTR_VALUE_TYPE_BOOL:
-                //     ...
-                // }
-
-                return true;
-            });
-
-            if (found == act_attr_list.end()) {
-                std::cout << "Can not found " << l[i].id;
-                // TODO: Show act_attr_list
-                // TODO: Show exp_attr_list
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    static bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
-    {
-        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
-            return false;
-        }
-
-        auto l = exp_attr_list.get_attr_list();
-        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
-            sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
-            auto meta = sai_metadata_get_attr_metadata(objecttype, id);
-
-            assert(meta != nullptr);
-
-            char act_buf[0x4000];
-            char exp_buf[0x4000];
-
-            auto act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
-            auto exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
-
-            // auto act = sai_serialize_attr_value(*meta, act_attr_list[i].value, false);
-            // auto exp = sai_serialize_attr_value(*meta, &exp_attr_list.get_attr_list()[i].value, false);
-
-            assert(act_len < sizeof(act_buf));
-            assert(exp_len < sizeof(exp_buf));
-
-            if (act_len != exp_len) {
-                std::cout << "AttrListEq failed\n";
-                std::cout << "Actual:   " << act_buf << "\n";
-                std::cout << "Expected: " << exp_buf << "\n";
-                return false;
-            }
-
-            if (strcmp(act_buf, exp_buf) != 0) {
-                std::cout << "AttrListEq failed\n";
-                std::cout << "Actual:   " << act_buf << "\n";
-                std::cout << "Expected: " << exp_buf << "\n";
-                return false;
-            }
-        }
-
-        return true;
-    }
-};
+// struct Check {
+//     static bool AttrListEq_Miss_objecttype_Dont_Use(const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+//     {
+//         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
+//             return false;
+//         }
+
+//         auto l = exp_attr_list.get_attr_list();
+//         for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
+//             // sai_attribute_t* ptr = &l[i];
+//             // sai_attribute_t& ref = l[i];
+//             auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t& attr) {
+//                 if (attr.id != l[i].id) {
+//                     return false;
+//                 }
+
+//                 // FIXME: find a way to conver attribute id to type
+//                 // type = idToType(attr.id) // metadata ..
+//                 // switch (type) {
+//                 //     case SAI_ATTR_VALUE_TYPE_BOOL:
+//                 //     ...
+//                 // }
+
+//                 return true;
+//             });
+
+//             if (found == act_attr_list.end()) {
+//                 std::cout << "Can not found " << l[i].id;
+//                 // TODO: Show act_attr_list
+//                 // TODO: Show exp_attr_list
+//                 return false;
+//             }
+//         }
+
+//         return true;
+//     }
+
+//     static bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+//     {
+//         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
+//             return false;
+//         }
+
+//         auto l = exp_attr_list.get_attr_list();
+//         for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
+//             sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
+//             auto meta = sai_metadata_get_attr_metadata(objecttype, id);
+
+//             assert(meta != nullptr);
+
+//             char act_buf[0x4000];
+//             char exp_buf[0x4000];
+
+//             auto act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
+//             auto exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
+
+//             // auto act = sai_serialize_attr_value(*meta, act_attr_list[i].value, false);
+//             // auto exp = sai_serialize_attr_value(*meta, &exp_attr_list.get_attr_list()[i].value, false);
+
+//             assert(act_len < sizeof(act_buf));
+//             assert(exp_len < sizeof(exp_buf));
+
+//             if (act_len != exp_len) {
+//                 std::cout << "AttrListEq failed\n";
+//                 std::cout << "Actual:   " << act_buf << "\n";
+//                 std::cout << "Expected: " << exp_buf << "\n";
+//                 return false;
+//             }
+
+//             if (strcmp(act_buf, exp_buf) != 0) {
+//                 std::cout << "AttrListEq failed\n";
+//                 std::cout << "Actual:   " << act_buf << "\n";
+//                 std::cout << "Expected: " << exp_buf << "\n";
+//                 return false;
+//             }
+//         }
+
+//         return true;
+//     }
+// };
 
 struct AclTestBase : public ::testing::Test {
     std::vector<int32_t*> m_s32list_pool;
