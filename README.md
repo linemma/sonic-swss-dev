@@ -1,12 +1,11 @@
 ## Introduction
-ACL unit test environment for SONiC
+Unit test environment for SONiC sonic-swss/orchagent
 
 ## Getting Started
-
 ```
-git clone https://github.com/ezio-chen/sonic-swss-acl-dev
-cd sonic-swss-acl-dev/
-git checkout remotes/origin/package_install
+git clone https://github.com/ezio-chen/sonic-swss-dev
+cd sonic-swss-dev/
+git checkout package_install
 
 sudo bash -x install-pkg.sh -g
 
@@ -14,13 +13,15 @@ cd ..
 mkdir <build-dir> && cd <build-dir>
 bash -x <source-dir>/build.sh
 source packages/.env
+
+
+# Run the tests
+## Start the redis-server with UNIX socket at the first time
+bash -x <build-dir>/redis/start_redis.sh
+
+<build-dir>/tests.out
+
+## Stop the redis-server after you don't need it.
+bash -x redis/stop_redis.sh
 ```
 
-## Starting redis-server and open UNIX socket
-```
-sudo apt install -y redis-server
-sudo mkdir -p /var/run/redis/
-echo "unixsocket /var/run/redis/redis.sock" | sudo tee --append  /etc/redis/redis.conf
-echo "unixsocketperm 777" | sudo tee --append  /etc/redis/redis.conf
-sudo service redis-server restart
-```
