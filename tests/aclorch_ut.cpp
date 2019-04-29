@@ -253,6 +253,11 @@ struct MockAclOrch {
     {
     }
 
+    operator const AclOrch*() const
+    {
+        return m_aclOrch;
+    }
+
     static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
     {
         /* Nothing popped */
@@ -298,7 +303,7 @@ struct MockAclOrch {
     void doAclTableTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
     {
         auto consumer = std::unique_ptr<Consumer>(new Consumer(
-            new swss::ConsumerStateTable(config_db, CFG_ACL_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_TABLE_NAME));
+            new swss::ConsumerStateTable(config_db, CFG_ACL_TABLE_NAME, 1, 1), m_aclOrch, CFG_ACL_TABLE_NAME));
 
         consumerAddToSync(consumer.get(), entries);
 
@@ -308,11 +313,21 @@ struct MockAclOrch {
     void doAclRuleTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
     {
         auto consumer = std::unique_ptr<Consumer>(new Consumer(
-            new swss::ConsumerStateTable(config_db, CFG_ACL_RULE_TABLE_NAME, 1, 1), gAclOrch, CFG_ACL_RULE_TABLE_NAME));
+            new swss::ConsumerStateTable(config_db, CFG_ACL_RULE_TABLE_NAME, 1, 1), m_aclOrch, CFG_ACL_RULE_TABLE_NAME));
 
         consumerAddToSync(consumer.get(), entries);
 
         static_cast<Orch*>(m_aclOrch)->doTask(*consumer);
+    }
+
+    sai_object_id_t getTableById(const string& table_id)
+    {
+        return m_aclOrch->getTableById(table_id);
+    }
+
+    const map<sai_object_id_t, AclTable>& getAclTables() const
+    {
+        return Portal::AclOrchInternal::getAclTables(m_aclOrch);
     }
 };
 
@@ -895,19 +910,19 @@ struct AclOrchTest : public AclTest {
     }
 
     // validate consistency between aclOrch and mock data (via SAI)
-    bool validateLowerLayerDb(const AclOrch* orch)
+    bool validateLowerLayerDb(const MockAclOrch* orch)
     {
         assert(orch != nullptr);
 
-        if (!validateResourceCountWithCrm(orch, gCrmOrch)) {
+        if (!validateResourceCountWithCrm(orch->m_aclOrch, gCrmOrch)) {
             return false;
         }
 
-        if (!validateResourceCountWithLowerLayerDb(orch)) {
+        if (!validateResourceCountWithLowerLayerDb(orch->m_aclOrch)) {
             return false;
         }
 
-        const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
+        const auto& acl_tables = orch->getAclTables();
 
         for (const auto& id_acl_table : acl_tables) {
             if (!validateAclTable(id_acl_table.first, id_acl_table.second)) {
@@ -1132,11 +1147,10 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
 
             orch->doAclTableTask(kvfAclTable);
 
-            // FIXME: don't use gAclOrch
-            auto oid = gAclOrch->getTableById(acl_table_id);
+            auto oid = orch->getTableById(acl_table_id);
             ASSERT_TRUE(oid != SAI_NULL_OBJECT_ID);
 
-            const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
+            const auto& acl_tables = orch->getAclTables();
 
             auto it = acl_tables.find(oid);
             ASSERT_TRUE(it != acl_tables.end());
@@ -1144,7 +1158,7 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
             const auto& acl_table = it->second;
 
             ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
-            ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+            ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
             // delete acl table ...
 
@@ -1155,11 +1169,10 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
 
             orch->doAclTableTask(kvfAclTable);
 
-            // FIXME: don't use gAclOrch
-            oid = gAclOrch->getTableById(acl_table_id);
+            oid = orch->getTableById(acl_table_id);
             ASSERT_TRUE(oid == SAI_NULL_OBJECT_ID);
 
-            ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+            ASSERT_TRUE(validateLowerLayerDb(orch.get()));
         }
     }
 }
@@ -1192,19 +1205,17 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
 
     // validate acl table ...
 
-    // FIXME: don't use gAclOrch
-    auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
-    const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
-
+    auto acl_table_oid = orch->getTableById(acl_table_id);
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
+    const auto& acl_tables = orch->getAclTables();
     auto it_table = acl_tables.find(acl_table_oid);
     ASSERT_TRUE(it_table != acl_tables.end());
 
     const auto& acl_table = it_table->second;
 
     ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
-    ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+    ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
     // add rule ...
     for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD /*, PACKET_ACTION_DROP*/ }) {
@@ -1237,7 +1248,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
         ASSERT_TRUE(it_rule != acl_table.rules.end());
 
         ASSERT_TRUE(validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front())));
-        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+        ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
         // delete acl rule ...
 
@@ -1251,7 +1262,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
 
         it_rule = acl_table.rules.find(acl_rule_id);
         ASSERT_TRUE(it_rule == acl_table.rules.end());
-        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+        ASSERT_TRUE(validateLowerLayerDb(orch.get()));
     }
 }
 
@@ -1283,19 +1294,17 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
 
     // validate acl table ...
 
-    // FIXME: don't use gAclOrch
-    auto acl_table_oid = gAclOrch->getTableById(acl_table_id);
-    const auto& acl_tables = Portal::AclOrchInternal::getAclTables(gAclOrch);
-
+    auto acl_table_oid = orch->getTableById(acl_table_id);
     ASSERT_TRUE(acl_table_oid != SAI_NULL_OBJECT_ID);
 
+    const auto& acl_tables = orch->getAclTables();
     auto it_table = acl_tables.find(acl_table_oid);
     ASSERT_TRUE(it_table != acl_tables.end());
 
     const auto& acl_table = it_table->second;
 
     ASSERT_TRUE(validateAclTableByConfOp(acl_table, kfvFieldsValues(kvfAclTable.front())));
-    ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+    ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
     // add rule ...
     for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD /*, PACKET_ACTION_DROP*/ }) {
@@ -1328,7 +1337,7 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
         ASSERT_TRUE(it_rule != acl_table.rules.end());
 
         ASSERT_TRUE(validateAclRuleByConfOp(*it_rule->second, kfvFieldsValues(kvfAclRule.front())));
-        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+        ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
         // delete acl rule ...
 
@@ -1342,7 +1351,7 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
 
         it_rule = acl_table.rules.find(acl_rule_id);
         ASSERT_TRUE(it_rule == acl_table.rules.end());
-        ASSERT_TRUE(validateLowerLayerDb(gAclOrch)); // FIXME: don't use gAclOrch
+        ASSERT_TRUE(validateLowerLayerDb(orch.get()));
     }
 }
 
