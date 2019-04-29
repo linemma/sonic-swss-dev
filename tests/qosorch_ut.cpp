@@ -1,131 +1,44 @@
-#include "gtest/gtest.h"
+#include "ut_helper.h"
 
-#include "consumerstatetable.h"
-#include "hiredis.h"
 #include "orchdaemon.h"
-#include "sai_vs.h"
-#include "saiattributelist.h"
-#include "saihelper.h"
 
 extern sai_object_id_t gSwitchId;
 
+extern PortsOrch* gPortsOrch;
+
 extern sai_switch_api_t* sai_switch_api;
 extern sai_qos_map_api_t* sai_qos_map_api;
-sai_qos_map_api_t* vs_sai_qos_map_api; // FIXME: don't define local var like from libvs !! exactly, do need to define this ? don't define it as global var
 extern sai_wred_api_t* sai_wred_api;
 
 namespace nsQosOrchTest {
 
 using namespace std;
 
-struct QosOrchMock : public QosOrch {
-    QosOrchMock(swss::DBConnector* db, vector<string>& tableNames)
-        : QosOrch(db, tableNames)
+class ConsumerExtend_Dont_Use : public Consumer {
+public:
+    ConsumerExtend_Dont_Use(ConsumerTableBase* select, Orch* orch, const string& name)
+        : Consumer(select, orch, name)
     {
     }
 
-    task_process_status handleDscpToTcTable(Consumer& consumer)
+    size_t addToSync(std::deque<KeyOpFieldsValuesTuple>& entries)
     {
-        // SWSS_LOG_ENTER();
-        DscpToTcMapHandler dscp_tc_handler;
-        return dscp_tc_handler.processWorkItem(consumer);
-    }
-};
-
-size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
-{
-    // SWSS_LOG_ENTER();
-
-    /* Nothing popped */
-    if (entries.empty()) {
-        return 0;
+        Consumer::addToSync(entries);
     }
 
-    for (auto& entry : entries) {
-        string key = kfvKey(entry);
-        string op = kfvOp(entry);
-
-        // /* Record incoming tasks */
-        // if (gSwssRecord)
-        // {
-        //     Orch::recordTuple(*this, entry);
-        // }
-
-        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-            consumer->m_toSync[key] = entry;
-        }
-        /* If an old task is still there, we combine the old task with new task */
-        else {
-            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
-
-            auto new_values = kfvFieldsValues(entry);
-            auto existing_values = kfvFieldsValues(existing_data);
-
-            for (auto it : new_values) {
-                string field = fvField(it);
-                string value = fvValue(it);
-
-                auto iu = existing_values.begin();
-                while (iu != existing_values.end()) {
-                    string ofield = fvField(*iu);
-                    if (field == ofield)
-                        iu = existing_values.erase(iu);
-                    else
-                        iu++;
-                }
-                existing_values.push_back(FieldValueTuple(field, value));
-            }
-            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
-        }
+    void clear()
+    {
+        Consumer::m_toSync.clear();
     }
-    return entries.size();
-}
-
-const char* profile_get_value_qos_move_in(
-    _In_ sai_switch_profile_id_t profile_id,
-    _In_ const char* variable)
-{
-    // UNREFERENCED_PARAMETER(profile_id);
-
-    if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-        return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-    } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-        return "20:03:04:05:06:00";
-    } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-        return "1000";
-    } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-        return "2000";
-    } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-        return "SAI_VS_SWITCH_TYPE_BCM56850";
-    }
-
-    return NULL;
-}
-
-static int profile_get_next_value_qos_move_in(
-    _In_ sai_switch_profile_id_t profile_id,
-    _Out_ const char** variable,
-    _Out_ const char** value)
-{
-    if (value == NULL) {
-        return 0;
-    }
-
-    if (variable == NULL) {
-        return -1;
-    }
-
-    return -1;
-}
-
-struct SetQosResult {
-    bool ret_val;
-    sai_object_id_t sai_object_id;
-    std::vector<sai_attribute_t> attr_list;
 };
 
 struct TestBase : public ::testing::Test {
+    struct SetQosResult {
+        bool ret_val;
+        sai_object_id_t sai_object_id;
+        std::vector<sai_attribute_t> attr_list;
+    };
+
     static sai_status_t create_qos_map(sai_object_id_t* sai_object_id,
         sai_object_id_t switch_id,
         uint32_t attr_count,
@@ -203,74 +116,9 @@ struct TestBase : public ::testing::Test {
         return ret;
     }
 
-    std::shared_ptr<SetQosResult> setDscp2TcViaProcessWorkItem(QosOrchMock& qosorch, Consumer& consumer)
-    {
-        assert(sai_qos_map_api == nullptr);
-
-        sai_qos_map_api = new sai_qos_map_api_t();
-        auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t* p) {
-            delete p;
-            sai_qos_map_api = nullptr;
-        });
-
-        // FIXME: add new function to setup spy function
-        sai_qos_map_api->create_qos_map = create_qos_map;
-        that = this;
-
-        auto ret = std::make_shared<SetQosResult>();
-
-        create_qos_map_fn =
-            [&](sai_object_id_t* sai_object_id, sai_object_id_t switch_id,
-                uint32_t attr_count,
-                const sai_attribute_t* attr_list) -> sai_status_t {
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->attr_list.emplace_back(attr_list[i]);
-            }
-            return SAI_STATUS_SUCCESS;
-        };
-
-        ret->ret_val = qosorch.handleDscpToTcTable(consumer) == task_process_status::task_success ? true : false;
-        return ret;
-    }
-
-    std::shared_ptr<SetQosResult> setDscp2TcViaVS(DscpToTcMapHandler& dscpToTc, KeyOpFieldsValuesTuple& tuple)
-    {
-        assert(sai_qos_map_api == nullptr);
-
-        sai_qos_map_api = new sai_qos_map_api_t();
-        vs_sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
-
-        auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t* p) {
-            delete p;
-            sai_qos_map_api = nullptr;
-        });
-
-        // FIXME: add new function to setup spy function
-        sai_qos_map_api->create_qos_map = create_qos_map;
-        that = this;
-
-        auto ret = std::make_shared<SetQosResult>();
-
-        create_qos_map_fn =
-            [&](sai_object_id_t* sai_object_id, sai_object_id_t switch_id,
-                uint32_t attr_count,
-                const sai_attribute_t* attr_list) -> sai_status_t {
-            for (auto i = 0; i < attr_count; ++i) {
-                ret->attr_list.emplace_back(attr_list[i]);
-            }
-            return vs_sai_qos_map_api->create_qos_map(sai_object_id,
-                switch_id, attr_count, attr_list);
-        };
-
-        vector<sai_attribute_t> attrs;
-        dscpToTc.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = dscpToTc.addQosItem(attrs);
-        return ret;
-    }
-
     std::shared_ptr<SetQosResult> setTc2Queue(TcToQueueMapHandler& tcToQueue, KeyOpFieldsValuesTuple& tuple)
     {
-        // assert(sai_qos_map_api == nullptr);
+        assert(sai_qos_map_api == nullptr);
 
         sai_qos_map_api = new sai_qos_map_api_t();
         auto sai_qos = std::shared_ptr<sai_qos_map_api_t>(sai_qos_map_api, [](sai_qos_map_api_t* p) {
@@ -473,37 +321,6 @@ struct TestBase : public ::testing::Test {
         return ret;
     }
 
-    bool AttrListEq(const std::vector<sai_attribute_t>& act_attr_list, SaiAttributeList& exp_attr_list)
-    {
-        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
-            return false;
-        }
-
-        auto l = exp_attr_list.get_attr_list();
-        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
-            auto found = std::find_if(act_attr_list.begin(), act_attr_list.end(), [&](const sai_attribute_t& attr) {
-                if (attr.id != l[i].id) {
-                    return false;
-                }
-
-                // FIXME: find a way to conver attribute id to type
-                // type = idToType(attr.id) // metadata ..
-                // switch (type) {
-                //     case SAI_ATTR_VALUE_TYPE_BOOL:
-                //     ...
-                // }
-
-                return true;
-            });
-
-            if (found == act_attr_list.end()) {
-                std::cout << "Can not found " << l[i].id;
-                return false;
-            }
-        }
-        return true;
-    }
-
     bool AttrListEq(sai_object_type_t objecttype, const std::vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
@@ -566,10 +383,81 @@ struct QosMapHandlerTest : public TestBase {
     }
 };
 
+struct MockQosOrch {
+    QosOrch* m_qosOrch;
+    swss::DBConnector* config_db;
+
+    MockQosOrch(QosOrch* qosOrch, swss::DBConnector* config_db)
+        : m_qosOrch(qosOrch)
+        , config_db(config_db)
+    {
+    }
+
+    size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+    {
+        /* Nothing popped */
+        if (entries.empty()) {
+            return 0;
+        }
+
+        for (auto& entry : entries) {
+            string key = kfvKey(entry);
+            string op = kfvOp(entry);
+
+            /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+            if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+                consumer->m_toSync[key] = entry;
+            }
+            /* If an old task is still there, we combine the old task with new task */
+            else {
+                KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+                auto new_values = kfvFieldsValues(entry);
+                auto existing_values = kfvFieldsValues(existing_data);
+
+                for (auto it : new_values) {
+                    string field = fvField(it);
+                    string value = fvValue(it);
+
+                    auto iu = existing_values.begin();
+                    while (iu != existing_values.end()) {
+                        string ofield = fvField(*iu);
+                        if (field == ofield)
+                            iu = existing_values.erase(iu);
+                        else
+                            iu++;
+                    }
+                    existing_values.push_back(FieldValueTuple(field, value));
+                }
+                consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+            }
+        }
+        return entries.size();
+    }
+
+    type_map& getTypeMap()
+    {
+        //SWSS_LOG_ENTER();
+        return m_qosOrch->m_qos_maps;
+    }
+
+    void doQosMapTask(const std::deque<KeyOpFieldsValuesTuple>& entries, std::string tableName)
+    {
+        auto consumer = std::unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(config_db, tableName, 1, 1), m_qosOrch, tableName));
+
+        consumerAddToSync(consumer.get(), entries);
+
+        static_cast<Orch*>(m_qosOrch)->doTask(*consumer);
+    }
+};
+
 struct QosOrchTest : public TestBase {
 
+    std::shared_ptr<swss::DBConnector> m_app_db;
     std::shared_ptr<swss::DBConnector> m_config_db;
     std::vector<sai_qos_map_t*> m_qos_map_list_pool;
+    QosOrch* qos_orch;
 
     vector<string> qos_tables = {
         CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
@@ -586,6 +474,7 @@ struct QosOrchTest : public TestBase {
     QosOrchTest()
     {
         // FIXME: move out from constructor
+        m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
         m_config_db = std::make_shared<swss::DBConnector>(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     }
 
@@ -596,48 +485,56 @@ struct QosOrchTest : public TestBase {
         }
     }
 
-    struct MockQosOrch : public QosOrch {
-        QosOrch* qosOrch; // FIXME: will change ....
-        swss::DBConnector* config_db;
-
-        MockQosOrch(swss::DBConnector* db, vector<string>& tableNames)
-            : QosOrch(db, tableNames)
-        {
-            // qosOrch =
+    static const char* profile_get_value(
+        sai_switch_profile_id_t profile_id,
+        const char* variable)
+    {
+        if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
+            return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
+        } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
+            return "20:03:04:05:06:00";
+        } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
+            return "1000";
+        } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
+            return "2000";
+        } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
+            return "SAI_VS_SWITCH_TYPE_BCM56850";
         }
 
-        type_map& getTypeMap()
-        {
-            //SWSS_LOG_ENTER();
-            return m_qos_maps;
+        return NULL;
+    }
+
+    static int profile_get_next_value(
+        sai_switch_profile_id_t profile_id,
+        const char** variable,
+        const char** value)
+    {
+        if (value == NULL) {
+            return 0;
         }
 
-        void doQosMapTask(const std::deque<KeyOpFieldsValuesTuple>& entries, std::string tableName)
-        {
-            auto consumer = std::unique_ptr<Consumer>(new Consumer(
-                new swss::ConsumerStateTable(config_db, tableName, 1, 1), qosOrch, tableName));
-
-            consumerAddToSync(consumer.get(), entries);
-
-            static_cast<Orch*>(qosOrch)->doTask(*consumer);
+        if (variable == NULL) {
+            return -1;
         }
-    };
+
+        return -1;
+    }
 
     void SetUp() override
     {
+        qos_orch = new QosOrch(m_config_db.get(), qos_tables);
         sai_service_method_table_t test_services = {
-            profile_get_value_qos_move_in,
-            profile_get_next_value_qos_move_in
+            QosOrchTest::profile_get_value,
+            QosOrchTest::profile_get_next_value
         };
 
         auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
 
-        // FIXME: using clone not just assign
+#if WITH_SAI == LIBVS
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
-
-        // FIXME: using clone not just assign
         sai_qos_map_api = const_cast<sai_qos_map_api_t*>(&vs_qos_map_api);
+#endif
 
         sai_attribute_t swattr;
 
@@ -646,10 +543,38 @@ struct QosOrchTest : public TestBase {
 
         status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        const int portsorch_base_pri = 40;
+
+        vector<table_name_with_pri_t> ports_tables = {
+            { APP_PORT_TABLE_NAME, portsorch_base_pri + 5 },
+            { APP_VLAN_TABLE_NAME, portsorch_base_pri + 2 },
+            { APP_VLAN_MEMBER_TABLE_NAME, portsorch_base_pri },
+            { APP_LAG_TABLE_NAME, portsorch_base_pri + 4 },
+            { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
+        };
+
+        // FIXME: doesn't use global variable !!
+        assert(gPortsOrch == nullptr);
+        gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
+
+        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
+        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+
+        auto setData = std::deque<KeyOpFieldsValuesTuple>(
+            { { "PortInitDone",
+                EMPTY_PREFIX,
+                { { "", "" } } } });
+        consumerExt->addToSync(setData);
+
+        Consumer* consumer = consumerExt.get();
+        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
     }
 
     void TearDown() override
     {
+        delete qos_orch;
+        qos_orch = nullptr;
         auto status = sai_switch_api->remove_switch(gSwitchId);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
         gSwitchId = 0;
@@ -662,7 +587,7 @@ struct QosOrchTest : public TestBase {
 
     std::shared_ptr<MockQosOrch> createQosOrch()
     {
-        return std::make_shared<MockQosOrch>(m_config_db.get(), qos_tables);
+        return std::make_shared<MockQosOrch>(qos_orch, m_config_db.get());
     }
 
     std::shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, std::string qos_table_name, const vector<FieldValueTuple>& values)
@@ -706,11 +631,11 @@ struct QosOrchTest : public TestBase {
         return sai_serialize_attr_value(*meta, attr);
     }
 
-    bool Validate(const QosOrch& orch, const std::string table_name, const vector<FieldValueTuple>& values)
+    bool Validate(MockQosOrch* orch, const std::string table_name, const vector<FieldValueTuple>& values)
     {
         const sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
 
-        auto qos_maps = orch.getTypeMap();
+        auto qos_maps = orch->getTypeMap();
         auto qos_map = qos_maps.find(table_name);
         if (qos_map == qos_maps.end()) {
             return false;
@@ -794,80 +719,19 @@ TEST_F(QosMapHandlerTest, DscpToTcMap)
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
 }
-
-// TEST_F(QosMapHandlerTest, DscpToTcMapViaProcessWorkItem)
-// {
-//     auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-
-//     vector<string> qos_tables = {
-//         CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
-//         CFG_SCHEDULER_TABLE_NAME,
-//         CFG_DSCP_TO_TC_MAP_TABLE_NAME,
-//         CFG_QUEUE_TABLE_NAME,
-//         CFG_PORT_QOS_MAP_TABLE_NAME,
-//         CFG_WRED_PROFILE_TABLE_NAME,
-//         CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-//         CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-//         CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
-//     };
-//     auto qosorch = QosOrchMock(&configDb, qos_tables);
-
-//     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&configDb, std::string(CFG_DSCP_TO_TC_MAP_TABLE_NAME), 1, 1), &qosorch, std::string(CFG_DSCP_TO_TC_MAP_TABLE_NAME)));
-
-//     KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
-//         { { "1", "0" }, { "2", "0" }, { "3", "3" } });
-//     std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
-
-//     consumerAddToSync(consumer.get(), setData);
-//     auto res = setDscp2TcViaProcessWorkItem(qosorch, *consumer);
-
-//     ASSERT_TRUE(res->ret_val == true);
-
-//     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
-//         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-//         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-//         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-//         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-//         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-//         \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-//         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
-//     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
-
-//     ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
-// }
 
 TEST_F(QosOrchTest, DscpToTcMapViaVS)
 {
-    auto configDb = swss::DBConnector(CONFIG_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-
-    vector<string> qos_tables = {
-        CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
-        CFG_SCHEDULER_TABLE_NAME,
-        CFG_DSCP_TO_TC_MAP_TABLE_NAME,
-        CFG_QUEUE_TABLE_NAME,
-        CFG_PORT_QOS_MAP_TABLE_NAME,
-        CFG_WRED_PROFILE_TABLE_NAME,
-        CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-        CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-        CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
-    };
-    auto qosorch = QosOrchMock(&configDb, qos_tables);
-
-    auto consumer = std::unique_ptr<Consumer>(new Consumer(
-        new swss::ConsumerStateTable(&configDb, CFG_DSCP_TO_TC_MAP_TABLE_NAME, 1, 1), &qosorch, CFG_DSCP_TO_TC_MAP_TABLE_NAME));
+    auto orch = createQosOrch();
 
     vector<FieldValueTuple> dscp_to_tc_values = { { "1", "0" }, { "2", "0" }, { "3", "3" } };
     KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND, dscp_to_tc_values);
     std::deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
-    consumerAddToSync(consumer.get(), setData);
-
-    auto status = qosorch.handleDscpToTcTable(*consumer);
-    ASSERT_TRUE(status == task_process_status::task_success);
-
-    ASSERT_TRUE(Validate(qosorch, CFG_DSCP_TO_TC_MAP_TABLE_NAME, dscp_to_tc_values));
+    orch->doQosMapTask(setData, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
+    ASSERT_TRUE(Validate(orch.get(), CFG_DSCP_TO_TC_MAP_TABLE_NAME, dscp_to_tc_values));
 }
 
 TEST_F(QosMapHandlerTest, TcToQueueMap)
@@ -890,7 +754,7 @@ TEST_F(QosMapHandlerTest, TcToQueueMap)
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, TcToPgMap)
@@ -913,7 +777,7 @@ TEST_F(QosMapHandlerTest, TcToPgMap)
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, PfcPrioToPgMap)
@@ -936,7 +800,7 @@ TEST_F(QosMapHandlerTest, PfcPrioToPgMap)
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":0,\"tc\":0}}]}" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, PfcToQueueMap)
@@ -959,7 +823,7 @@ TEST_F(QosMapHandlerTest, PfcToQueueMap)
         \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, AddWredProfile)
@@ -995,7 +859,7 @@ TEST_F(QosMapHandlerTest, AddWredProfile)
         { "SAI_WRED_ATTR_RED_DROP_PROBABILITY", "100" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_WRED, v, false);
 
-    ASSERT_TRUE(AttrListEq(res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
 }
 
 // TEST_F(QosMapHandlerTest, DeleteWredProfile)
