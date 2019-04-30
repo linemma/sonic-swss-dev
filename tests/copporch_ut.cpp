@@ -267,6 +267,18 @@ struct CoppTest : public CoppTestBase {
         return std::make_shared<CoppOrchHandler>(copp, m_app_db.get());
     }
 
+    vector<string> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
+    {
+        std::vector<string> types;
+        for (auto it : ruleAttr) {
+            if (kfvKey(it) == copp_trap_id_list) {
+                types = tokenize(fvValue(it), list_item_delimiter);
+            }
+        }
+
+        return types;
+    }
+
     std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
@@ -276,6 +288,14 @@ struct CoppTest : public CoppTestBase {
         }
 
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, fields, false));
+    }
+
+    void replaceTrapType(vector<FieldValueTuple>& rule_values, string trap_type){
+        for (auto& it : rule_values) {
+            if (kfvKey(it) == copp_trap_id_list) {
+                it.second = trap_type;
+            }
+        }
     }
 
     std::shared_ptr<SaiAttributeList> getTrapAttributeList(const vector<FieldValueTuple> rule_values)
@@ -486,19 +506,6 @@ struct CoppOrchTest : public CoppTest {
         sai_bridge_api = nullptr;
     }
 
-    vector<sai_hostif_trap_type_t>
-    getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
-    {
-        std::vector<sai_hostif_trap_type_t> types;
-        for (auto it : ruleAttr) {
-            if (kfvKey(it) == copp_trap_id_list) {
-                types.push_back({ m_trap_id_map.at(fvValue(it)) });
-            }
-        }
-
-        return types;
-    }
-
     bool ValidateTrapGroup(sai_object_id_t id, SaiAttributeList& exp_group_attr_list)
     {
         sai_object_type_t trap_group_object_type = SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP;
@@ -594,9 +601,7 @@ struct CoppOrchTest : public CoppTest {
 
     bool Validate(CoppOrchHandler* orch, const std::string& groupName, const vector<FieldValueTuple>& rule_values)
     {
-        auto exp_group_attr_list = getTrapGroupAttributeList(rule_values);
-        auto exp_trap_attr_list = getTrapAttributeList(rule_values);
-        auto type_list = getTrapTypeList(rule_values);
+        auto exp_group_attr_list = getTrapGroupAttributeList(rule_values);        
         auto exp_police_attr_list = getPoliceAttributeList(rule_values);
 
         //valid trap group
@@ -610,6 +615,7 @@ struct CoppOrchTest : public CoppTest {
             return false;
         }
 
+        //valid policer
         auto group_policer_map = orch->getTrapGroupPolicerMap();
         auto policer_itr = group_policer_map.find(grp_itr->second);
         if(policer_itr != group_policer_map.end()) {
@@ -618,11 +624,17 @@ struct CoppOrchTest : public CoppTest {
             }
         }
         
-
         //valid trap
+        auto trap_type_list = getTrapTypeList(rule_values);
         auto trap_map = orch->getTrapIdTrapGroupMap();
-        for (auto trap_type : type_list) {
-            auto trap_itr = trap_map.find(trap_type);
+        for (auto trap_type : trap_type_list) {
+            vector<FieldValueTuple> temp_rule_values;
+            temp_rule_values.assign(rule_values.begin(), rule_values.end());;
+            replaceTrapType(temp_rule_values, trap_type);
+
+            auto exp_trap_attr_list = getTrapAttributeList(temp_rule_values);
+            auto trap_itr = trap_map.find(m_trap_id_map.at(trap_type));
+
             if (trap_itr == trap_map.end()) {
                 return false;
             }
@@ -630,7 +642,7 @@ struct CoppOrchTest : public CoppTest {
             if (!ValidateTrap(trap_itr->second, *exp_trap_attr_list.get())) {
                 return false;
             }
-        }
+        } 
 
         return true;
     }
@@ -689,6 +701,30 @@ TEST_F(CoppOrchTest, create_copp_eapol_rule_via_libvs)
 
     std::string trap_group_id = "coppRule1";
     vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
+    auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    orch->doCoppTask(kvf_copp_value);
+
+    ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
+
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // setData = { delActionAttr };
+    // consumerAddToSync(consumer.get(), setData);
+
+    // //call CoPP function
+    // coppMock.processCoppRule(*consumer);
+
+    // const auto& trapGroupTables = coppMock.getTrapGroupMap();
+    // auto grpIt = trapGroupTables.find(groupName);
+
+    // ASSERT_TRUE(grpIt == trapGroupTables.end());
+}
+
+TEST_F(CoppOrchTest, create_all_copp_rule_via_libvs)
+{
+    auto orch = createCoppOrch();
+
+    std::string trap_group_id = "coppRule1";
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "stp,lacp,eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
