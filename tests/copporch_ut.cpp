@@ -279,7 +279,7 @@ struct CoppTest : public CoppTestBase {
         for (auto it : rule_values) {
             if (kfvKey(it) == copp_trap_action_field) {
                 fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", m_packet_action_map.at(fvValue(it)) });
-            } else if (kfvKey(it) == copp_trap_action_field) {
+            } else if (kfvKey(it) == copp_trap_priority_field) {
                 fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", fvValue(it) });
             } else if (kfvKey(it) == copp_trap_id_list) {
                 fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", m_trap_type_map.at(fvValue(it)) });
@@ -432,7 +432,7 @@ struct CoppOrchTest : public CoppTest {
 
         gVirtualRouterId = swattr.value.oid;
 
-        //call orch->doTask need to initial portsOrch
+        //call copporch->doTask need to initial portsOrch
         const int portsorch_base_pri = 40;
 
         vector<table_name_with_pri_t> ports_tables = {
