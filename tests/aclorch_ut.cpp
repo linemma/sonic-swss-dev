@@ -527,6 +527,10 @@ struct AclOrchTest : public AclTest {
 
         sai_switch_api = nullptr;
         sai_acl_api = nullptr;
+        sai_port_api = nullptr;
+        sai_vlan_api = nullptr;
+        sai_bridge_api = nullptr;
+        sai_route_api = nullptr;
     }
 
     std::shared_ptr<MockAclOrch> createAclOrch()
@@ -539,6 +543,16 @@ struct AclOrchTest : public AclTest {
     {
         // const sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_TABLE; // <----------
         std::vector<swss::FieldValueTuple> fields;
+
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" });
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" });
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" });
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" });
+
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" });
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" });
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" });
+        fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" });
 
         switch (acl_table.type) {
         case ACL_TABLE_L3:
@@ -557,18 +571,8 @@ struct AclOrchTest : public AclTest {
             //         { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
             // // SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
 
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" });
             fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_SRC_IP", "true" });
             fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_DST_IP", "true" });
-
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" });
             break;
 
         case ACL_TABLE_L3V6:
@@ -587,21 +591,24 @@ struct AclOrchTest : public AclTest {
             //     { "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" },
             //     { "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" } });
 
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_BIND_POINT_TYPE_LIST", "2:SAI_ACL_BIND_POINT_TYPE_PORT,SAI_ACL_BIND_POINT_TYPE_LAG" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" });
             fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_SRC_IPV6", "true" });
             fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_DST_IPV6", "true" });
-
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_RANGE_TYPE", "2:SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE,SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE" });
-            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" });
             break;
 
         default:
+            assert(false);
+        }
+
+        static map<acl_stage_type_t, string> aclStageLookUp = {
+            { ACL_STAGE_INGRESS, TABLE_INGRESS },
+            { ACL_STAGE_EGRESS, TABLE_EGRESS }
+        };
+
+        if (ACL_STAGE_INGRESS == acl_table.stage) {
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_INGRESS" });
+        } else if (ACL_STAGE_EGRESS == acl_table.stage) {
+            fields.push_back({ "SAI_ACL_TABLE_ATTR_ACL_STAGE", "SAI_ACL_STAGE_EGRESS" });
+        } else {
             assert(false);
         }
 
@@ -614,6 +621,32 @@ struct AclOrchTest : public AclTest {
 
         auto table_id = sai_serialize_object_id(acl_table_oid);
         auto counter_id = sai_serialize_object_id(const_cast<AclRule&>(acl_rule).getCounterOid()); // FIXME: getcounterOid() should be const
+
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
+
+        // const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
+        // auto actionIt = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION);
+        // assert(actionIt != rule_actions.end());
+        // assert(actionIt->second.aclaction.enable == true);
+        // fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION",
+        //     std::to_string(actionIt->second.aclaction.parameter.s32) });
+
+        //FIXME: fill matchs field by auto
+        // const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
+        // for (auto matchIt = rule_matches.begin(); matchIt != rule_matches.end(); ++matchIt) {
+        //     // matchIt = map<sai_acl_entry_attr_t (enum), sai_attribute_value_t (union)>
+        //     auto meta = sai_metadata_get_attr_metadata(objecttype, matchIt->first);
+
+        //     assert(meta != nullptr);
+
+        //     switch (meta->attrvaluetype) {
+        //     case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_IPV4:
+        //         sai_serialize_attr_value(*meta, ) break;
+        //     }
+        // }
 
         switch (acl_table.type) {
         case ACL_TABLE_L3:
@@ -636,13 +669,7 @@ struct AclOrchTest : public AclTest {
             //         });
             //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
 
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
-
             fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" });
             break;
 
         case ACL_TABLE_L3V6:
@@ -659,13 +686,8 @@ struct AclOrchTest : public AclTest {
             //     //                                            SAI_PACKET_ACTION_FORWARD
             //
             // });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
 
             fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" });
             break;
 
         default:
@@ -899,6 +921,10 @@ struct AclOrchTest : public AclTest {
                     if (acl_table.stage != ACL_STAGE_INGRESS) {
                         return false;
                     }
+                } else if (fv.second == TABLE_EGRESS) {
+                    if (acl_table.stage != ACL_STAGE_EGRESS) {
+                        return false;
+                    }
                 } else {
                     return false;
                 }
@@ -1077,7 +1103,7 @@ TEST_F(AclOrchTest, ACL_Creation_and_Destorying)
     auto orch = createAclOrch();
 
     for (const auto& acl_table_type : { TABLE_TYPE_L3, TABLE_TYPE_L3V6 }) {
-        for (const auto& acl_table_stage : { TABLE_INGRESS /*, TABLE_EGRESS*/ }) {
+        for (const auto& acl_table_stage : { TABLE_INGRESS, TABLE_EGRESS }) {
             std::string acl_table_id = "acl_table_1";
 
             auto kvfAclTable = std::deque<KeyOpFieldsValuesTuple>(
@@ -1162,7 +1188,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
     ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
     // add rule ...
-    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD /*, PACKET_ACTION_DROP*/ }) {
+    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD, PACKET_ACTION_DROP }) {
 
         auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
             SET_COMMAND,
@@ -1251,7 +1277,7 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
     ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
     // add rule ...
-    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD /*, PACKET_ACTION_DROP*/ }) {
+    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD, PACKET_ACTION_DROP }) {
 
         auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
             SET_COMMAND,

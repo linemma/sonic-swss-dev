@@ -1,4 +1,4 @@
-set(PROJECT_NAME aclTest)
+set(PROJECT_NAME swss-tests)
 
 project(${PROJECT_NAME})
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
@@ -21,6 +21,11 @@ find_package(Gtest REQUIRED)
 message(STATUS "GTEST_INCLUDE_DIR: " ${GTEST_INCLUDE_DIR})
 message(STATUS "GTEST_LIBRARIES: " ${GTEST_LIBRARIES})
 message(STATUS "======================================")
+
+## Add coverage test flag
+include(CodeCoverage)
+APPEND_COVERAGE_COMPILER_FLAGS()
+include(CTest)
 
 ## Add definitions
 add_definitions(-std=c++11)
@@ -137,7 +142,7 @@ target_link_libraries(orchagent
 
 #################################################################
 
-## aclTest ######################################################
+## test target ##################################################
 
 configure_file (
     tests/spec_auto_config.h.in
@@ -179,3 +184,20 @@ set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "tests.out")
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_BINARY_DIR}/tests)
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon saimeta saimetadata orchagent saivs sairedis)
+
+## make test_coverage ###########################################
+set(COVERAGE_LCOV_EXCLUDES
+    "*/c++/*"
+    "*/gtest/*"
+    "*/sonic-swss-dev/main.cpp"
+    "*/sonic-swss-common/common/*"
+    "*/sonic-swss-dev/tests/*"
+)
+
+add_test(tests.out tests.out)
+SETUP_TARGET_FOR_COVERAGE_LCOV(
+    NAME test_coverage
+    EXECUTABLE ctest
+    DEPENDENCIES ${PROJECT_NAME}
+    LCOV_ARGS
+)
