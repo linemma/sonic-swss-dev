@@ -1,7 +1,5 @@
 #include "ut_helper.h"
 
-#include "orchdaemon.h"
-
 extern sai_object_id_t gSwitchId;
 
 extern CrmOrch* gCrmOrch;
@@ -9,8 +7,8 @@ extern PortsOrch* gPortsOrch;
 extern RouteOrch* gRouteOrch;
 extern IntfsOrch* gIntfsOrch;
 extern NeighOrch* gNeighOrch;
+
 extern FdbOrch* gFdbOrch;
-extern AclOrch* gAclOrch;
 extern MirrorOrch* gMirrorOrch;
 extern VRFOrch* gVrfOrch;
 
@@ -24,6 +22,48 @@ extern sai_route_api_t* sai_route_api;
 namespace nsAclOrchTest {
 
 using namespace std;
+
+static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+{
+    /* Nothing popped */
+    if (entries.empty()) {
+        return 0;
+    }
+
+    for (auto& entry : entries) {
+        string key = kfvKey(entry);
+        string op = kfvOp(entry);
+
+        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+            consumer->m_toSync[key] = entry;
+        }
+        /* If an old task is still there, we combine the old task with new task */
+        else {
+            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+            auto new_values = kfvFieldsValues(entry);
+            auto existing_values = kfvFieldsValues(existing_data);
+
+            for (auto it : new_values) {
+                string field = fvField(it);
+                string value = fvValue(it);
+
+                auto iu = existing_values.begin();
+                while (iu != existing_values.end()) {
+                    string ofield = fvField(*iu);
+                    if (field == ofield)
+                        iu = existing_values.erase(iu);
+                    else
+                        iu++;
+                }
+                existing_values.push_back(FieldValueTuple(field, value));
+            }
+            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+        }
+    }
+    return entries.size();
+}
 
 TEST(ConvertTest, field_value_to_attribute)
 {
@@ -91,14 +131,13 @@ struct AclTest : public AclTestBase {
 
     void SetUp() override
     {
-        // FIXME: doesn't use global variable !!
         assert(gCrmOrch == nullptr);
         gCrmOrch = new CrmOrch(m_config_db.get(), CFG_CRM_TABLE_NAME);
     }
 
     void TearDown() override
     {
-        delete gCrmOrch; // FIXME: using auto ptr
+        delete gCrmOrch;
         gCrmOrch = nullptr;
     }
 
@@ -116,7 +155,7 @@ struct AclTest : public AclTestBase {
 
         auto spy = SpyOn<SAI_API_ACL, SAI_OBJECT_TYPE_ACL_TABLE>(&sai_acl_api->create_acl_table);
         spy->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t attr_count, const sai_attribute_t* attr_list) -> sai_status_t {
-            for (auto i = 0; i < attr_count; ++i) {
+            for (uint32_t i = 0; i < attr_count; ++i) {
                 ret->attr_list.emplace_back(attr_list[i]);
             }
             return SAI_STATUS_SUCCESS;
@@ -247,57 +286,29 @@ struct MockAclOrch {
     AclOrch* m_aclOrch;
     swss::DBConnector* config_db;
 
-    MockAclOrch(AclOrch* aclOrch, swss::DBConnector* config_db)
-        : m_aclOrch(aclOrch)
-        , config_db(config_db)
+    MockAclOrch(swss::DBConnector* config_db, swss::DBConnector* state_db,
+        PortsOrch* portsOrch, MirrorOrch* mirrorOrch, NeighOrch* neighOrch, RouteOrch* routeOrch)
+        : config_db(config_db)
     {
+        TableConnector confDbAclTable(config_db, CFG_ACL_TABLE_NAME);
+        TableConnector confDbAclRuleTable(config_db, CFG_ACL_RULE_TABLE_NAME);
+
+        vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
+
+        TableConnector stateDbSwitchTable(state_db, "SWITCH_CAPABILITY");
+
+        m_aclOrch = new AclOrch(acl_table_connectors, stateDbSwitchTable, portsOrch, mirrorOrch,
+            neighOrch, routeOrch);
+    }
+
+    ~MockAclOrch()
+    {
+        delete m_aclOrch;
     }
 
     operator const AclOrch*() const
     {
         return m_aclOrch;
-    }
-
-    static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        /* Nothing popped */
-        if (entries.empty()) {
-            return 0;
-        }
-
-        for (auto& entry : entries) {
-            string key = kfvKey(entry);
-            string op = kfvOp(entry);
-
-            /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-            if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-                consumer->m_toSync[key] = entry;
-            }
-            /* If an old task is still there, we combine the old task with new task */
-            else {
-                KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
-
-                auto new_values = kfvFieldsValues(entry);
-                auto existing_values = kfvFieldsValues(existing_data);
-
-                for (auto it : new_values) {
-                    string field = fvField(it);
-                    string value = fvValue(it);
-
-                    auto iu = existing_values.begin();
-                    while (iu != existing_values.end()) {
-                        string ofield = fvField(*iu);
-                        if (field == ofield)
-                            iu = existing_values.erase(iu);
-                        else
-                            iu++;
-                    }
-                    existing_values.push_back(FieldValueTuple(field, value));
-                }
-                consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
-            }
-        }
-        return entries.size();
     }
 
     void doAclTableTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
@@ -352,27 +363,12 @@ struct AclOrchTest : public AclTest {
         sai_switch_profile_id_t profile_id,
         const char* variable)
     {
-        if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-            return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-        } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-            return "20:03:04:05:06:00";
-        } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-            return "1000";
-        } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-            return "2000";
-        } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-            return "SAI_VS_SWITCH_TYPE_BCM56850";
+        std::map<std::string, std::string>::const_iterator it = gProfileMap.find(variable);
+        if (it == gProfileMap.end()) {
+            return NULL;
         }
 
-        return NULL;
-
-        // std::map<std::string, std::string>::const_iterator it = gProfileMap.find(variable);
-        // if (it == gProfileMap.end()) {
-        //     printf("%s: NULL\n", variable);
-        //     return NULL;
-        // }
-        //
-        // return it->second.c_str();
+        return it->second.c_str();
     }
 
     static int profile_get_next_value(
@@ -381,26 +377,20 @@ struct AclOrchTest : public AclTest {
         const char** value)
     {
         if (value == NULL) {
-            printf("resetting profile map iterator");
-
             gProfileIter = gProfileMap.begin();
             return 0;
         }
 
         if (variable == NULL) {
-            printf("variable is null");
             return -1;
         }
 
         if (gProfileIter == gProfileMap.end()) {
-            printf("iterator reached end");
             return -1;
         }
 
         *variable = gProfileIter->first.c_str();
         *value = gProfileIter->second.c_str();
-
-        printf("key: %s:%s", *variable, *value);
 
         gProfileIter++;
 
@@ -411,28 +401,7 @@ struct AclOrchTest : public AclTest {
     {
         AclTestBase::SetUp();
 
-        assert(gAclOrch == nullptr);
-        assert(gFdbOrch == nullptr);
-        assert(gMirrorOrch == nullptr);
-        assert(gRouteOrch == nullptr);
-        assert(gNeighOrch == nullptr);
-        assert(gIntfsOrch == nullptr);
-        assert(gVrfOrch == nullptr);
-        assert(gCrmOrch == nullptr);
-        assert(gPortsOrch == nullptr);
-
-        ///////////////////////////////////////////////////////////////////////
-        // if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-        //     return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-        // } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-        //     return "20:03:04:05:06:00";
-        // } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-        //     return "1000";
-        // } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-        //     return "2000";
-        // } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-        //     return "SAI_VS_SWITCH_TYPE_BCM56850";
-        // }
+        // Init switch and create dependencies
 
         gProfileMap.emplace("SAI_VS_SWITCH_TYPE", "SAI_VS_SWITCH_TYPE_BCM56850");
         gProfileMap.emplace("KV_DEVICE_MAC_ADDRESS", "20:03:04:05:06:00");
@@ -478,10 +447,7 @@ struct AclOrchTest : public AclTest {
 
         gVirtualRouterId = attr.value.oid;
 
-        ///////////////////////////////////////////////////////////////////////
-
-        TableConnector confDbAclTable(m_config_db.get(), CFG_ACL_TABLE_NAME);
-        TableConnector confDbAclRuleTable(m_config_db.get(), CFG_ACL_RULE_TABLE_NAME);
+        // Create dependencies ...
 
         const int portsorch_base_pri = 40;
 
@@ -493,88 +459,65 @@ struct AclOrchTest : public AclTest {
             { APP_LAG_MEMBER_TABLE_NAME, portsorch_base_pri }
         };
 
-        // FIXME: doesn't use global variable !!
         assert(gPortsOrch == nullptr);
         gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
-        // FIXME: doesn't use global variable !!
         assert(gCrmOrch == nullptr);
         gCrmOrch = new CrmOrch(m_config_db.get(), CFG_CRM_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
         assert(gVrfOrch == nullptr);
         gVrfOrch = new VRFOrch(m_app_db.get(), APP_VRF_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
         assert(gIntfsOrch == nullptr);
         gIntfsOrch = new IntfsOrch(m_app_db.get(), APP_INTF_TABLE_NAME, gVrfOrch);
 
-        // FIXME: doesn't use global variable !!
         assert(gNeighOrch == nullptr);
         gNeighOrch = new NeighOrch(m_app_db.get(), APP_NEIGH_TABLE_NAME, gIntfsOrch);
 
-        // FIXME: doesn't use global variable !!
         assert(gRouteOrch == nullptr);
         gRouteOrch = new RouteOrch(m_app_db.get(), APP_ROUTE_TABLE_NAME, gNeighOrch);
 
         TableConnector applDbFdb(m_app_db.get(), APP_FDB_TABLE_NAME);
         TableConnector stateDbFdb(m_state_db.get(), STATE_FDB_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
         assert(gFdbOrch == nullptr);
         gFdbOrch = new FdbOrch(applDbFdb, stateDbFdb, gPortsOrch);
 
         TableConnector stateDbMirrorSession(m_state_db.get(), APP_MIRROR_SESSION_TABLE_NAME);
         TableConnector confDbMirrorSession(m_config_db.get(), CFG_MIRROR_SESSION_TABLE_NAME);
 
-        // FIXME: doesn't use global variable !!
         assert(gMirrorOrch == nullptr);
         gMirrorOrch = new MirrorOrch(stateDbMirrorSession, confDbMirrorSession,
             gPortsOrch, gRouteOrch, gNeighOrch, gFdbOrch);
 
-        vector<TableConnector> acl_table_connectors = { confDbAclTable, confDbAclRuleTable };
+        auto consumer = std::unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1), gPortsOrch, APP_PORT_TABLE_NAME));
 
-        // FIXME: Using local variable or data member for aclorch ... ??
-        gAclOrch = new AclOrch(acl_table_connectors, gPortsOrch, gMirrorOrch,
-            gNeighOrch, gRouteOrch);
+        consumerAddToSync(consumer.get(), { { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
 
-        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
-        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
-
-        auto setData = std::deque<KeyOpFieldsValuesTuple>(
-            { { "PortInitDone",
-                EMPTY_PREFIX,
-                { { "", "" } } } });
-        consumerExt->addToSync(setData);
-
-        Consumer* consumer = consumerExt.get();
-        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
+        static_cast<Orch*>(gPortsOrch)->doTask(*consumer.get());
     }
 
     void TearDown() override
     {
         AclTestBase::TearDown();
 
-        delete gAclOrch; // FIXME: using auto ptr
-        gAclOrch = nullptr;
-        delete gFdbOrch; // FIXME: using auto ptr
+        delete gFdbOrch;
         gFdbOrch = nullptr;
-        delete gMirrorOrch; // FIXME: using auto ptr
+        delete gMirrorOrch;
         gMirrorOrch = nullptr;
-        delete gRouteOrch; // FIXME: using auto ptr
+        delete gRouteOrch;
         gRouteOrch = nullptr;
-        delete gNeighOrch; // FIXME: using auto ptr
+        delete gNeighOrch;
         gNeighOrch = nullptr;
-        delete gIntfsOrch; // FIXME: using auto ptr
+        delete gIntfsOrch;
         gIntfsOrch = nullptr;
-        delete gVrfOrch; // FIXME: using auto ptr
+        delete gVrfOrch;
         gVrfOrch = nullptr;
-        delete gCrmOrch; // FIXME: using auto ptr
+        delete gCrmOrch;
         gCrmOrch = nullptr;
-        delete gPortsOrch; // FIXME: using auto ptr
+        delete gPortsOrch;
         gPortsOrch = nullptr;
-
-        ///////////////////////////////////////////////////////////////////////
 
         auto status = sai_switch_api->remove_switch(gSwitchId);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
@@ -588,7 +531,8 @@ struct AclOrchTest : public AclTest {
 
     std::shared_ptr<MockAclOrch> createAclOrch()
     {
-        return std::make_shared<MockAclOrch>(gAclOrch, m_config_db.get());
+        return std::make_shared<MockAclOrch>(m_config_db.get(), m_state_db.get(), gPortsOrch, gMirrorOrch,
+            gNeighOrch, gRouteOrch);
     }
 
     std::shared_ptr<SaiAttributeList> getAclTableAttributeList(sai_object_type_t objecttype, const AclTable& acl_table)
@@ -1003,7 +947,7 @@ struct AclOrchTest : public AclTest {
     {
         const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
 
-        if (attr_name == MATCH_SRC_IP | attr_name == MATCH_DST_IP) {
+        if (attr_name == MATCH_SRC_IP || attr_name == MATCH_DST_IP) {
             auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP);
             if (it_field == rule_matches.end()) {
                 return false;
@@ -1056,7 +1000,7 @@ struct AclOrchTest : public AclTest {
                 if (!validateAclRuleAction(acl_rule, attr_name, attr_value)) {
                     return false;
                 }
-            } else if (attr_name == MATCH_SRC_IP | attr_name == MATCH_DST_IP | attr_name == MATCH_SRC_IPV6) {
+            } else if (attr_name == MATCH_SRC_IP || attr_name == MATCH_DST_IP || attr_name == MATCH_SRC_IPV6) {
                 if (!validateAclRuleMatch(acl_rule, attr_name, attr_value)) {
                     return false;
                 }
