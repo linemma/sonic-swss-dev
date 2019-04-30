@@ -220,6 +220,11 @@ struct CoppOrchHandler {
     {
         return Portal::CoppOrchInternal::getTrapIdTrapGroupMap(m_coppOrch);
     }
+
+    const TrapGroupPolicerTable& getTrapGroupPolicerMap() const
+    {
+        return Portal::CoppOrchInternal::getTrapGroupPolicerMap(m_coppOrch);
+    }
 };
 
 struct CoppTestBase : public ::testing::Test {
@@ -496,12 +501,12 @@ struct CoppOrchTest : public CoppTest {
 
     bool ValidateTrapGroup(sai_object_id_t id, SaiAttributeList& exp_group_attr_list)
     {
-        sai_object_type_t trapGroupObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP;
+        sai_object_type_t trap_group_object_type = SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP;
         std::vector<sai_attribute_t> trap_group_act_attr;
 
         for (int i = 0; i < exp_group_attr_list.get_attr_count(); ++i) {
             const auto attr = exp_group_attr_list.get_attr_list()[i];
-            auto meta = sai_metadata_get_attr_metadata(trapGroupObjectType, attr.id);
+            auto meta = sai_metadata_get_attr_metadata(trap_group_object_type, attr.id);
 
             if (meta == nullptr) {
                 return false;
@@ -517,7 +522,7 @@ struct CoppOrchTest : public CoppTest {
             return false;
         }
 
-        auto b_attr_eq = Check::AttrListEq(trapGroupObjectType, trap_group_act_attr, exp_group_attr_list);
+        auto b_attr_eq = Check::AttrListEq(trap_group_object_type, trap_group_act_attr, exp_group_attr_list);
         if (!b_attr_eq) {
             return false;
         }
@@ -527,12 +532,12 @@ struct CoppOrchTest : public CoppTest {
 
     bool ValidateTrap(sai_object_id_t id, SaiAttributeList& exp_trap_attr_list)
     {
-        sai_object_type_t trapObjectType = SAI_OBJECT_TYPE_HOSTIF_TRAP;
+        sai_object_type_t trap_object_type = SAI_OBJECT_TYPE_HOSTIF_TRAP;
         std::vector<sai_attribute_t> trap_act_attr;
 
         for (int i = 0; i < exp_trap_attr_list.get_attr_count(); ++i) {
             const auto attr = exp_trap_attr_list.get_attr_list()[i];
-            auto meta = sai_metadata_get_attr_metadata(trapObjectType, attr.id);
+            auto meta = sai_metadata_get_attr_metadata(trap_object_type, attr.id);
 
             if (meta == nullptr) {
                 return false;
@@ -548,7 +553,38 @@ struct CoppOrchTest : public CoppTest {
             return false;
         }
 
-        auto b_attr_eq = Check::AttrListEq(trapObjectType, trap_act_attr, exp_trap_attr_list);
+        auto b_attr_eq = Check::AttrListEq(trap_object_type, trap_act_attr, exp_trap_attr_list);
+        if (!b_attr_eq) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool ValidatePolicer(sai_object_id_t id, SaiAttributeList& exp_policer_attr_list)
+    {
+        sai_object_type_t policer_object_type = SAI_OBJECT_TYPE_POLICER;
+        std::vector<sai_attribute_t> policer_act_attr;
+
+        for (int i = 0; i < exp_policer_attr_list.get_attr_count(); ++i) {
+            const auto attr = exp_policer_attr_list.get_attr_list()[i];
+            auto meta = sai_metadata_get_attr_metadata(policer_object_type, attr.id);
+
+            if (meta == nullptr) {
+                return false;
+            }
+
+            sai_attribute_t new_attr = { 0 };
+            new_attr.id = attr.id;
+            policer_act_attr.emplace_back(new_attr);
+        }
+
+        auto status = sai_policer_api->get_policer_attribute(id, policer_act_attr.size(), policer_act_attr.data());
+        if (status != SAI_STATUS_SUCCESS) {
+            return false;
+        }
+
+        auto b_attr_eq = Check::AttrListEq(policer_object_type, policer_act_attr, exp_policer_attr_list);
         if (!b_attr_eq) {
             return false;
         }
@@ -565,24 +601,33 @@ struct CoppOrchTest : public CoppTest {
 
         //valid trap group
         auto trap_group_map = orch->getTrapGroupMap();
-        auto grpIt = trap_group_map.find(groupName);
-        if (grpIt == trap_group_map.end()) {
+        auto grp_itr = trap_group_map.find(groupName);
+        if (grp_itr == trap_group_map.end()) {
             return false;
         }
 
-        if (!ValidateTrapGroup(grpIt->second, *exp_group_attr_list.get())) {
+        if (!ValidateTrapGroup(grp_itr->second, *exp_group_attr_list.get())) {
             return false;
         }
+
+        auto group_policer_map = orch->getTrapGroupPolicerMap();
+        auto policer_itr = group_policer_map.find(grp_itr->second);
+        if(policer_itr != group_policer_map.end()) {
+            if (!ValidatePolicer(policer_itr->second, *exp_police_attr_list.get())) {
+                return false;
+            }
+        }
+        
 
         //valid trap
         auto trap_map = orch->getTrapIdTrapGroupMap();
         for (auto trap_type : type_list) {
-            auto trapIt = trap_map.find(trap_type);
-            if (trapIt == trap_map.end()) {
+            auto trap_itr = trap_map.find(trap_type);
+            if (trap_itr == trap_map.end()) {
                 return false;
             }
 
-            if (!ValidateTrap(trapIt->second, *exp_trap_attr_list.get())) {
+            if (!ValidateTrap(trap_itr->second, *exp_trap_attr_list.get())) {
                 return false;
             }
         }
