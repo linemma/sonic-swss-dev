@@ -584,6 +584,10 @@ struct AclOrchTest : public AclTest {
 
         sai_switch_api = nullptr;
         sai_acl_api = nullptr;
+        sai_port_api = nullptr;
+        sai_vlan_api = nullptr;
+        sai_bridge_api = nullptr;
+        sai_route_api = nullptr;
     }
 
     std::shared_ptr<MockAclOrch> createAclOrch()
@@ -674,6 +678,32 @@ struct AclOrchTest : public AclTest {
         auto table_id = sai_serialize_object_id(acl_table_oid);
         auto counter_id = sai_serialize_object_id(const_cast<AclRule&>(acl_rule).getCounterOid()); // FIXME: getcounterOid() should be const
 
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
+
+        // const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
+        // auto actionIt = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION);
+        // assert(actionIt != rule_actions.end());
+        // assert(actionIt->second.aclaction.enable == true);
+        // fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION",
+        //     std::to_string(actionIt->second.aclaction.parameter.s32) });
+
+        //FIXME: fill matchs field by auto
+        // const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
+        // for (auto matchIt = rule_matches.begin(); matchIt != rule_matches.end(); ++matchIt) {
+        //     // matchIt = map<sai_acl_entry_attr_t (enum), sai_attribute_value_t (union)>
+        //     auto meta = sai_metadata_get_attr_metadata(objecttype, matchIt->first);
+
+        //     assert(meta != nullptr);
+
+        //     switch (meta->attrvaluetype) {
+        //     case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_IPV4:
+        //         sai_serialize_attr_value(*meta, ) break;
+        //     }
+        // }
+
         switch (acl_table.type) {
         case ACL_TABLE_L3:
             //     auto table_id = sai_serialize_object_id(acl_table_oid);
@@ -695,13 +725,7 @@ struct AclOrchTest : public AclTest {
             //         });
             //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
 
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
-
             fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" });
             break;
 
         case ACL_TABLE_L3V6:
@@ -718,13 +742,8 @@ struct AclOrchTest : public AclTest {
             //     //                                            SAI_PACKET_ACTION_FORWARD
             //
             // });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
 
             fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" });
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" });
             break;
 
         default:
@@ -1225,7 +1244,7 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
     ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
     // add rule ...
-    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD /*, PACKET_ACTION_DROP*/ }) {
+    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD, PACKET_ACTION_DROP }) {
 
         auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
             SET_COMMAND,
@@ -1314,7 +1333,7 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
     ASSERT_TRUE(validateLowerLayerDb(orch.get()));
 
     // add rule ...
-    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD /*, PACKET_ACTION_DROP*/ }) {
+    for (const auto& acl_rule_pkg_action : { PACKET_ACTION_FORWARD, PACKET_ACTION_DROP }) {
 
         auto kvfAclRule = std::deque<KeyOpFieldsValuesTuple>({ { acl_table_id + "|" + acl_rule_id,
             SET_COMMAND,
