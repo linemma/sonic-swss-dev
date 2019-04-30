@@ -8,7 +8,16 @@ extern PortsOrch* gPortsOrch;
 
 extern sai_hostif_api_t* sai_hostif_api;
 extern sai_policer_api_t* sai_policer_api;
+
+// portOrch dependency start
+extern sai_port_api_t* sai_port_api;
+extern sai_vlan_api_t* sai_vlan_api;
+extern sai_bridge_api_t* sai_bridge_api;
+// portOrch dependency end
+
+// system dependency start
 extern sai_switch_api_t* sai_switch_api;
+// system dependency end
 
 namespace nsCoppOrchTest {
 
@@ -382,6 +391,9 @@ struct CoppOrchTest : public CoppTest {
 #if WITH_SAI == LIBVS
         sai_hostif_api = const_cast<sai_hostif_api_t*>(&vs_hostif_api);
         sai_policer_api = const_cast<sai_policer_api_t*>(&vs_policer_api);
+        sai_port_api = const_cast<sai_port_api_t*>(&vs_port_api);
+        sai_vlan_api = const_cast<sai_vlan_api_t*>(&vs_vlan_api);
+        sai_bridge_api = const_cast<sai_bridge_api_t*>(&vs_bridge_api);        
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
 #endif
 
@@ -403,6 +415,22 @@ struct CoppOrchTest : public CoppTest {
 
         status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        // Get switch source MAC address
+        swattr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
+        status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &swattr);
+
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        gMacAddress = swattr.value.mac;
+
+        // Get the default virtual router ID
+        swattr.id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
+        status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &swattr);
+
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        gVirtualRouterId = swattr.value.oid;
 
         //call orch->doTask need to initial portsOrch
         const int portsorch_base_pri = 40;
@@ -448,6 +476,9 @@ struct CoppOrchTest : public CoppTest {
         sai_hostif_api = nullptr;
         sai_policer_api = nullptr;
         sai_switch_api = nullptr;
+        sai_port_api = nullptr;
+        sai_vlan_api = nullptr;
+        sai_bridge_api = nullptr;
     }
 
     vector<sai_hostif_trap_type_t>
@@ -574,15 +605,11 @@ TEST_F(CoppOrchTest, create_copp_stp_rule_via_libvs)
 
     ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
-    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
-    // setData = { delActionAttr };
-    // consumerAddToSync(consumer.get(), setData);
+    // kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "DEL", rule_values } });
+    // orch->doCoppTask(kvf_copp_value);
 
-    // //call CoPP function
-    // coppMock.processCoppRule(*consumer);
-
-    // const auto& trapGroupTables = coppMock.getTrapGroupMap();
-    // auto grpIt = trapGroupTables.find(groupName);
+    // const auto& trapGroupTables = orch->getTrapGroupMap();
+    // auto grpIt = trapGroupTables.find(trap_group_id);
 
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
