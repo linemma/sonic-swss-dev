@@ -1,6 +1,7 @@
 #pragma once
 
 #include "aclorch.h"
+#include "copporch.h"
 #include "crmorch.h"
 
 struct Portal {
@@ -47,6 +48,23 @@ struct Portal {
         static void getResAvailableCounters(CrmOrch* crmOrch)
         {
             crmOrch->getResAvailableCounters();
+        }
+    };
+
+    struct CoppOrchInternal {
+        static const object_map& getTrapGroupMap(const CoppOrch* coppOrch)
+        {
+            return coppOrch->m_trap_group_map;
+        }
+
+        static const TrapIdTrapGroupTable& getTrapIdTrapGroupMap(const CoppOrch* coppOrch)
+        {
+            return coppOrch->m_syncdTrapIds;
+        }
+
+        static const TrapGroupPolicerTable& getTrapGroupPolicerMap(const CoppOrch* coppOrch)
+        {
+            return coppOrch->m_trap_group_policer_map;
         }
     };
 };
