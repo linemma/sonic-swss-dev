@@ -3,7 +3,7 @@
 	url = https://github.com/Azure/sonic-swss-common.git
 [submodule "sonic-swss"]
 	path = sonic-swss
-	url = https://github.com/Azure/sonic-swss.git
+	url = https://github.com/yehjunying/sonic-swss.git
 [submodule "sonic-sairedis"]
 	path = sonic-sairedis
 	url = https://github.com/Azure/sonic-sairedis.git
