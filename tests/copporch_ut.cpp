@@ -228,7 +228,7 @@ struct CoppTest : public CoppTestBase {
 
     void TearDown() override
     {
-         CoppTestBase::TearDown();
+        CoppTestBase::TearDown();
     }
 
     std::shared_ptr<CoppOrchHandler> createCoppOrch()
@@ -397,12 +397,15 @@ struct CoppOrchTest : public CoppTest {
     void TearDown() override
     {
         CoppTest::TearDown();
-        
+
         auto status = sai_switch_api->remove_switch(gSwitchId);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
         gSwitchId = 0;
 
         sai_api_uninitialize();
+
+        delete gPortsOrch;
+        gPortsOrch = nullptr;
 
         sai_hostif_api = nullptr;
         sai_policer_api = nullptr;
@@ -629,22 +632,16 @@ TEST_F(CoppOrchTest, create_copp_stp_rule_without_policer)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppTest, create_copp_lacp_rule_without_policer)
+TEST_F(CoppOrchTest, create_copp_lacp_rule_without_policer)
 {
-    // auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-    // CoppOrchMock copp_mock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
-    // auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &copp_mock, std::string(APP_COPP_TABLE_NAME)));
+    auto orch = createCoppOrch();
 
-    // std::string trap_group_id = "coppRule1";
-    // vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
-    // KeyOpFieldsValuesTuple add_action_values(trap_group_id, "SET", rule_values);
-    // std::deque<KeyOpFieldsValuesTuple> setData = { add_action_values };
-    // consumerAddToSync(consumer.get(), setData);
+    std::string trap_group_id = "coppRule1";
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    orch->doCoppTask(kvf_copp_value);
 
-    // //call CoPP function
-    // copp_mock.processCoppRule(*consumer);
-
-    // ASSERT_TRUE(Validate(copp_mock, trap_group_id, rule_values));
+    ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
     // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
     // setData = { delActionAttr };
@@ -659,22 +656,16 @@ TEST_F(CoppTest, create_copp_lacp_rule_without_policer)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppTest, create_copp_eapol_rule_without_policer)
+TEST_F(CoppOrchTest, create_copp_eapol_rule_without_policer)
 {
-    // auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-    // CoppOrchMock copp_mock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
-    // auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &copp_mock, std::string(APP_COPP_TABLE_NAME)));
+    auto orch = createCoppOrch();
 
-    // std::string trap_group_id = "coppRule1";
-    // vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
-    // KeyOpFieldsValuesTuple add_action_values(trap_group_id, "SET", rule_values);
-    // std::deque<KeyOpFieldsValuesTuple> setData = { add_action_values };
-    // consumerAddToSync(consumer.get(), setData);
+    std::string trap_group_id = "coppRule1";
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    orch->doCoppTask(kvf_copp_value);
 
-    // //call CoPP function
-    // copp_mock.processCoppRule(*consumer);
-
-    // ASSERT_TRUE(Validate(copp_mock, trap_group_id, rule_values));
+    ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
     // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
     // setData = { delActionAttr };
