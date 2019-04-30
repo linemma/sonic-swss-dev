@@ -66,7 +66,8 @@ apply_patch() {
     rm crmorch.h.rej
     patch -N "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.h" < "${SRC_PATH}/patch/swss-pfcwdorch.diff"
     rm pfcwdorch.h.rej
-    
+    patch -N "${SRC_PATH}/sonic-swss/orchagent/copporch.h" < "${SRC_PATH}/patch/swss-copporch.diff"
+    rm copporch.h.rej
 }
 
 download_source_code() {
