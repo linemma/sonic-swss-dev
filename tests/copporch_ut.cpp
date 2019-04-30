@@ -14,6 +14,22 @@ namespace nsCoppOrchTest {
 
 using namespace std;
 
+map<string, string> m_policer_meter_map = {
+    { "packets", "SAI_METER_TYPE_PACKETS" },
+    { "bytes", "SAI_METER_TYPE_BYTES" }
+};
+
+map<string, string> m_policer_mode_map = {
+    { "sr_tcm", "SAI_POLICER_MODE_SR_TCM" },
+    { "tr_tcm", "SAI_POLICER_MODE_TR_TCM" },
+    { "storm", "SAI_POLICER_MODE_STORM_CONTROL" }
+};
+
+map<string, string> m_policer_color_aware_map = {
+    { "aware", "SAI_POLICER_COLOR_SOURCE_AWARE" },
+    { "blind", "SAI_POLICER_COLOR_SOURCE_BLIND" }
+};
+
 map<string, string> m_trap_type_map = {
     { "stp", "SAI_HOSTIF_TRAP_TYPE_STP" },
     { "lacp", "SAI_HOSTIF_TRAP_TYPE_LACP" },
@@ -210,7 +226,7 @@ struct CoppTestBase : public ::testing::Test {
 
 struct CoppTest : public CoppTestBase {
 
-    struct CreateCoppResult {
+    struct CoppResult {
         bool ret_val;
 
         std::vector<sai_attribute_t> group_attr_list;
@@ -235,6 +251,64 @@ struct CoppTest : public CoppTestBase {
     {
         auto copp = new CoppOrch(m_app_db.get(), APP_COPP_TABLE_NAME);
         return std::make_shared<CoppOrchHandler>(copp, m_app_db.get());
+    }
+
+    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> rule_values)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+        for (auto it : rule_values) {
+            if (kfvKey(it) == copp_queue_field)
+                fields.push_back({ "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", fvValue(it) });
+        }
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, fields, false));
+    }
+
+    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const vector<FieldValueTuple> rule_values)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+        for (auto it : rule_values) {
+            if (kfvKey(it) == copp_trap_action_field) {
+                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", m_packet_action_map.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_trap_action_field) {
+                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", fvValue(it) });
+            } else if (kfvKey(it) == copp_trap_id_list) {
+                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", m_trap_type_map.at(fvValue(it)) });
+            }
+        }
+        fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" });
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
+    }
+
+    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple> rule_values)
+    {
+        std::vector<swss::FieldValueTuple> fields;
+        for (auto it : rule_values) {
+            if (kfvKey(it) == copp_policer_meter_type_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_METER_TYPE", m_policer_meter_map.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_policer_mode_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_MODE", m_policer_mode_map.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_policer_color_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_COLOR_SOURCE", m_policer_color_aware_map.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_policer_cbs_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_CBS", fvValue(it) });
+            } else if (kfvKey(it) == copp_policer_cir_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_CIR", fvValue(it) });
+            } else if (kfvKey(it) == copp_policer_pbs_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_PBS", fvValue(it) });
+            } else if (kfvKey(it) == copp_policer_pir_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_PIR", fvValue(it) });
+            } else if (kfvKey(it) == copp_policer_action_green_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_GREEN_PACKET_ACTION", m_packet_action_map.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_policer_action_red_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_RED_PACKET_ACTION", m_packet_action_map.at(fvValue(it)) });
+            } else if (kfvKey(it) == copp_policer_action_yellow_field) {
+                fields.push_back({ "SAI_POLICER_ATTR_YELLOW_PACKET_ACTION", m_packet_action_map.at(fvValue(it)) });
+            }
+        }
+
+        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_POLICER, fields, false));
     }
 };
 
@@ -376,42 +450,8 @@ struct CoppOrchTest : public CoppTest {
         sai_switch_api = nullptr;
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> rule_values)
-    {
-        std::vector<swss::FieldValueTuple> fields;
-        for (auto it : rule_values) {
-            if (kfvKey(it) == copp_queue_field)
-                fields.push_back({ "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", fvValue(it) });
-        }
-
-        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, fields, false));
-    }
-
-    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const vector<FieldValueTuple> rule_values)
-    {
-        std::vector<swss::FieldValueTuple> fields;
-        for (auto it : rule_values) {
-            if (kfvKey(it) == copp_trap_action_field) {
-                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", m_packet_action_map.at(fvValue(it)) });
-            } else if (kfvKey(it) == copp_trap_action_field) {
-                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", fvValue(it) });
-            } else if (kfvKey(it) == copp_trap_id_list) {
-                fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", m_trap_type_map.at(fvValue(it)) });
-            }
-        }
-        fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" });
-
-        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
-    }
-
-    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple> rule_values)
-    {
-        std::vector<swss::FieldValueTuple> fields;
-
-        return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_POLICER, fields, false));
-    }
-
-    vector<sai_hostif_trap_type_t> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
+    vector<sai_hostif_trap_type_t>
+    getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
     {
         std::vector<sai_hostif_trap_type_t> types;
         for (auto it : ruleAttr) {
@@ -523,12 +563,12 @@ struct CoppOrchTest : public CoppTest {
 std::map<std::string, std::string> CoppOrchTest::gProfileMap;
 std::map<std::string, std::string>::iterator CoppOrchTest::gProfileIter = CoppOrchTest::gProfileMap.begin();
 
-TEST_F(CoppOrchTest, create_copp_stp_rule_without_policer)
+TEST_F(CoppOrchTest, create_copp_stp_rule_via_libvs)
 {
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
@@ -547,12 +587,12 @@ TEST_F(CoppOrchTest, create_copp_stp_rule_without_policer)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppOrchTest, create_copp_lacp_rule_without_policer)
+TEST_F(CoppOrchTest, create_copp_lacp_rule_via_libvs)
 {
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
@@ -571,12 +611,12 @@ TEST_F(CoppOrchTest, create_copp_lacp_rule_without_policer)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppOrchTest, create_copp_eapol_rule_without_policer)
+TEST_F(CoppOrchTest, create_copp_eapol_rule_via_libvs)
 {
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } };
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
@@ -595,43 +635,56 @@ TEST_F(CoppOrchTest, create_copp_eapol_rule_without_policer)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-// TEST_F(CoppTest, delete_copp_eapol_rule_without_policer)
+// TEST_F(CoppTest, create_delete_copp_stp_rule_with_policer_via_mock_function)
 // {
-//     sai_hostif_api->create_hostif_trap_group = sai_create_hostif_trap_group_;
-//     sai_hostif_api->remove_hostif_trap_group = sai_remove_hostif_trap_group_;
-//     sai_hostif_api->create_hostif_trap = sai_create_hostif_trap_;
-//     sai_hostif_api->create_hostif_table_entry = sai_create_hostif_table_entry_;
-//     sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
+//     assert(sai_hostif_api == nullptr);
+//     assert(sai_policer_api == nullptr);
+//     assert(sai_switch_api == nullptr);
 
-//     that = this;
+//     sai_hostif_api = new sai_hostif_api_t();
+//     auto sai_hostif = std::shared_ptr<sai_hostif_api_t>(sai_hostif_api, [](sai_hostif_api_t* p) {
+//         delete p;
+//         sai_hostif_api = nullptr;
+//     });
 
-//     auto ret = std::make_shared<CreateCoppResult>();
+//     sai_policer_api = new sai_policer_api_t();
+//     auto sai_policer = std::shared_ptr<sai_policer_api_t>(sai_policer_api, [](sai_policer_api_t* p) {
+//         delete p;
+//         sai_policer_api = nullptr;
+//     });
 
-//     sai_create_hostif_trap_group_fn =
-//         [&](sai_object_id_t* hostif_trap_group_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
+//     sai_switch_api = new sai_switch_api_t();
+//     auto sai_switch = std::shared_ptr<sai_switch_api_t>(sai_switch_api, [](sai_switch_api_t* p) {
+//         delete p;
+//         sai_switch_api = nullptr;
+//     });
+
+//     auto ret = std::make_shared<CoppResult>();
+
+//     auto spy_create_group = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP>(&sai_hostif_api->create_hostif_trap_group);
+//     spy_create_group->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t attr_count, const sai_attribute_t* attr_list) -> sai_status_t {
 //         for (auto i = 0; i < attr_count; ++i) {
 //             ret->group_attr_list.emplace_back(attr_list[i]);
 //         }
-//         *hostif_trap_group_id = 12345l;
+//         // FIXME: should not hard code !!
+//         *oid = 12345l;
 //         return SAI_STATUS_SUCCESS;
-//     };
+//     });
 
 //     bool b_check_delete = false;
-
-//     sai_remove_hostif_trap_group_fn =
-//         [&](sai_object_id_t hostif_trap_group_id) -> sai_status_t {
+//     auto spy_remove_group = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP>(&sai_hostif_api->remove_hostif_trap_group);
+//     spy_remove_group->callFake([&](sai_object_id_t oid) -> sai_status_t {
 //         b_check_delete = true;
 //         return SAI_STATUS_SUCCESS;
-//     };
+//     });
 
-//     sai_create_hostif_trap_fn =
-//         [&](sai_object_id_t* hostif_trap_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
+//     auto spy_set_group = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP>(&sai_hostif_api->set_hostif_trap_group_attribute);
+//     spy_set_group->callFake([&](sai_object_id_t oid, const sai_attribute_t* attr_list) -> sai_status_t {
+//         return SAI_STATUS_SUCCESS;
+//     });
+
+//     auto spy_create_trap = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_HOSTIF_TRAP>(&sai_hostif_api->create_hostif_trap);
+//     spy_create_trap->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t attr_count, const sai_attribute_t* attr_list) -> sai_status_t {
 //         bool defaultTrap = false;
 //         for (auto i = 0; i < attr_count; ++i) {
 //             if (attr_list[i].id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE) {
@@ -643,273 +696,59 @@ TEST_F(CoppOrchTest, create_copp_eapol_rule_without_policer)
 
 //         if (!defaultTrap) {
 //             // FIXME: should not hard code !!
-//             *hostif_trap_id = 12345l;
+//             *oid = 12345l;
 //             for (auto i = 0; i < attr_count; ++i) {
 //                 ret->trap_attr_list.emplace_back(attr_list[i]);
 //             }
 //         }
 //         return SAI_STATUS_SUCCESS;
-//     };
+//     });
 
-//     auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-//     auto coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
-//     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &coppMock, std::string(APP_COPP_TABLE_NAME)));
-
-//     KeyOpFieldsValuesTuple addRuleAttr("coppRule1", "SET", { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" } });
-//     std::deque<KeyOpFieldsValuesTuple> setData = { addRuleAttr };
-//     consumerAddToSync(consumer.get(), setData);
-
-//     auto groupValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", "1" } });
-//     SaiAttributeList group_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, groupValue, false);
-
-//     auto trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "3" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
-//     SaiAttributeList trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
-
-//     //call CoPP function
-//     coppMock.processCoppRule(*consumer);
-
-//     ASSERT_TRUE(AttrListEq(ret->group_attr_list, group_attr_list));
-//     ASSERT_TRUE(AttrListEq(ret->trap_attr_list, trap_attr_list));
-
-//     KeyOpFieldsValuesTuple delAttr("coppRule1", "DEL", { { "trap_ids", "eapol" } });
-//     setData = { delAttr };
-//     consumerAddToSync(consumer.get(), setData);
-
-//     //call CoPP function
-//     coppMock.processCoppRule(*consumer);
-
-//     //verify
-//     ASSERT_TRUE(b_check_delete);
-
-//     //teardown
-//     sai_hostif_api->create_hostif_trap_group = NULL;
-//     sai_hostif_api->create_hostif_trap = NULL;
-//     sai_hostif_api->create_hostif_table_entry = NULL;
-//     sai_switch_api->get_switch_attribute = NULL;
-// }
-
-// TEST_F(CoppTest, create_copp_stp_rule_with_policer)
-// {
-//     sai_hostif_api->create_hostif_trap_group = sai_create_hostif_trap_group_;
-//     sai_hostif_api->create_hostif_trap = sai_create_hostif_trap_;
-//     sai_hostif_api->create_hostif_table_entry = sai_create_hostif_table_entry_;
-//     sai_hostif_api->set_hostif_trap_group_attribute = sai_set_hostif_trap_group_attribute_;
-//     sai_policer_api->create_policer = sai_create_policer_;
-//     sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
-
-//     that = this;
-//     auto ret = std::make_shared<CreateCoppResult>();
-
-//     sai_create_hostif_trap_group_fn =
-//         [&](sai_object_id_t* hostif_trap_group_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
-//         for (auto i = 0; i < attr_count; ++i) {
-//             ret->group_attr_list.emplace_back(attr_list[i]);
-//         }
+//     auto spy_create_table = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_HOSTIF_TABLE_ENTRY>(&sai_hostif_api->create_hostif_table_entry);
+//     spy_create_table->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t attr_count, const sai_attribute_t* attr_list) -> sai_status_t {
 //         return SAI_STATUS_SUCCESS;
-//     };
+//     });
 
-//     sai_create_hostif_trap_fn =
-//         [&](sai_object_id_t* hostif_trap_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
-//         bool defaultTrap = false;
-//         for (auto i = 0; i < attr_count; ++i) {
-//             if (attr_list[i].id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE) {
-//                 if (attr_list[i].value.s32 == SAI_HOSTIF_TRAP_TYPE_TTL_ERROR) {
-//                     defaultTrap = true;
-//                     break;
-//                 }
-//             }
-//         }
-
-//         if (!defaultTrap) {
-//             // FIXME: should not hard code !!
-//             *hostif_trap_id = 12345l;
-//             for (auto i = 0; i < attr_count; ++i) {
-//                 ret->trap_attr_list.emplace_back(attr_list[i]);
-//             }
-//         }
-//         return SAI_STATUS_SUCCESS;
-//     };
-
-//     sai_create_policer_fn =
-//         [&](sai_object_id_t* policer_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
+//     auto spy_create_policer = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_POLICER>(&sai_policer_api->create_policer);
+//     spy_create_policer->callFake([&](sai_object_id_t* oid, sai_object_id_t, uint32_t attr_count, const sai_attribute_t* attr_list) -> sai_status_t {
 //         for (auto i = 0; i < attr_count; ++i) {
 //             ret->policer_attr_list.emplace_back(attr_list[i]);
 //         }
 //         return SAI_STATUS_SUCCESS;
-//     };
-
-//     auto appl_Db = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-//     auto coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
-//     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &coppMock, std::string(APP_COPP_TABLE_NAME)));
-
-//     KeyOpFieldsValuesTuple addRuleAttr("coppRule1", "SET", { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } });
-//     std::deque<KeyOpFieldsValuesTuple> setData = { addRuleAttr };
-
-//     consumerAddToSync(consumer.get(), setData);
-
-//     auto groupValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", "1" } });
-//     SaiAttributeList group_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, groupValue, false);
-
-//     auto trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "1" },
-//         { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" },
-//         { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" },
-//         { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
-//     SaiAttributeList trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
-
-//     auto policerValue = std::vector<swss::FieldValueTuple>({ { "SAI_POLICER_ATTR_METER_TYPE", "1" },
-//         { "SAI_POLICER_ATTR_MODE", "0" },
-//         { "SAI_POLICER_ATTR_COLOR_SOURCE", "2" },
-//         { "SAI_POLICER_ATTR_CBS", "1" },
-//         { "SAI_POLICER_ATTR_CIR", "1" },
-//         { "SAI_POLICER_ATTR_PBS", "1" },
-//         { "SAI_POLICER_ATTR_PIR", "1" },
-//         { "SAI_POLICER_ATTR_GREEN_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
-//         { "SAI_POLICER_ATTR_RED_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" },
-//         { "SAI_POLICER_ATTR_YELLOW_PACKET_ACTION", "SAI_PACKET_ACTION_DENY" } });
-//     SaiAttributeList policer_attr_list(SAI_OBJECT_TYPE_POLICER, policerValue, false);
-
-//     //call CoPP function
-//     coppMock.processCoppRule(*consumer);
-
-//     //verify
-//     ASSERT_TRUE(AttrListEq(ret->group_attr_list, group_attr_list));
-//     ASSERT_TRUE(AttrListEq(ret->trap_attr_list, trap_attr_list));
-//     ASSERT_TRUE(AttrListEq(ret->policer_attr_list, policer_attr_list));
-
-//     //teardown
-//     sai_hostif_api->create_hostif_trap_group = NULL;
-//     sai_hostif_api->create_hostif_trap = NULL;
-//     sai_hostif_api->create_hostif_table_entry = NULL;
-//     sai_hostif_api->set_hostif_trap_group_attribute = NULL;
-//     sai_policer_api->create_policer = NULL;
-//     sai_switch_api->get_switch_attribute = NULL;
-// }
-
-// TEST_F(CoppTest, delete_copp_stp_rule_with_policer)
-// {
-//     sai_hostif_api->create_hostif_trap_group = sai_create_hostif_trap_group_;
-//     sai_hostif_api->remove_hostif_trap_group = sai_remove_hostif_trap_group_;
-//     sai_hostif_api->set_hostif_trap_group_attribute = sai_set_hostif_trap_group_attribute_;
-//     sai_hostif_api->create_hostif_trap = sai_create_hostif_trap_;
-//     sai_hostif_api->create_hostif_table_entry = sai_create_hostif_table_entry_;
-//     sai_policer_api->create_policer = sai_create_policer_;
-//     sai_policer_api->remove_policer = sai_remove_policer_;
-//     sai_switch_api->get_switch_attribute = sai_get_switch_attribute_;
-
-//     that = this;
-
-//     auto ret = std::make_shared<CreateCoppResult>();
-
-//     sai_create_hostif_trap_group_fn =
-//         [&](sai_object_id_t* hostif_trap_group_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
-//         for (auto i = 0; i < attr_count; ++i) {
-//             ret->group_attr_list.emplace_back(attr_list[i]);
-//         }
-//         *hostif_trap_group_id = 12345l;
-//         return SAI_STATUS_SUCCESS;
-//     };
-
-//     bool b_check_delete = false;
-
-//     sai_remove_hostif_trap_group_fn =
-//         [&](sai_object_id_t hostif_trap_group_id) -> sai_status_t {
-//         b_check_delete = true;
-//         return SAI_STATUS_SUCCESS;
-//     };
-
-//     sai_create_hostif_trap_fn =
-//         [&](sai_object_id_t* hostif_trap_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
-//         bool defaultTrap = false;
-//         for (auto i = 0; i < attr_count; ++i) {
-//             if (attr_list[i].id == SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE) {
-//                 if (attr_list[i].value.s32 == SAI_HOSTIF_TRAP_TYPE_TTL_ERROR)
-//                     defaultTrap = true;
-//                 break;
-//             }
-//         }
-
-//         if (!defaultTrap) {
-//             // FIXME: should not hard code !!
-//             *hostif_trap_id = 12345l;
-//             for (auto i = 0; i < attr_count; ++i) {
-//                 ret->trap_attr_list.emplace_back(attr_list[i]);
-//             }
-//         }
-//         return SAI_STATUS_SUCCESS;
-//     };
-
-//     sai_create_policer_fn =
-//         [&](sai_object_id_t* policer_id,
-//             sai_object_id_t switch_id,
-//             uint32_t attr_count,
-//             const sai_attribute_t* attr_list) -> sai_status_t {
-//         for (auto i = 0; i < attr_count; ++i) {
-//             ret->policer_attr_list.emplace_back(attr_list[i]);
-//         }
-//         return SAI_STATUS_SUCCESS;
-//     };
+//     });
 
 //     bool check_policer_delete = false;
-//     sai_remove_policer_fn =
-//         [&](sai_object_id_t policer_id) -> sai_status_t {
+//     auto spy_remove_policer = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_POLICER>(&sai_policer_api->remove_policer);
+//     spy_remove_policer->callFake([&](sai_object_id_t oid) -> sai_status_t {
 //         check_policer_delete = true;
 //         return SAI_STATUS_SUCCESS;
-//     };
+//     });
 
-//     auto appl_Db
-//         = swss::DBConnector(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
-//     auto coppMock = CoppOrchMock(&appl_Db, APP_COPP_TABLE_NAME);
-//     auto consumer = std::unique_ptr<Consumer>(new Consumer(new swss::ConsumerStateTable(&appl_Db, std::string(APP_COPP_TABLE_NAME), 1, 1), &coppMock, std::string(APP_COPP_TABLE_NAME)));
+//     auto spy_get_switch = SpyOn<SAI_API_HOSTIF, SAI_OBJECT_TYPE_POLICER>(&sai_switch_api->get_switch_attribute);
+//     spy_get_switch->callFake([&](sai_object_id_t oid, uint32_t attr_count, sai_attribute_t* attr_list) -> sai_status_t {
+//         return SAI_STATUS_SUCCESS;
+//     });
 
-//     KeyOpFieldsValuesTuple addRuleAttr("coppRule1", "SET", { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } });
-//     std::deque<KeyOpFieldsValuesTuple> setData = { addRuleAttr };
-//     consumerAddToSync(consumer.get(), setData);
+//     auto orch = createCoppOrch();
 
-//     auto groupValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_GROUP_ATTR_QUEUE", "1" } });
-//     SaiAttributeList group_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, groupValue, false);
+//     std::string trap_group_id = "coppRule1";
+//     vector<FieldValueTuple> rule_values = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
+//     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+//     orch->doCoppTask(kvf_copp_value);
 
-//     auto trapValue = std::vector<swss::FieldValueTuple>({ { "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", "1" }, { "SAI_HOSTIF_TRAP_ATTR_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" }, { "SAI_HOSTIF_TRAP_ATTR_TRAP_PRIORITY", "1" } });
-//     SaiAttributeList trap_attr_list(SAI_OBJECT_TYPE_HOSTIF_TRAP, trapValue, false);
+//     auto exp_group_attr_list = getTrapGroupAttributeList(rule_values);
+//     auto exp_trap_attr_list = getTrapAttributeList(rule_values);
+//     auto exp_police_attr_list = getPoliceAttributeList(rule_values);
 
-//     auto policerValue = std::vector<swss::FieldValueTuple>({ { "SAI_POLICER_ATTR_METER_TYPE", "1" },
-//         { "SAI_POLICER_ATTR_MODE", "0" },
-//         { "SAI_POLICER_ATTR_COLOR_SOURCE", "2" },
-//         { "SAI_POLICER_ATTR_CBS", "1" },
-//         { "SAI_POLICER_ATTR_CIR", "1" },
-//         { "SAI_POLICER_ATTR_PBS", "1" },
-//         { "SAI_POLICER_ATTR_PIR", "1" },
-//         { "SAI_POLICER_ATTR_GREEN_PACKET_ACTION", "SAI_PACKET_ACTION_FORWARD" },
-//         { "SAI_POLICER_ATTR_RED_PACKET_ACTION", "SAI_PACKET_ACTION_DROP" },
-//         { "SAI_POLICER_ATTR_YELLOW_PACKET_ACTION", "SAI_PACKET_ACTION_DENY" } });
-//     SaiAttributeList policer_attr_list(SAI_OBJECT_TYPE_POLICER, policerValue, false);
+//     ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(ret->group_attr_list, *exp_group_attr_list.get()));
+//     ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(ret->trap_attr_list, *exp_trap_attr_list.get()));
+//     ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(ret->policer_attr_list, *exp_police_attr_list.get()));
+
+//     rule_values = { { "trap_ids", "stp" } };
+//     kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "DEL", rule_values } });
 
 //     //call CoPP function
-//     coppMock.processCoppRule(*consumer);
-
-//     ASSERT_TRUE(AttrListEq(ret->group_attr_list, group_attr_list));
-//     ASSERT_TRUE(AttrListEq(ret->trap_attr_list, trap_attr_list));
-
-//     KeyOpFieldsValuesTuple delAttr("coppRule1", "DEL", { { "trap_ids", "stp" } });
-//     setData = { delAttr };
-//     consumerAddToSync(consumer.get(), setData);
-
-//     //call CoPP function
-//     coppMock.processCoppRule(*consumer);
+//     orch->doCoppTask(kvf_copp_value);
 
 //     //verify
 //     ASSERT_TRUE(b_check_delete);
