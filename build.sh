@@ -113,25 +113,15 @@ build_swsscommon() {
     mkdir -p "${BUILD_PATH}/sonic-swss-common"
     cd "${BUILD_PATH}/sonic-swss-common"
 
-    # if [ ! -f "${SRC_PATH}/sonic-swss-common/configure" ]; then
     if [ ! -e "${BUILD_PATH}/sonic-swss-common/Makefile" ]; then
-        # cd ${SWSS_COMMON_PATH}
         cd "${SRC_PATH}/sonic-swss-common"
         ./autogen.sh
-        # make distclean
 
-        # mkdir -p "${BUILD_PATH}/sonic-swss-common"
         cd "${BUILD_PATH}/sonic-swss-common"
 
         "${SRC_PATH}/sonic-swss-common/configure" --prefix=${BUILD_PATH}/install
     fi
 
-    # cd "${SRC_PATH}/sonic-swss-common"
-    # make distclean
-
-    # mkdir -p "${BUILD_PATH}/sonic-swss-common"
-    # cd "${BUILD_PATH}/sonic-swss-common"
-    # "${SRC_PATH}/sonic-swss-common/configure" --prefix=$(realpath ${BUILD_PATH}/install )
     make "-j$(nproc)"
 
     if [ "$?" -ne "0" ]; then
