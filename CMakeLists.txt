@@ -151,11 +151,11 @@ configure_file (
 
 file(GLOB TESTS
     main.cpp
-    tests/fake_main.cpp
-    tests/aclorch_ut.cpp
+    ${SWSS_PATH}/tests/fake_main.cpp
+    ${SWSS_PATH}/tests/aclorch_ut.cpp
     tests/copporch_ut.cpp
     tests/qosorch_ut.cpp
-    tests/saispy_ut.cpp
+    ${SWSS_PATH}/tests/saispy_ut.cpp
 )
 
 file(GLOB SRCS

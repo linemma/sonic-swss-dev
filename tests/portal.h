@@ -1,10 +1,16 @@
 #pragma once
 
-#include "mock_aclorch.h"
-#include "mock_crmorch.h"
-
-#include "copporch.h"
 #include "orch.h"
+
+#define private public
+#define protected public
+
+#include "aclorch.h"
+#include "crmorch.h"
+#include "copporch.h"
+
+#undef protected
+#undef private
 
 struct Portal {
     struct AclRuleInternal {
