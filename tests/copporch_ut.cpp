@@ -720,7 +720,7 @@ TEST_F(CoppOrchTest, COPP_Create_EAPOL_Rule)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppOrchTest, COPP_Create_All_Rule)
+TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
 {
     auto orch = createCoppOrch();
 
