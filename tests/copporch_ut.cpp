@@ -298,7 +298,7 @@ struct CoppTest : public CoppTestBase {
         }
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple> rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -310,7 +310,8 @@ struct CoppTest : public CoppTestBase {
                 fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", m_trap_type_map.at(fvValue(it)) });
             }
         }
-        // fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" });
+        auto table_id = sai_serialize_object_id(group_id);
+        fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", table_id });
 
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
     }
@@ -630,10 +631,9 @@ struct CoppOrchTest : public CoppTest {
         for (auto trap_type : trap_type_list) {
             vector<FieldValueTuple> temp_rule_values;
             temp_rule_values.assign(rule_values.begin(), rule_values.end());
-            ;
             replaceTrapType(temp_rule_values, trap_type);
 
-            auto exp_trap_attr_list = getTrapAttributeList(temp_rule_values);
+            auto exp_trap_attr_list = getTrapAttributeList(grp_itr->second, temp_rule_values);
             auto trap_itr = trap_map.find(m_trap_id_map.at(trap_type));
 
             if (trap_itr == trap_map.end()) {
