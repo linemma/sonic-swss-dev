@@ -148,10 +148,10 @@ struct CoppOrchHandler {
     CoppOrch* m_coppOrch;
     swss::DBConnector* app_db;
 
-    CoppOrchHandler(CoppOrch* coppOrch, swss::DBConnector* app_db)
-        : m_coppOrch(coppOrch)
-        , app_db(app_db)
+    CoppOrchHandler(swss::DBConnector* app_db)
+        : app_db(app_db)
     {
+        m_coppOrch = new CoppOrch(app_db, APP_COPP_TABLE_NAME);
     }
 
     operator const CoppOrch*() const
@@ -263,8 +263,7 @@ struct CoppTest : public CoppTestBase {
 
     std::shared_ptr<CoppOrchHandler> createCoppOrch()
     {
-        auto copp = new CoppOrch(m_app_db.get(), APP_COPP_TABLE_NAME);
-        return std::make_shared<CoppOrchHandler>(copp, m_app_db.get());
+        return std::make_shared<CoppOrchHandler>(m_app_db.get());
     }
 
     vector<string> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
