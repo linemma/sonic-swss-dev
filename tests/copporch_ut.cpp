@@ -290,7 +290,8 @@ struct CoppTest : public CoppTestBase {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP_GROUP, fields, false));
     }
 
-    void replaceTrapType(vector<FieldValueTuple>& rule_values, string trap_type){
+    void replaceTrapType(vector<FieldValueTuple>& rule_values, string trap_type)
+    {
         for (auto& it : rule_values) {
             if (kfvKey(it) == copp_trap_id_list) {
                 it.second = trap_type;
@@ -310,7 +311,7 @@ struct CoppTest : public CoppTestBase {
                 fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_TYPE", m_trap_type_map.at(fvValue(it)) });
             }
         }
-        fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" });
+        // fields.push_back({ "SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP", "oid:0x3" });
 
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
     }
@@ -418,7 +419,7 @@ struct CoppOrchTest : public CoppTest {
         sai_policer_api = const_cast<sai_policer_api_t*>(&vs_policer_api);
         sai_port_api = const_cast<sai_port_api_t*>(&vs_port_api);
         sai_vlan_api = const_cast<sai_vlan_api_t*>(&vs_vlan_api);
-        sai_bridge_api = const_cast<sai_bridge_api_t*>(&vs_bridge_api);        
+        sai_bridge_api = const_cast<sai_bridge_api_t*>(&vs_bridge_api);
         sai_switch_api = const_cast<sai_switch_api_t*>(&vs_switch_api);
 #endif
 
@@ -601,7 +602,7 @@ struct CoppOrchTest : public CoppTest {
 
     bool Validate(CoppOrchHandler* orch, const std::string& groupName, const vector<FieldValueTuple>& rule_values)
     {
-        auto exp_group_attr_list = getTrapGroupAttributeList(rule_values);        
+        auto exp_group_attr_list = getTrapGroupAttributeList(rule_values);
         auto exp_police_attr_list = getPoliceAttributeList(rule_values);
 
         //valid trap group
@@ -618,18 +619,19 @@ struct CoppOrchTest : public CoppTest {
         //valid policer
         auto group_policer_map = orch->getTrapGroupPolicerMap();
         auto policer_itr = group_policer_map.find(grp_itr->second);
-        if(policer_itr != group_policer_map.end()) {
+        if (policer_itr != group_policer_map.end()) {
             if (!ValidatePolicer(policer_itr->second, *exp_police_attr_list.get())) {
                 return false;
             }
         }
-        
+
         //valid trap
         auto trap_type_list = getTrapTypeList(rule_values);
         auto trap_map = orch->getTrapIdTrapGroupMap();
         for (auto trap_type : trap_type_list) {
             vector<FieldValueTuple> temp_rule_values;
-            temp_rule_values.assign(rule_values.begin(), rule_values.end());;
+            temp_rule_values.assign(rule_values.begin(), rule_values.end());
+            ;
             replaceTrapType(temp_rule_values, trap_type);
 
             auto exp_trap_attr_list = getTrapAttributeList(temp_rule_values);
@@ -642,7 +644,7 @@ struct CoppOrchTest : public CoppTest {
             if (!ValidateTrap(trap_itr->second, *exp_trap_attr_list.get())) {
                 return false;
             }
-        } 
+        }
 
         return true;
     }

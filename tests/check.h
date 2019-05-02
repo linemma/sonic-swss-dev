@@ -53,11 +53,6 @@ struct Check {
         for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
             sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
 
-            // ignore oid check
-            if (objecttype == SAI_OBJECT_TYPE_HOSTIF_TRAP && id == SAI_HOSTIF_TRAP_ATTR_TRAP_GROUP) {
-                continue;
-            }
-
             auto meta = sai_metadata_get_attr_metadata(objecttype, id);
 
             assert(meta != nullptr);
