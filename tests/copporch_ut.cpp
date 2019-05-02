@@ -652,12 +652,12 @@ struct CoppOrchTest : public CoppTest {
 std::map<std::string, std::string> CoppOrchTest::gProfileMap;
 std::map<std::string, std::string>::iterator CoppOrchTest::gProfileIter = CoppOrchTest::gProfileMap.begin();
 
-TEST_F(CoppOrchTest, create_copp_stp_rule_via_libvs)
+TEST_F(CoppOrchTest, COPP_Create_STP_Rule)
 {
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "stp" }, { "trap_action", "copy" }, { "queue", "1" }, { "trap_priority", "5" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
@@ -672,12 +672,12 @@ TEST_F(CoppOrchTest, create_copp_stp_rule_via_libvs)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppOrchTest, create_copp_lacp_rule_via_libvs)
+TEST_F(CoppOrchTest, COPP_Create_LACP_Rule)
 {
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "lacp" }, { "trap_action", "deny" }, { "queue", "7" }, { "trap_priority", "4" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
@@ -696,12 +696,12 @@ TEST_F(CoppOrchTest, create_copp_lacp_rule_via_libvs)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppOrchTest, create_copp_eapol_rule_via_libvs)
+TEST_F(CoppOrchTest, COPP_Create_EAPOL_Rule)
 {
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
+    vector<FieldValueTuple> rule_values = { { "trap_ids", "eapol" }, { "trap_action", "forward" }, { "queue", "8" }, { "trap_priority", "9" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
@@ -720,7 +720,7 @@ TEST_F(CoppOrchTest, create_copp_eapol_rule_via_libvs)
     // ASSERT_TRUE(grpIt == trapGroupTables.end());
 }
 
-TEST_F(CoppOrchTest, create_all_copp_rule_via_libvs)
+TEST_F(CoppOrchTest, COPP_Create_All_Rule)
 {
     auto orch = createCoppOrch();
 
