@@ -926,63 +926,102 @@ struct AclOrchTest : public AclTest {
 
     bool validateAclRuleMatch(const AclRule& acl_rule, const std::string& attr_name, const std::string& attr_value)
     {
+        static const acl_rule_attr_lookup_t aclMatchLookup = {
+            { MATCH_IN_PORTS, SAI_ACL_ENTRY_ATTR_FIELD_IN_PORTS },
+            { MATCH_OUT_PORTS, SAI_ACL_ENTRY_ATTR_FIELD_OUT_PORTS },
+            { MATCH_SRC_IP, SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP },
+            { MATCH_DST_IP, SAI_ACL_ENTRY_ATTR_FIELD_DST_IP },
+            { MATCH_SRC_IPV6, SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6 },
+            { MATCH_DST_IPV6, SAI_ACL_ENTRY_ATTR_FIELD_DST_IPV6 },
+            { MATCH_L4_SRC_PORT, SAI_ACL_ENTRY_ATTR_FIELD_L4_SRC_PORT },
+            { MATCH_L4_DST_PORT, SAI_ACL_ENTRY_ATTR_FIELD_L4_DST_PORT },
+            { MATCH_ETHER_TYPE, SAI_ACL_ENTRY_ATTR_FIELD_ETHER_TYPE },
+            { MATCH_IP_PROTOCOL, SAI_ACL_ENTRY_ATTR_FIELD_IP_PROTOCOL },
+            { MATCH_TCP_FLAGS, SAI_ACL_ENTRY_ATTR_FIELD_TCP_FLAGS },
+            { MATCH_IP_TYPE, SAI_ACL_ENTRY_ATTR_FIELD_ACL_IP_TYPE },
+            { MATCH_DSCP, SAI_ACL_ENTRY_ATTR_FIELD_DSCP },
+            { MATCH_TC, SAI_ACL_ENTRY_ATTR_FIELD_TC },
+            { MATCH_L4_SRC_PORT_RANGE, (sai_acl_entry_attr_t)SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE },
+            { MATCH_L4_DST_PORT_RANGE, (sai_acl_entry_attr_t)SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE },
+            { MATCH_TUNNEL_VNI, SAI_ACL_ENTRY_ATTR_FIELD_TUNNEL_VNI },
+            { MATCH_INNER_ETHER_TYPE, SAI_ACL_ENTRY_ATTR_FIELD_INNER_ETHER_TYPE },
+            { MATCH_INNER_IP_PROTOCOL, SAI_ACL_ENTRY_ATTR_FIELD_INNER_IP_PROTOCOL },
+            { MATCH_INNER_L4_SRC_PORT, SAI_ACL_ENTRY_ATTR_FIELD_INNER_L4_SRC_PORT },
+            { MATCH_INNER_L4_DST_PORT, SAI_ACL_ENTRY_ATTR_FIELD_INNER_L4_DST_PORT }
+        };
+        auto itAclMatchLookup = aclMatchLookup.find(attr_name);
+        if (itAclMatchLookup == aclMatchLookup.end()) {
+            return false;
+        }
+
         const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
+        auto it_field = rule_matches.find(itAclMatchLookup->second);
+        if (it_field == rule_matches.end()) {
+            return false;
+        }
 
         if (attr_name == MATCH_SRC_IP || attr_name == MATCH_DST_IP) {
-            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP
-                                                                        : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP);
-            if (it_field == rule_matches.end()) {
+            IpPrefix ip(attr_value);
+            if (!ip.isV4()) {
                 return false;
             }
 
-            char addr[20];
-            sai_serialize_ip4(addr, it_field->second.aclfield.data.ip4);
-            if (attr_value != addr) {
+            if (it_field->second.aclfield.data.ip4 != ip.getIp().getV4Addr()
+                || it_field->second.aclfield.mask.ip4 != ip.getMask().getV4Addr()) {
                 return false;
             }
 
-            char mask[20];
-            sai_serialize_ip4(mask, it_field->second.aclfield.mask.ip4);
-            if (std::string(mask) != "255.255.255.255") {
-                return false;
-            }
         } else if (attr_name == MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6) {
-            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IPV6 ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6
-                                                                          : SAI_ACL_ENTRY_ATTR_FIELD_DST_IPV6);
-            if (it_field == rule_matches.end()) {
+            IpPrefix ip(attr_value);
+            if (ip.isV4()) {
                 return false;
             }
 
-            char addr[46];
-            sai_serialize_ip6(addr, it_field->second.aclfield.data.ip6);
-            if (attr_value != addr) {
-                return false;
-            }
-
-            char mask[46];
-            sai_serialize_ip6(mask, it_field->second.aclfield.mask.ip6);
-            if (std::string(mask) != "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff") {
+            if (0 != memcmp(it_field->second.aclfield.data.ip6, ip.getIp().getV6Addr(), 16)
+                || 0 != memcmp(it_field->second.aclfield.mask.ip6, ip.getMask().getV6Addr(), 16)) {
                 return false;
             }
         } else if (attr_name == MATCH_ETHER_TYPE || attr_name == MATCH_L4_SRC_PORT || attr_name == MATCH_L4_DST_PORT) {
-            sai_acl_entry_attr_t attr_field = (attr_name == MATCH_ETHER_TYPE)
-                ? SAI_ACL_ENTRY_ATTR_FIELD_ETHER_TYPE
-                : (attr_name == MATCH_ETHER_TYPE)
-                    ? SAI_ACL_ENTRY_ATTR_FIELD_L4_SRC_PORT
-                    : (attr_name == MATCH_ETHER_TYPE)
-                        ? SAI_ACL_ENTRY_ATTR_FIELD_L4_DST_PORT
-                        : SAI_ACL_ENTRY_ATTR_END;
-
-            auto it_field = rule_matches.find(attr_field);
-            if (it_field == rule_matches.end()) {
+            if (swss::to_uint<uint16_t>(attr_value) != it_field->second.aclfield.data.u16
+                || 0xffff != it_field->second.aclfield.mask.u16) {
+                return false;
+            }
+        } else if (attr_name == MATCH_IP_PROTOCOL) {
+            if (swss::to_uint<uint8_t>(attr_value) != it_field->second.aclfield.data.u8
+                || 0xff != it_field->second.aclfield.mask.u8) {
+                return false;
+            }
+        } else if (attr_name == MATCH_IP_TYPE) {
+            static const acl_ip_type_lookup_t aclIpTypeLookup = {
+                { IP_TYPE_ANY, SAI_ACL_IP_TYPE_ANY },
+                { IP_TYPE_IP, SAI_ACL_IP_TYPE_IP },
+                { IP_TYPE_NON_IP, SAI_ACL_IP_TYPE_NON_IP },
+                { IP_TYPE_IPv4ANY, SAI_ACL_IP_TYPE_IPV4ANY },
+                { IP_TYPE_NON_IPv4, SAI_ACL_IP_TYPE_NON_IPV4 },
+                { IP_TYPE_IPv6ANY, SAI_ACL_IP_TYPE_IPV6ANY },
+                { IP_TYPE_NON_IPv6, SAI_ACL_IP_TYPE_NON_IPV6 },
+                { IP_TYPE_ARP, SAI_ACL_IP_TYPE_ARP },
+                { IP_TYPE_ARP_REQUEST, SAI_ACL_IP_TYPE_ARP_REQUEST },
+                { IP_TYPE_ARP_REPLY, SAI_ACL_IP_TYPE_ARP_REPLY }
+            };
+            auto itAclIpTypeLookup = aclIpTypeLookup.find(swss::to_upper(attr_value));
+            if (itAclIpTypeLookup == aclIpTypeLookup.end()) {
                 return false;
             }
 
-            if (swss::to_uint<uint16_t>(attr_value) != it_field->second.aclfield.data.u16) {
+            if (it_field->second.aclfield.data.u32 != itAclIpTypeLookup->second
+                || 0xFFFFFFFF != it_field->second.aclfield.mask.u32) {
+                return false;
+            }
+        } else if (attr_name == MATCH_TCP_FLAGS) {
+            // tcp_flags = h8/h8
+            size_t delimiter_pos = attr_value.find("/");
+            if (delimiter_pos == string::npos) {
                 return false;
             }
 
-            if (0xffff != it_field->second.aclfield.mask.u16) {
+            if (swss::to_uint<uint8_t>(attr_value.substr(0, delimiter_pos)) != it_field->second.aclfield.data.u8
+                || swss::to_uint<uint8_t>(attr_value.substr(delimiter_pos + 1)) != it_field->second.aclfield.mask.u8) {
                 return false;
             }
         } else {
@@ -1000,7 +1039,16 @@ struct AclOrchTest : public AclTest {
             auto attr_value = fv.second;
 
             static std::vector<std::string> match_attr_field = {
-                MATCH_SRC_IP, MATCH_DST_IP, MATCH_SRC_IPV6, MATCH_DST_IPV6, MATCH_ETHER_TYPE
+                MATCH_SRC_IP,
+                MATCH_DST_IP,
+                MATCH_SRC_IPV6,
+                MATCH_DST_IPV6,
+                MATCH_ETHER_TYPE,
+                MATCH_IP_PROTOCOL,
+                MATCH_IP_TYPE,
+                MATCH_L4_SRC_PORT,
+                MATCH_L4_DST_PORT,
+                MATCH_TCP_FLAGS
             };
 
             if (attr_name == ACTION_PACKET_ACTION) {
@@ -1185,9 +1233,14 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
                 // TODO: required field (add new test cases for that ....)
                 //
 
-                { MATCH_SRC_IP, "1.2.3.4" },
-                { MATCH_DST_IP, "4.3.2.1" },
-                { MATCH_ETHER_TYPE, "0x0800" } } } });
+                { MATCH_ETHER_TYPE, "0x0800" },
+                { MATCH_SRC_IP, "1.2.3.4/32" },
+                { MATCH_DST_IP, "4.3.2.1/32" },
+                { MATCH_IP_TYPE, "ipv4any" },
+                { MATCH_IP_PROTOCOL, "0x11" },
+                { MATCH_L4_SRC_PORT, "0" },
+                { MATCH_L4_DST_PORT, "65535" },
+                { MATCH_TCP_FLAGS, "0x7/0x3f" } } } });
 
         // TODO: RULE_PRIORITY (important field)
         // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
