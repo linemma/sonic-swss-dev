@@ -528,7 +528,7 @@ struct MockQosOrch {
         return m_qosOrch->m_qos_maps;
     }
 
-    void doQosMapTask(const std::deque<KeyOpFieldsValuesTuple>& entries, std::string tableName)
+    void doQosMapTask(const std::deque<KeyOpFieldsValuesTuple>& entries, const std::string& tableName)
     {
         auto consumer = std::unique_ptr<Consumer>(new Consumer(
             new swss::ConsumerStateTable(config_db, tableName, 1, 1), m_qosOrch, tableName));
@@ -687,7 +687,7 @@ struct QosOrchTest : public TestBase {
         return std::make_shared<MockQosOrch>(qos_orch, m_config_db.get());
     }
 
-    std::shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, std::string qos_table_name, const vector<FieldValueTuple>& values)
+    std::shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, const std::string& qos_table_name, const vector<FieldValueTuple>& values)
     {
         std::vector<swss::FieldValueTuple> fields;
 
@@ -702,7 +702,7 @@ struct QosOrchTest : public TestBase {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
     }
 
-    std::string convertValuesToQosMapListStr(std::string qos_table_name, const vector<FieldValueTuple> values)
+    std::string convertValuesToQosMapListStr(const std::string& qos_table_name, const vector<FieldValueTuple>& values)
     {
         const sai_attr_metadata_t* meta;
         sai_attribute_t attr;
@@ -728,7 +728,7 @@ struct QosOrchTest : public TestBase {
         return sai_serialize_attr_value(*meta, attr);
     }
 
-    bool Validate(MockQosOrch* orch, const std::string table_name, const vector<FieldValueTuple>& values)
+    bool Validate(MockQosOrch* orch, const std::string& table_name, const vector<FieldValueTuple>& values)
     {
         const sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
 
