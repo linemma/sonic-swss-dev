@@ -1,3 +1,4 @@
+#include "converter.h"
 #include "ut_helper.h"
 
 extern sai_object_id_t gSwitchId;
@@ -627,71 +628,25 @@ struct AclOrchTest : public AclTest {
         fields.push_back({ "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" });
         fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id });
 
-        // const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
-        // auto actionIt = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION);
-        // assert(actionIt != rule_actions.end());
-        // assert(actionIt->second.aclaction.enable == true);
-        // fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION",
-        //     std::to_string(actionIt->second.aclaction.parameter.s32) });
+        const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
+        auto actionIt = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION);
+        assert(actionIt != rule_actions.end());
+        assert(actionIt->second.aclaction.enable == true);
+        fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION",
+            std::to_string(actionIt->second.aclaction.parameter.s32) });
 
-        //FIXME: fill matchs field by auto
-        // const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
-        // for (auto matchIt = rule_matches.begin(); matchIt != rule_matches.end(); ++matchIt) {
-        //     // matchIt = map<sai_acl_entry_attr_t (enum), sai_attribute_value_t (union)>
-        //     auto meta = sai_metadata_get_attr_metadata(objecttype, matchIt->first);
+        // SAI_ACL_ENTRY_ATTR_FIELD_*
+        const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
+        for (auto matchIt = rule_matches.begin(); matchIt != rule_matches.end(); ++matchIt) {
+            // matchIt = map<sai_acl_entry_attr_t (enum), sai_attribute_value_t (union)>
+            auto meta = sai_metadata_get_attr_metadata(objecttype, matchIt->first);
+            assert(meta != nullptr);
 
-        //     assert(meta != nullptr);
+            sai_attribute_t saiAttribute = { matchIt->first, matchIt->second };
+            saiAttribute.value.aclfield.enable = true; // TODO: check why m_matches didn't set this ?
+            auto attrValString = sai_serialize_attr_value(*meta, saiAttribute, false);
 
-        //     switch (meta->attrvaluetype) {
-        //     case SAI_ATTR_VALUE_TYPE_ACL_FIELD_DATA_IPV4:
-        //         sai_serialize_attr_value(*meta, ) break;
-        //     }
-        // }
-
-        switch (acl_table.type) {
-        case ACL_TABLE_L3:
-            //     auto table_id = sai_serialize_object_id(acl_table_oid);
-            //     auto counter_id = sai_serialize_object_id(acl_rule->getCounterOid());
-            //
-            //     sai_object_type_t objecttype = SAI_OBJECT_TYPE_ACL_ENTRY; // <----------
-            //     auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
-            //         {
-            //             { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
-            //             { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-            //             { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-            //             { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
-            //
-            //             // cfg fields
-            //             { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" },
-            //             { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
-            //             //                                            SAI_PACKET_ACTION_FORWARD
-            //
-            //         });
-            //     SaiAttributeList exp_attrlist(objecttype, exp_fields, false);
-
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP", "1.2.3.4&mask:255.255.255.255" });
-            break;
-
-        case ACL_TABLE_L3V6:
-            // auto exp_fields = std::vector<swss::FieldValueTuple>( // <----------
-            // {
-            //     { "SAI_ACL_ENTRY_ATTR_TABLE_ID", table_id },
-            //     { "SAI_ACL_ENTRY_ATTR_PRIORITY", "0" },
-            //     { "SAI_ACL_ENTRY_ATTR_ADMIN_STATE", "true" },
-            //     { "SAI_ACL_ENTRY_ATTR_ACTION_COUNTER", counter_id },
-            //
-            //     // cfg fields
-            //     { "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" },
-            //     { "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION", "1" }
-            //     //                                            SAI_PACKET_ACTION_FORWARD
-            //
-            // });
-
-            fields.push_back({ "SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6", "::1.2.3.4&mask:ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" });
-            break;
-
-        default:
-            assert(false);
+            fields.push_back({ meta->attridname, attrValString });
         }
 
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
@@ -974,7 +929,8 @@ struct AclOrchTest : public AclTest {
         const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
 
         if (attr_name == MATCH_SRC_IP || attr_name == MATCH_DST_IP) {
-            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP);
+            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IP ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP
+                                                                        : SAI_ACL_ENTRY_ATTR_FIELD_DST_IP);
             if (it_field == rule_matches.end()) {
                 return false;
             }
@@ -990,8 +946,9 @@ struct AclOrchTest : public AclTest {
             if (std::string(mask) != "255.255.255.255") {
                 return false;
             }
-        } else if (attr_name == MATCH_SRC_IPV6) {
-            auto it_field = rule_matches.find(SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6);
+        } else if (attr_name == MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6) {
+            auto it_field = rule_matches.find(attr_name == MATCH_SRC_IPV6 ? SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6
+                                                                          : SAI_ACL_ENTRY_ATTR_FIELD_DST_IPV6);
             if (it_field == rule_matches.end()) {
                 return false;
             }
@@ -1007,7 +964,27 @@ struct AclOrchTest : public AclTest {
             if (std::string(mask) != "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff") {
                 return false;
             }
+        } else if (attr_name == MATCH_ETHER_TYPE || attr_name == MATCH_L4_SRC_PORT || attr_name == MATCH_L4_DST_PORT) {
+            sai_acl_entry_attr_t attr_field = (attr_name == MATCH_ETHER_TYPE)
+                ? SAI_ACL_ENTRY_ATTR_FIELD_ETHER_TYPE
+                : (attr_name == MATCH_ETHER_TYPE)
+                    ? SAI_ACL_ENTRY_ATTR_FIELD_L4_SRC_PORT
+                    : (attr_name == MATCH_ETHER_TYPE)
+                        ? SAI_ACL_ENTRY_ATTR_FIELD_L4_DST_PORT
+                        : SAI_ACL_ENTRY_ATTR_END;
 
+            auto it_field = rule_matches.find(attr_field);
+            if (it_field == rule_matches.end()) {
+                return false;
+            }
+
+            if (swss::to_uint<uint16_t>(attr_value) != it_field->second.aclfield.data.u16) {
+                return false;
+            }
+
+            if (0xffff != it_field->second.aclfield.mask.u16) {
+                return false;
+            }
         } else {
             // unknow attr_name
             return false;
@@ -1022,16 +999,20 @@ struct AclOrchTest : public AclTest {
             auto attr_name = fv.first;
             auto attr_value = fv.second;
 
+            static std::vector<std::string> match_attr_field = {
+                MATCH_SRC_IP, MATCH_DST_IP, MATCH_SRC_IPV6, MATCH_DST_IPV6, MATCH_ETHER_TYPE
+            };
+
             if (attr_name == ACTION_PACKET_ACTION) {
                 if (!validateAclRuleAction(acl_rule, attr_name, attr_value)) {
                     return false;
                 }
-            } else if (attr_name == MATCH_SRC_IP || attr_name == MATCH_DST_IP || attr_name == MATCH_SRC_IPV6) {
+            } else if (match_attr_field.end() != std::find(match_attr_field.begin(), match_attr_field.end(), attr_name)) {
                 if (!validateAclRuleMatch(acl_rule, attr_name, attr_value)) {
                     return false;
                 }
             } else {
-                // unknow attr_name
+                ADD_FAILURE() << "Unknow attr_name: " << attr_name;
                 return false;
             }
         }
@@ -1205,7 +1186,8 @@ TEST_F(AclOrchTest, L3Acl_Matches_Actions)
                 //
 
                 { MATCH_SRC_IP, "1.2.3.4" },
-                { MATCH_DST_IP, "4.3.2.1" } } } });
+                { MATCH_DST_IP, "4.3.2.1" },
+                { MATCH_ETHER_TYPE, "0x0800" } } } });
 
         // TODO: RULE_PRIORITY (important field)
         // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
@@ -1294,7 +1276,7 @@ TEST_F(AclOrchTest, L3V6Acl_Matches_Actions)
                 //
 
                 { MATCH_SRC_IPV6, "::1.2.3.4" },
-                /*{ MATCH_DST_IP, "4.3.2.1" }*/ } } });
+                { MATCH_DST_IPV6, "::4.3.2.1" } } } });
 
         // TODO: RULE_PRIORITY (important field)
         // TODO: MATCH_DSCP / MATCH_SRC_IPV6 || attr_name == MATCH_DST_IPV6
