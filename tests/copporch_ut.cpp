@@ -126,23 +126,47 @@ map<string, string> m_packet_action_map = {
     { "transit", "SAI_PACKET_ACTION_TRANSIT" }
 };
 
-class ConsumerExtend_Dont_Use : public Consumer {
-public:
-    ConsumerExtend_Dont_Use(ConsumerTableBase* select, Orch* orch, const string& name)
-        : Consumer(select, orch, name)
-    {
+static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+{
+    /* Nothing popped */
+    if (entries.empty()) {
+        return 0;
     }
 
-    size_t addToSync(std::deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        Consumer::addToSync(entries);
-    }
+    for (auto& entry : entries) {
+        string key = kfvKey(entry);
+        string op = kfvOp(entry);
 
-    void clear()
-    {
-        Consumer::m_toSync.clear();
+        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+            consumer->m_toSync[key] = entry;
+        }
+        /* If an old task is still there, we combine the old task with new task */
+        else {
+            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+            auto new_values = kfvFieldsValues(entry);
+            auto existing_values = kfvFieldsValues(existing_data);
+
+            for (auto it : new_values) {
+                string field = fvField(it);
+                string value = fvValue(it);
+
+                auto iu = existing_values.begin();
+                while (iu != existing_values.end()) {
+                    string ofield = fvField(*iu);
+                    if (field == ofield)
+                        iu = existing_values.erase(iu);
+                    else
+                        iu++;
+                }
+                existing_values.push_back(FieldValueTuple(field, value));
+            }
+            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+        }
     }
-};
+    return entries.size();
+}
 
 struct CoppOrchHandler {
     CoppOrch* m_coppOrch;
@@ -157,48 +181,6 @@ struct CoppOrchHandler {
     operator const CoppOrch*() const
     {
         return m_coppOrch;
-    }
-
-    static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        /* Nothing popped */
-        if (entries.empty()) {
-            return 0;
-        }
-
-        for (auto& entry : entries) {
-            string key = kfvKey(entry);
-            string op = kfvOp(entry);
-
-            /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-            if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-                consumer->m_toSync[key] = entry;
-            }
-            /* If an old task is still there, we combine the old task with new task */
-            else {
-                KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
-
-                auto new_values = kfvFieldsValues(entry);
-                auto existing_values = kfvFieldsValues(existing_data);
-
-                for (auto it : new_values) {
-                    string field = fvField(it);
-                    string value = fvValue(it);
-
-                    auto iu = existing_values.begin();
-                    while (iu != existing_values.end()) {
-                        string ofield = fvField(*iu);
-                        if (field == ofield)
-                            iu = existing_values.erase(iu);
-                        else
-                            iu++;
-                    }
-                    existing_values.push_back(FieldValueTuple(field, value));
-                }
-                consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
-            }
-        }
-        return entries.size();
     }
 
     void doCoppTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
@@ -256,10 +238,10 @@ struct CoppTest : public CoppTestBase {
         return std::make_shared<CoppOrchHandler>(m_app_db.get());
     }
 
-    vector<string> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
+    vector<string> getTrapTypeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<string> types;
-        for (auto it : ruleAttr) {
+        for (auto it : rule_values) {
             if (kfvKey(it) == copp_trap_id_list) {
                 types = tokenize(fvValue(it), list_item_delimiter);
             }
@@ -268,7 +250,7 @@ struct CoppTest : public CoppTestBase {
         return types;
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -288,7 +270,7 @@ struct CoppTest : public CoppTestBase {
         }
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -306,7 +288,7 @@ struct CoppTest : public CoppTestBase {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
     }
 
-    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -338,13 +320,6 @@ struct CoppTest : public CoppTestBase {
 };
 
 struct CoppOrchTest : public CoppTest {
-
-    CoppOrchTest()
-    {
-    }
-    ~CoppOrchTest()
-    {
-    }
 
     static const char* profile_get_value(
         sai_switch_profile_id_t profile_id,
@@ -456,16 +431,12 @@ struct CoppOrchTest : public CoppTest {
         gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
         auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
-        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
 
-        auto setData = std::deque<KeyOpFieldsValuesTuple>(
-            { { "PortInitDone",
-                EMPTY_PREFIX,
-                { { "", "" } } } });
-        consumerExt->addToSync(setData);
+        auto consumer = std::unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1), gPortsOrch, APP_PORT_TABLE_NAME));
 
-        Consumer* consumer = consumerExt.get();
-        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
+        consumerAddToSync(consumer.get(), { { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
+        static_cast<Orch*>(gPortsOrch)->doTask(*consumer.get());
     }
 
     void TearDown() override
@@ -588,7 +559,7 @@ struct CoppOrchTest : public CoppTest {
         auto exp_police_attr_list = getPoliceAttributeList(rule_values);
 
         //valid trap group
-        auto trap_group_map = orch->getTrapGroupMap();
+        const auto& trap_group_map = orch->getTrapGroupMap();
         auto grp_itr = trap_group_map.find(groupName);
         if (grp_itr == trap_group_map.end()) {
             return false;
@@ -599,7 +570,7 @@ struct CoppOrchTest : public CoppTest {
         }
 
         //valid policer
-        auto group_policer_map = orch->getTrapGroupPolicerMap();
+        const auto& group_policer_map = orch->getTrapGroupPolicerMap();
         auto policer_itr = group_policer_map.find(grp_itr->second);
         if (policer_itr != group_policer_map.end()) {
             if (!ValidatePolicer(policer_itr->second, *exp_police_attr_list.get())) {
