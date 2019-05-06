@@ -51,6 +51,37 @@
                 "/mnt/e": "e:\\",
                 "/mnt/f": "f:\\"
             }
+        },
+        {
+            "name": "(gdb) Docker Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "~/20190502-v2/sonic-swss-dev.build/tests.out",
+            "args": [],
+            "cwd": "~/",
+            "environment": [],
+            "externalConsole": true,
+            "sourceFileMap": {
+                "/home/fred/20190502-v2" : "D:\\Project\\Docker\\SONiC_Dev", // remote source 
+                "/usr" : "D:\\Project\\Docker\\RemoteSource\\usr" // c++ lib in system
+            },
+            "pipeTransport": {
+                "debuggerPath": "source ./20190502-v2/sonic-swss-dev.build/packages/.env; ./20190502-v2/sonic-swss-dev.build/redis/start_redis.sh; /usr/bin/gdb",
+                "pipeProgram": "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
+                "pipeArgs": [
+                    "-p 10022",
+                    "fred@localhost"
+                ],
+                "pipeCwd": "",
+            },
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         }
     ]
 }
