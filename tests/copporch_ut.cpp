@@ -350,19 +350,12 @@ struct CoppOrchTest : public CoppTest {
         sai_switch_profile_id_t profile_id,
         const char* variable)
     {
-        if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-            return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-        } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-            return "20:03:04:05:06:00";
-        } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-            return "1000";
-        } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-            return "2000";
-        } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-            return "SAI_VS_SWITCH_TYPE_BCM56850";
+        std::map<std::string, std::string>::const_iterator it = gProfileMap.find(variable);
+        if (it == gProfileMap.end()) {
+            return NULL;
         }
 
-        return NULL;
+        return it->second.c_str();
     }
 
     static int profile_get_next_value(
