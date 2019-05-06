@@ -137,11 +137,6 @@ public:
     {
         Consumer::addToSync(entries);
     }
-
-    void clear()
-    {
-        Consumer::m_toSync.clear();
-    }
 };
 
 struct CoppOrchHandler {
@@ -256,10 +251,10 @@ struct CoppTest : public CoppTestBase {
         return std::make_shared<CoppOrchHandler>(m_app_db.get());
     }
 
-    vector<string> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
+    vector<string> getTrapTypeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<string> types;
-        for (auto it : ruleAttr) {
+        for (auto it : rule_values) {
             if (kfvKey(it) == copp_trap_id_list) {
                 types = tokenize(fvValue(it), list_item_delimiter);
             }
@@ -268,7 +263,7 @@ struct CoppTest : public CoppTestBase {
         return types;
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -288,7 +283,7 @@ struct CoppTest : public CoppTestBase {
         }
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -306,7 +301,7 @@ struct CoppTest : public CoppTestBase {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
     }
 
-    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -588,7 +583,7 @@ struct CoppOrchTest : public CoppTest {
         auto exp_police_attr_list = getPoliceAttributeList(rule_values);
 
         //valid trap group
-        auto trap_group_map = orch->getTrapGroupMap();
+        const auto& trap_group_map = orch->getTrapGroupMap();
         auto grp_itr = trap_group_map.find(groupName);
         if (grp_itr == trap_group_map.end()) {
             return false;
@@ -599,7 +594,7 @@ struct CoppOrchTest : public CoppTest {
         }
 
         //valid policer
-        auto group_policer_map = orch->getTrapGroupPolicerMap();
+        const auto& group_policer_map = orch->getTrapGroupPolicerMap();
         auto policer_itr = group_policer_map.find(grp_itr->second);
         if (policer_itr != group_policer_map.end()) {
             if (!ValidatePolicer(policer_itr->second, *exp_police_attr_list.get())) {
