@@ -228,14 +228,6 @@ struct CoppOrchHandler {
 };
 
 struct CoppTestBase : public ::testing::Test {
-    std::vector<int32_t*> m_s32list_pool;
-
-    virtual ~CoppTestBase()
-    {
-        for (auto p : m_s32list_pool) {
-            free(p);
-        }
-    }
 };
 
 struct CoppTest : public CoppTestBase {
@@ -252,13 +244,11 @@ struct CoppTest : public CoppTestBase {
 
     void SetUp() override
     {
-        CoppTestBase::SetUp();
         m_app_db = std::make_shared<swss::DBConnector>(APPL_DB, swss::DBConnector::DEFAULT_UNIXSOCKET, 0);
     }
 
     void TearDown() override
     {
-        CoppTestBase::TearDown();
     }
 
     std::shared_ptr<CoppOrchHandler> createCoppOrch()
@@ -382,7 +372,6 @@ struct CoppOrchTest : public CoppTest {
     {
         if (value == NULL) {
             printf("resetting profile map iterator");
-
             gProfileIter = gProfileMap.begin();
             return 0;
         }
@@ -663,7 +652,7 @@ TEST_F(CoppOrchTest, COPP_Create_STP_Rule)
 
     ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
-    // kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "DEL", rule_values } });
+    // kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "DEL", {} } });
     // orch->doCoppTask(kvf_copp_value);
 
     // const auto& trapGroupTables = orch->getTrapGroupMap();
