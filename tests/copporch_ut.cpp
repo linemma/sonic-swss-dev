@@ -238,7 +238,7 @@ struct CoppTest : public CoppTestBase {
         return std::make_shared<CoppOrchHandler>(m_app_db.get());
     }
 
-    vector<string> getTrapTypeList(const vector<FieldValueTuple> ruleAttr)
+    vector<string> getTrapTypeList(const vector<FieldValueTuple>& ruleAttr)
     {
         std::vector<string> types;
         for (auto it : ruleAttr) {
@@ -250,7 +250,7 @@ struct CoppTest : public CoppTestBase {
         return types;
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapGroupAttributeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -270,7 +270,7 @@ struct CoppTest : public CoppTestBase {
         }
     }
 
-    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getTrapAttributeList(const sai_object_id_t group_id, const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
@@ -288,7 +288,7 @@ struct CoppTest : public CoppTestBase {
         return std::shared_ptr<SaiAttributeList>(new SaiAttributeList(SAI_OBJECT_TYPE_HOSTIF_TRAP, fields, false));
     }
 
-    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple> rule_values)
+    std::shared_ptr<SaiAttributeList> getPoliceAttributeList(const vector<FieldValueTuple>& rule_values)
     {
         std::vector<swss::FieldValueTuple> fields;
         for (auto it : rule_values) {
