@@ -137,7 +137,7 @@ target_include_directories(orchagent PUBLIC
 )
 
 target_link_libraries(orchagent
-    swsscommon sairedis saimetadata
+    swsscommon sairedis saimetadata jansson
 )
 
 #################################################################
