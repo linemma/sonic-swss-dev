@@ -19,6 +19,7 @@ extern sai_port_api_t* sai_port_api;
 extern sai_vlan_api_t* sai_vlan_api;
 extern sai_bridge_api_t* sai_bridge_api;
 extern sai_route_api_t* sai_route_api;
+extern sai_hostif_api_t* sai_hostif_api;
 
 namespace nsAclOrchTest {
 
@@ -422,6 +423,7 @@ struct AclOrchTest : public AclTest {
         sai_vlan_api = const_cast<sai_vlan_api_t*>(&vs_vlan_api);
         sai_bridge_api = const_cast<sai_bridge_api_t*>(&vs_bridge_api);
         sai_route_api = const_cast<sai_route_api_t*>(&vs_route_api);
+        sai_hostif_api = const_cast<sai_hostif_api_t*>(&vs_hostif_api);
 #endif
 
         sai_attribute_t attr;
@@ -494,7 +496,47 @@ struct AclOrchTest : public AclTest {
         auto consumer = std::unique_ptr<Consumer>(new Consumer(
             new swss::ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1), gPortsOrch, APP_PORT_TABLE_NAME));
 
-        consumerAddToSync(consumer.get(), { { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
+        /* Get port number */
+        auto port_count = attr.value.u32;
+        attr.id = SAI_SWITCH_ATTR_PORT_NUMBER;
+        status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        port_count = attr.value.u32;
+
+        /* Get port list */
+        vector<sai_object_id_t> port_list;
+        port_list.resize(port_count);
+        attr.id = SAI_SWITCH_ATTR_PORT_LIST;
+        attr.value.objlist.count = (uint32_t)port_list.size();
+        attr.value.objlist.list = port_list.data();
+        status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
+        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+        deque<KeyOpFieldsValuesTuple> port_init_tuple;
+        for (auto i = 0; i < port_count; i++) {
+            string lan_map_str = "";
+            sai_uint32_t lanes[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+            attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
+            attr.value.u32list.count = 8;
+            attr.value.u32list.list = lanes;
+
+            status = sai_port_api->get_port_attribute(port_list[i], 1, &attr);
+            ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+
+            for (auto j = 0; j < attr.value.u32list.count; j++) {
+                if (j != 0) {
+                    lan_map_str += ",";
+                }
+                lan_map_str += to_string(attr.value.u32list.list[j]);
+            }
+
+            port_init_tuple.push_back(
+                { to_string(i), SET_COMMAND, { { "lanes", lan_map_str }, { "admin_status", "up" }, { "speed", "1000" } } });
+        }
+        port_init_tuple.push_back({ "PortConfigDone", SET_COMMAND, { { "count", to_string(port_count) } } });
+        port_init_tuple.push_back({ "PortInitDone", EMPTY_PREFIX, { { "", "" } } });
+        consumerAddToSync(consumer.get(), port_init_tuple);
 
         static_cast<Orch*>(gPortsOrch)->doTask(*consumer.get());
     }
@@ -532,6 +574,7 @@ struct AclOrchTest : public AclTest {
         sai_vlan_api = nullptr;
         sai_bridge_api = nullptr;
         sai_route_api = nullptr;
+        sai_hostif_api = nullptr;
     }
 
     std::shared_ptr<MockAclOrch> createAclOrch()
