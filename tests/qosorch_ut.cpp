@@ -17,7 +17,7 @@ namespace nsQosOrchTest {
 
 using namespace std;
 
-static size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
+size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
 {
     /* Nothing popped */
     if (entries.empty()) {
@@ -60,11 +60,6 @@ static size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValue
 }
 
 struct TestBase : public ::testing::Test {
-
-    void SetUp() override
-    {
-        ASSERT_TRUE(0 == setenv("platform", "x86_64-barefoot_p4-r0", 1));
-    }
 
     bool AttrListEq(sai_object_type_t objecttype, const vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
@@ -554,23 +549,19 @@ struct QosOrchTest : public TestBase {
         }
     }
 
+    static map<string, string> gProfileMap;
+    static map<string, string>::iterator gProfileIter;
+
     static const char* profile_get_value(
         sai_switch_profile_id_t profile_id,
         const char* variable)
     {
-        if (!strcmp(variable, "SAI_KEY_INIT_CONFIG_FILE")) {
-            return "/usr/share/sai_2410.xml"; // FIXME: create a json file, and passing the path into test
-        } else if (!strcmp(variable, "KV_DEVICE_MAC_ADDRESS")) {
-            return "20:03:04:05:06:00";
-        } else if (!strcmp(variable, "SAI_KEY_L3_ROUTE_TABLE_SIZE")) {
-            return "1000";
-        } else if (!strcmp(variable, "SAI_KEY_L3_NEIGHBOR_TABLE_SIZE")) {
-            return "2000";
-        } else if (!strcmp(variable, "SAI_VS_SWITCH_TYPE")) {
-            return "SAI_VS_SWITCH_TYPE_BCM56850";
+        map<string, string>::const_iterator it = gProfileMap.find(variable);
+        if (it == gProfileMap.end()) {
+            return NULL;
         }
 
-        return NULL;
+        return it->second.c_str();
     }
 
     static int profile_get_next_value(
@@ -579,6 +570,7 @@ struct QosOrchTest : public TestBase {
         const char** value)
     {
         if (value == NULL) {
+            gProfileIter = gProfileMap.begin();
             return 0;
         }
 
@@ -586,12 +578,25 @@ struct QosOrchTest : public TestBase {
             return -1;
         }
 
-        return -1;
+        if (gProfileIter == gProfileMap.end()) {
+            return -1;
+        }
+
+        *variable = gProfileIter->first.c_str();
+        *value = gProfileIter->second.c_str();
+
+        gProfileIter++;
+
+        return 0;
     }
 
     void SetUp() override
     {
         TestBase::SetUp();
+
+        ASSERT_TRUE(0 == setenv("platform", "x86_64-barefoot_p4-r0", 1));
+        gProfileMap.emplace("SAI_VS_SWITCH_TYPE", "SAI_VS_SWITCH_TYPE_BCM56850");
+        gProfileMap.emplace("KV_DEVICE_MAC_ADDRESS", "20:03:04:05:06:00");
 
         qos_orch = new QosOrch(m_config_db.get(), qos_tables);
         sai_service_method_table_t test_services = {
@@ -649,6 +654,9 @@ struct QosOrchTest : public TestBase {
         auto status = sai_switch_api->remove_switch(gSwitchId);
         ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
         gSwitchId = 0;
+
+        delete gPortsOrch;
+        gPortsOrch = nullptr;
 
         sai_api_uninitialize();
 
@@ -773,15 +781,41 @@ struct QosOrchTest : public TestBase {
     }
 };
 
+map<string, string> QosOrchTest::gProfileMap;
+map<string, string>::iterator QosOrchTest::gProfileIter = QosOrchTest::gProfileMap.begin();
+
 TEST_F(QosOrchTest, Dscp_To_Tc_Map_Via_VS)
 {
     auto orch = createQosOrch();
 
-    vector<FieldValueTuple> dscp_to_tc_values = { { "1", "0" }, { "2", "0" }, { "3", "3" } };
+    vector<FieldValueTuple> dscp_to_tc_values = { { "0", "0" }, { "1", "0" }, { "2", "0" },
+        { "3", "3" }, { "4", "4" }, { "5", "0" }, { "6", "0" }, { "7", "0" }, { "8", "1" },
+        { "9", "0" }, { "10", "0" }, { "11", "0" }, { "12", "0" }, { "13", "0" }, { "14", "0" },
+        { "15", "0" }, { "16", "0" }, { "17", "0" }, { "18", "0" }, { "19", "0" }, { "20", "0" },
+        { "21", "0" }, { "22", "0" }, { "23", "0" }, { "24", "0" }, { "25", "0" }, { "26", "0" },
+        { "27", "0" }, { "28", "0" }, { "29", "0" }, { "30", "0" }, { "31", "0" }, { "32", "0" },
+        { "33", "0" }, { "34", "0" }, { "35", "0" }, { "36", "0" }, { "37", "0" }, { "38", "0" },
+        { "39", "0" }, { "40", "0" }, { "41", "0" }, { "42", "0" }, { "43", "0" }, { "44", "0" },
+        { "45", "0" }, { "46", "0" }, { "47", "0" }, { "48", "0" }, { "49", "0" }, { "50", "0" },
+        { "51", "0" }, { "52", "0" }, { "53", "0" }, { "54", "0" }, { "55", "0" }, { "56", "0" },
+        { "57", "0" }, { "58", "0" }, { "59", "0" }, { "60", "0" }, { "61", "0" }, { "62", "0" },
+        { "63", "0" } };
     KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND, dscp_to_tc_values);
     deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
     orch->doQosMapTask(setData, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
     ASSERT_TRUE(Validate(orch.get(), CFG_DSCP_TO_TC_MAP_TABLE_NAME, dscp_to_tc_values));
+}
+
+TEST_F(QosOrchTest, Tc_To_Queue_Map_Via_VS)
+{
+    auto orch = createQosOrch();
+
+    vector<FieldValueTuple> tc_to_queue_values = { { "0", "0" }, { "1", "1" }, { "3", "3" }, { "4", "4" } };
+    KeyOpFieldsValuesTuple tc_to_queue_tuple(CFG_TC_TO_QUEUE_MAP_TABLE_NAME, SET_COMMAND, tc_to_queue_values);
+    deque<KeyOpFieldsValuesTuple> setData = { tc_to_queue_tuple };
+
+    orch->doQosMapTask(setData, CFG_TC_TO_QUEUE_MAP_TABLE_NAME);
+    ASSERT_TRUE(Validate(orch.get(), CFG_TC_TO_QUEUE_MAP_TABLE_NAME, tc_to_queue_values));
 }
 }
