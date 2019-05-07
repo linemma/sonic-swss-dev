@@ -617,27 +617,27 @@ TEST_F(CoppOrchTest, COPP_Create_STP_Rule)
 
     string trap_group_id = "coppRule1";
     vector<FieldValueTuple> rule_values = {
-        { "trap_ids", "stp" },
-        { "trap_action", "copy" },
-        { "queue", "1" },
-        { "trap_priority", "5" },
-        { "meter_type", "packets" },
-        { "mode", "sr_tcm" },
-        { "color", "aware" },
-        { "cir", "90" },
-        { "cbs", "10" },
-        { "pir", "5" },
-        { "pbs", "1" },
-        { "green_action", "forward" },
-        { "yellow_action", "drop" },
-        { "red_action", "deny" }
+        { copp_trap_id_list, "stp" },
+        { copp_trap_action_field, "copy" },
+        { copp_queue_field, "1" },
+        { copp_trap_priority_field, "5" },
+        { copp_policer_meter_type_field, "packets" },
+        { copp_policer_mode_field, "sr_tcm" },
+        { copp_policer_color_field, "aware" },
+        { copp_policer_cir_field, "90" },
+        { copp_policer_cbs_field, "10" },
+        { copp_policer_pir_field, "5" },
+        { copp_policer_pbs_field, "1" },
+        { copp_policer_action_green_field, "forward" },
+        { copp_policer_action_yellow_field, "drop" },
+        { copp_policer_action_red_field, "deny" }
     };
-    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, SET_COMMAND, rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
     ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
-    // kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "DEL", {} } });
+    // kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, DEL_COMMAND, {} } });
     // orch->doCoppTask(kvf_copp_value);
 
     // const auto& trapGroupTables = orch->getTrapGroupMap();
@@ -652,27 +652,27 @@ TEST_F(CoppOrchTest, COPP_Create_LACP_Rule)
 
     string trap_group_id = "coppRule1";
     vector<FieldValueTuple> rule_values = {
-        { "trap_ids", "lacp" },
-        { "trap_action", "deny" },
-        { "queue", "7" },
-        { "trap_priority", "4" },
-        { "meter_type", "bytes" },
-        { "mode", "sr_tcm" },
-        { "color", "blind" },
-        { "cir", "90" },
-        { "cbs", "10" },
-        { "pir", "5" },
-        { "pbs", "1" },
-        { "green_action", "forward" },
-        { "yellow_action", "drop" },
-        { "red_action", "deny" }
+        { copp_trap_id_list, "lacp" },
+        { copp_trap_action_field, "deny" },
+        { copp_queue_field, "7" },
+        { copp_trap_priority_field, "4" },
+        { copp_policer_meter_type_field, "packets" },
+        { copp_policer_mode_field, "sr_tcm" },
+        { copp_policer_color_field, "aware" },
+        { copp_policer_cir_field, "90" },
+        { copp_policer_cbs_field, "10" },
+        { copp_policer_pir_field, "5" },
+        { copp_policer_pbs_field, "1" },
+        { copp_policer_action_green_field, "forward" },
+        { copp_policer_action_yellow_field, "drop" },
+        { copp_policer_action_red_field, "deny" }
     };
-    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, SET_COMMAND, rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
     ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
-    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, DEL_COMMAND, {});
     // setData = { delActionAttr };
     // consumerAddToSync(consumer.get(), setData);
 
@@ -691,27 +691,27 @@ TEST_F(CoppOrchTest, COPP_Create_EAPOL_Rule)
 
     string trap_group_id = "coppRule1";
     vector<FieldValueTuple> rule_values = {
-        { "trap_ids", "eapol" },
-        { "trap_action", "forward" },
-        { "queue", "8" },
-        { "trap_priority", "9" },
-        { "meter_type", "packets" },
-        { "mode", "storm" },
-        { "color", "aware" },
-        { "cir", "90" },
-        { "cbs", "10" },
-        { "pir", "5" },
-        { "pbs", "1" },
-        { "green_action", "forward" },
-        { "yellow_action", "drop" },
-        { "red_action", "deny" }
+        { copp_trap_id_list, "eapol" },
+        { copp_trap_action_field, "forward" },
+        { copp_queue_field, "8" },
+        { copp_trap_priority_field, "9" },
+        { copp_policer_meter_type_field, "packets" },
+        { copp_policer_mode_field, "sr_tcm" },
+        { copp_policer_color_field, "aware" },
+        { copp_policer_cir_field, "90" },
+        { copp_policer_cbs_field, "10" },
+        { copp_policer_pir_field, "5" },
+        { copp_policer_pbs_field, "1" },
+        { copp_policer_action_green_field, "forward" },
+        { copp_policer_action_yellow_field, "drop" },
+        { copp_policer_action_red_field, "deny" }
     };
-    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, SET_COMMAND, rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
     ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
-    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, DEL_COMMAND, {});
     // setData = { delActionAttr };
     // consumerAddToSync(consumer.get(), setData);
 
@@ -730,27 +730,27 @@ TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
 
     string trap_group_id = "coppRule1";
     vector<FieldValueTuple> rule_values = {
-        { "trap_ids", "stp,lacp,eapol" },
-        { "trap_action", "drop" },
-        { "queue", "3" },
-        { "trap_priority", "1" },
-        { "meter_type", "bytes" },
-        { "mode", "tr_tcm" },
-        { "color", "blind" },
-        { "cir", "90" },
-        { "cbs", "10" },
-        { "pir", "5" },
-        { "pbs", "1" },
-        { "green_action", "forward" },
-        { "yellow_action", "drop" },
-        { "red_action", "deny" }
+        { copp_trap_id_list, "stp,lacp,eapol" },
+        { copp_trap_action_field, "drop" },
+        { copp_queue_field, "3" },
+        { copp_trap_priority_field, "1" },
+        { copp_policer_meter_type_field, "packets" },
+        { copp_policer_mode_field, "sr_tcm" },
+        { copp_policer_color_field, "aware" },
+        { copp_policer_cir_field, "90" },
+        { copp_policer_cbs_field, "10" },
+        { copp_policer_pir_field, "5" },
+        { copp_policer_pbs_field, "1" },
+        { copp_policer_action_green_field, "forward" },
+        { copp_policer_action_yellow_field, "drop" },
+        { copp_policer_action_red_field, "deny" }
     };
-    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+    auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, SET_COMMAND, rule_values } });
     orch->doCoppTask(kvf_copp_value);
 
     ASSERT_TRUE(Validate(orch.get(), trap_group_id, rule_values));
 
-    // KeyOpFieldsValuesTuple delActionAttr(groupName, "DEL", {});
+    // KeyOpFieldsValuesTuple delActionAttr(groupName, DEL_COMMAND, {});
     // setData = { delActionAttr };
     // consumerAddToSync(consumer.get(), setData);
 
@@ -860,8 +860,8 @@ TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
 //     auto orch = createCoppOrch();
 
 //     string trap_group_id = "coppRule1";
-//     vector<FieldValueTuple> rule_values = { { "trap_ids", "stp" }, { "trap_action", "drop" }, { "queue", "3" }, { "trap_priority", "1" }, { "meter_type", "packets" }, { "mode", "sr_tcm" }, { "color", "aware" }, { "cir", "90" }, { "cbs", "10" }, { "pir", "5" }, { "pbs", "1" }, { "green_action", "forward" }, { "yellow_action", "drop" }, { "red_action", "deny" } };
-//     auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
+//     vector<FieldValueTuple> rule_values = { { copp_trap_id_list, "stp" }, { copp_trap_action_field, "drop" }, { copp_queue_field, "3" }, { copp_trap_priority_field, "1" }, { copp_policer_meter_type_field, "packets" }, { copp_policer_mode_field, "sr_tcm" }, { copp_policer_color_field, "aware" }, { copp_policer_cir_field, "90" }, { copp_policer_cbs_field, "10" }, { copp_policer_pir_field, "5" }, { copp_policer_pbs_field, "1" }, { copp_policer_action_green_field, "forward" }, { copp_policer_action_yellow_field, "drop" }, { copp_policer_action_red_field, "deny" } };
+//     auto kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, SET_COMMAND, rule_values } });
 //     orch->doCoppTask(kvf_copp_value);
 
 //     auto exp_group_attr_list = getTrapGroupAttributeList(rule_values);
@@ -872,8 +872,8 @@ TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
 //     ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(ret->trap_attr_list, *exp_trap_attr_list.get()));
 //     ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(ret->policer_attr_list, *exp_police_attr_list.get()));
 
-//     rule_values = { { "trap_ids", "stp" } };
-//     kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "DEL", rule_values } });
+//     rule_values = { { copp_trap_id_list, "stp" } };
+//     kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, DEL_COMMAND, rule_values } });
 
 //     //call CoPP function
 //     orch->doCoppTask(kvf_copp_value);
