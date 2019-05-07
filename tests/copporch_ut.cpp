@@ -126,23 +126,47 @@ map<string, string> m_packet_action_map = {
     { "transit", "SAI_PACKET_ACTION_TRANSIT" }
 };
 
-class ConsumerExtend_Dont_Use : public Consumer {
-public:
-    ConsumerExtend_Dont_Use(ConsumerTableBase* select, Orch* orch, const string& name)
-        : Consumer(select, orch, name)
-    {
+static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
+{
+    /* Nothing popped */
+    if (entries.empty()) {
+        return 0;
     }
 
-    size_t addToSync(std::deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        Consumer::addToSync(entries);
-    }
+    for (auto& entry : entries) {
+        string key = kfvKey(entry);
+        string op = kfvOp(entry);
 
-    void clear()
-    {
-        Consumer::m_toSync.clear();
+        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+            consumer->m_toSync[key] = entry;
+        }
+        /* If an old task is still there, we combine the old task with new task */
+        else {
+            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+            auto new_values = kfvFieldsValues(entry);
+            auto existing_values = kfvFieldsValues(existing_data);
+
+            for (auto it : new_values) {
+                string field = fvField(it);
+                string value = fvValue(it);
+
+                auto iu = existing_values.begin();
+                while (iu != existing_values.end()) {
+                    string ofield = fvField(*iu);
+                    if (field == ofield)
+                        iu = existing_values.erase(iu);
+                    else
+                        iu++;
+                }
+                existing_values.push_back(FieldValueTuple(field, value));
+            }
+            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+        }
     }
-};
+    return entries.size();
+}
 
 struct CoppOrchHandler {
     CoppOrch* m_coppOrch;
@@ -157,48 +181,6 @@ struct CoppOrchHandler {
     operator const CoppOrch*() const
     {
         return m_coppOrch;
-    }
-
-    static size_t consumerAddToSync(Consumer* consumer, const std::deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        /* Nothing popped */
-        if (entries.empty()) {
-            return 0;
-        }
-
-        for (auto& entry : entries) {
-            string key = kfvKey(entry);
-            string op = kfvOp(entry);
-
-            /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-            if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-                consumer->m_toSync[key] = entry;
-            }
-            /* If an old task is still there, we combine the old task with new task */
-            else {
-                KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
-
-                auto new_values = kfvFieldsValues(entry);
-                auto existing_values = kfvFieldsValues(existing_data);
-
-                for (auto it : new_values) {
-                    string field = fvField(it);
-                    string value = fvValue(it);
-
-                    auto iu = existing_values.begin();
-                    while (iu != existing_values.end()) {
-                        string ofield = fvField(*iu);
-                        if (field == ofield)
-                            iu = existing_values.erase(iu);
-                        else
-                            iu++;
-                    }
-                    existing_values.push_back(FieldValueTuple(field, value));
-                }
-                consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
-            }
-        }
-        return entries.size();
     }
 
     void doCoppTask(const std::deque<KeyOpFieldsValuesTuple>& entries)
@@ -455,17 +437,12 @@ struct CoppOrchTest : public CoppTest {
         assert(gPortsOrch == nullptr);
         gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
-        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
-        auto consumerExt = std::make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+        auto consumer = std::unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1), gPortsOrch, APP_PORT_TABLE_NAME));
 
-        auto setData = std::deque<KeyOpFieldsValuesTuple>(
-            { { "PortInitDone",
-                EMPTY_PREFIX,
-                { { "", "" } } } });
-        consumerExt->addToSync(setData);
+        consumerAddToSync(consumer.get(), { { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
 
-        Consumer* consumer = consumerExt.get();
-        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
+        static_cast<Orch*>(gPortsOrch)->doTask(*consumer.get());
     }
 
     void TearDown() override
@@ -639,21 +616,21 @@ TEST_F(CoppOrchTest, COPP_Create_STP_Rule)
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { 
-        { "trap_ids", "stp" }, 
-        { "trap_action", "copy" }, 
-        { "queue", "1" }, 
-        { "trap_priority", "5" }, 
-        { "meter_type", "packets" }, 
-        { "mode", "sr_tcm" }, 
-        { "color", "aware" }, 
-        { "cir", "90" }, 
-        { "cbs", "10" }, 
-        { "pir", "5" }, 
-        { "pbs", "1" }, 
-        { "green_action", "forward" }, 
-        { "yellow_action", "drop" }, 
-        { "red_action", "deny" } 
+    vector<FieldValueTuple> rule_values = {
+        { "trap_ids", "stp" },
+        { "trap_action", "copy" },
+        { "queue", "1" },
+        { "trap_priority", "5" },
+        { "meter_type", "packets" },
+        { "mode", "sr_tcm" },
+        { "color", "aware" },
+        { "cir", "90" },
+        { "cbs", "10" },
+        { "pir", "5" },
+        { "pbs", "1" },
+        { "green_action", "forward" },
+        { "yellow_action", "drop" },
+        { "red_action", "deny" }
     };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
@@ -674,21 +651,21 @@ TEST_F(CoppOrchTest, COPP_Create_LACP_Rule)
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { 
-        { "trap_ids", "lacp" }, 
-        { "trap_action", "deny" }, 
-        { "queue", "7" }, 
-        { "trap_priority", "4" }, 
-        { "meter_type", "packets" }, 
-        { "mode", "sr_tcm" }, 
-        { "color", "aware" }, 
-        { "cir", "90" }, 
-        { "cbs", "10" }, 
-        { "pir", "5" }, 
-        { "pbs", "1" }, 
-        { "green_action", "forward" }, 
-        { "yellow_action", "drop" }, 
-        { "red_action", "deny" } 
+    vector<FieldValueTuple> rule_values = {
+        { "trap_ids", "lacp" },
+        { "trap_action", "deny" },
+        { "queue", "7" },
+        { "trap_priority", "4" },
+        { "meter_type", "packets" },
+        { "mode", "sr_tcm" },
+        { "color", "aware" },
+        { "cir", "90" },
+        { "cbs", "10" },
+        { "pir", "5" },
+        { "pbs", "1" },
+        { "green_action", "forward" },
+        { "yellow_action", "drop" },
+        { "red_action", "deny" }
     };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
@@ -713,21 +690,21 @@ TEST_F(CoppOrchTest, COPP_Create_EAPOL_Rule)
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { 
-        { "trap_ids", "eapol" }, 
-        { "trap_action", "forward" }, 
-        { "queue", "8" }, 
-        { "trap_priority", "9" }, 
-        { "meter_type", "packets" }, 
-        { "mode", "sr_tcm" }, 
-        { "color", "aware" }, 
-        { "cir", "90" }, 
-        { "cbs", "10" }, 
-        { "pir", "5" }, 
-        { "pbs", "1" }, 
-        { "green_action", "forward" }, 
-        { "yellow_action", "drop" }, 
-        { "red_action", "deny" } 
+    vector<FieldValueTuple> rule_values = {
+        { "trap_ids", "eapol" },
+        { "trap_action", "forward" },
+        { "queue", "8" },
+        { "trap_priority", "9" },
+        { "meter_type", "packets" },
+        { "mode", "sr_tcm" },
+        { "color", "aware" },
+        { "cir", "90" },
+        { "cbs", "10" },
+        { "pir", "5" },
+        { "pbs", "1" },
+        { "green_action", "forward" },
+        { "yellow_action", "drop" },
+        { "red_action", "deny" }
     };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
@@ -752,21 +729,21 @@ TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
     auto orch = createCoppOrch();
 
     std::string trap_group_id = "coppRule1";
-    vector<FieldValueTuple> rule_values = { 
-        { "trap_ids", "stp,lacp,eapol" }, 
-        { "trap_action", "drop" }, 
-        { "queue", "3" }, 
-        { "trap_priority", "1" }, 
-        { "meter_type", "packets" }, 
-        { "mode", "sr_tcm" }, 
-        { "color", "aware" }, 
-        { "cir", "90" }, 
-        { "cbs", "10" }, 
-        { "pir", "5" }, 
-        { "pbs", "1" }, 
-        { "green_action", "forward" }, 
-        { "yellow_action", "drop" }, 
-        { "red_action", "deny" } 
+    vector<FieldValueTuple> rule_values = {
+        { "trap_ids", "stp,lacp,eapol" },
+        { "trap_action", "drop" },
+        { "queue", "3" },
+        { "trap_priority", "1" },
+        { "meter_type", "packets" },
+        { "mode", "sr_tcm" },
+        { "color", "aware" },
+        { "cir", "90" },
+        { "cbs", "10" },
+        { "pir", "5" },
+        { "pbs", "1" },
+        { "green_action", "forward" },
+        { "yellow_action", "drop" },
+        { "red_action", "deny" }
     };
     auto kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, "SET", rule_values } });
     orch->doCoppTask(kvf_copp_value);
