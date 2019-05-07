@@ -656,9 +656,9 @@ TEST_F(CoppOrchTest, COPP_Create_LACP_Rule)
         { copp_trap_action_field, "deny" },
         { copp_queue_field, "7" },
         { copp_trap_priority_field, "4" },
-        { copp_policer_meter_type_field, "packets" },
+        { copp_policer_meter_type_field, "bytes" },
         { copp_policer_mode_field, "sr_tcm" },
-        { copp_policer_color_field, "aware" },
+        { copp_policer_color_field, "blind" },
         { copp_policer_cir_field, "90" },
         { copp_policer_cbs_field, "10" },
         { copp_policer_pir_field, "5" },
@@ -696,7 +696,7 @@ TEST_F(CoppOrchTest, COPP_Create_EAPOL_Rule)
         { copp_queue_field, "8" },
         { copp_trap_priority_field, "9" },
         { copp_policer_meter_type_field, "packets" },
-        { copp_policer_mode_field, "sr_tcm" },
+        { copp_policer_mode_field, "storm" },
         { copp_policer_color_field, "aware" },
         { copp_policer_cir_field, "90" },
         { copp_policer_cbs_field, "10" },
@@ -734,9 +734,9 @@ TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
         { copp_trap_action_field, "drop" },
         { copp_queue_field, "3" },
         { copp_trap_priority_field, "1" },
-        { copp_policer_meter_type_field, "packets" },
-        { copp_policer_mode_field, "sr_tcm" },
-        { copp_policer_color_field, "aware" },
+        { copp_policer_meter_type_field, "bytes" },
+        { copp_policer_mode_field, "tr_tcm" },
+        { copp_policer_color_field, "blind" },
         { copp_policer_cir_field, "90" },
         { copp_policer_cbs_field, "10" },
         { copp_policer_pir_field, "5" },
@@ -873,7 +873,7 @@ TEST_F(CoppOrchTest, COPP_Create_All_Rule_In_One_Group)
 //     ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(ret->policer_attr_list, *exp_police_attr_list.get()));
 
 //     rule_values = { { copp_trap_id_list, "stp" } };
-//     kvf_copp_value = std::deque<KeyOpFieldsValuesTuple>({ { trap_group_id, DEL_COMMAND, rule_values } });
+//     kvf_copp_value = deque<KeyOpFieldsValuesTuple>({ { trap_group_id, DEL_COMMAND, rule_values } });
 
 //     //call CoPP function
 //     orch->doCoppTask(kvf_copp_value);
