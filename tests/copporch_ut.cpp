@@ -126,7 +126,7 @@ map<string, string> m_packet_action_map = {
     { "transit", "SAI_PACKET_ACTION_TRANSIT" }
 };
 
-static size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
+size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
 {
     /* Nothing popped */
     if (entries.empty()) {
@@ -396,7 +396,7 @@ struct CoppOrchTest : public CoppTest {
         };
 
         auto status = sai_api_initialize(0, (sai_service_method_table_t*)&test_services);
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        ASSERT_EQ(status, SAI_STATUS_SUCCESS);
 
         sai_attribute_t swattr;
 
@@ -404,13 +404,13 @@ struct CoppOrchTest : public CoppTest {
         swattr.value.booldata = true;
 
         status = sai_switch_api->create_switch(&gSwitchId, 1, &swattr);
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        ASSERT_EQ(status, SAI_STATUS_SUCCESS);
 
         // Get switch source MAC address
         swattr.id = SAI_SWITCH_ATTR_SRC_MAC_ADDRESS;
         status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &swattr);
 
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        ASSERT_EQ(status, SAI_STATUS_SUCCESS);
 
         gMacAddress = swattr.value.mac;
 
@@ -418,7 +418,7 @@ struct CoppOrchTest : public CoppTest {
         swattr.id = SAI_SWITCH_ATTR_DEFAULT_VIRTUAL_ROUTER_ID;
         status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &swattr);
 
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        ASSERT_EQ(status, SAI_STATUS_SUCCESS);
 
         gVirtualRouterId = swattr.value.oid;
 
@@ -434,7 +434,7 @@ struct CoppOrchTest : public CoppTest {
         };
 
         // FIXME: doesn't use global variable !!
-        assert(gPortsOrch == nullptr);
+        ASSERT_EQ(gPortsOrch, nullptr);
         gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
         auto consumer = unique_ptr<Consumer>(new Consumer(
@@ -450,7 +450,7 @@ struct CoppOrchTest : public CoppTest {
         CoppTest::TearDown();
 
         auto status = sai_switch_api->remove_switch(gSwitchId);
-        ASSERT_TRUE(status == SAI_STATUS_SUCCESS);
+        ASSERT_EQ(status, SAI_STATUS_SUCCESS);
         gSwitchId = 0;
 
         sai_api_uninitialize();
