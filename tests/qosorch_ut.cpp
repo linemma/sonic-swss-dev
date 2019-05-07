@@ -61,7 +61,7 @@ size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>
 
 struct TestBase : public ::testing::Test {
 
-    bool AttrListEq(sai_object_type_t objecttype, const vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
+    bool AttrListEq(sai_object_type_t object_type, const vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
     {
         if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
             return false;
@@ -70,7 +70,7 @@ struct TestBase : public ::testing::Test {
         auto l = exp_attr_list.get_attr_list();
         for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
             sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
-            auto meta = sai_metadata_get_attr_metadata(objecttype, id);
+            auto meta = sai_metadata_get_attr_metadata(object_type, id);
 
             assert(meta != nullptr);
 
@@ -120,7 +120,7 @@ struct QosMapHandlerTest : public TestBase {
         vector<sai_attribute_t> attr_list;
     };
 
-    shared_ptr<SetQosResult> setDscp2Tc(DscpToTcMapHandler& dscpToTc, KeyOpFieldsValuesTuple& tuple)
+    shared_ptr<SetQosResult> setDscp2Tc(DscpToTcMapHandler& dscp_to_tc, KeyOpFieldsValuesTuple& tuple)
     {
         assert(sai_qos_map_api == nullptr);
 
@@ -141,12 +141,12 @@ struct QosMapHandlerTest : public TestBase {
         });
 
         vector<sai_attribute_t> attrs;
-        dscpToTc.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = dscpToTc.addQosItem(attrs);
+        dscp_to_tc.convertFieldValuesToAttributes(tuple, attrs);
+        ret->ret_val = dscp_to_tc.addQosItem(attrs);
         return ret;
     }
 
-    shared_ptr<SetQosResult> setTc2Queue(TcToQueueMapHandler& tcToQueue, KeyOpFieldsValuesTuple& tuple)
+    shared_ptr<SetQosResult> setTc2Queue(TcToQueueMapHandler& tc_to_queue, KeyOpFieldsValuesTuple& tuple)
     {
         assert(sai_qos_map_api == nullptr);
 
@@ -167,12 +167,12 @@ struct QosMapHandlerTest : public TestBase {
         });
 
         vector<sai_attribute_t> attrs;
-        tcToQueue.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = tcToQueue.addQosItem(attrs);
+        tc_to_queue.convertFieldValuesToAttributes(tuple, attrs);
+        ret->ret_val = tc_to_queue.addQosItem(attrs);
         return ret;
     }
 
-    shared_ptr<SetQosResult> setTc2Pg(TcToPgHandler& tcToPg, KeyOpFieldsValuesTuple& tuple)
+    shared_ptr<SetQosResult> setTc2Pg(TcToPgHandler& tc_to_pg, KeyOpFieldsValuesTuple& tuple)
     {
         assert(sai_qos_map_api == nullptr);
 
@@ -193,12 +193,12 @@ struct QosMapHandlerTest : public TestBase {
         });
 
         vector<sai_attribute_t> attrs;
-        tcToPg.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = tcToPg.addQosItem(attrs);
+        tc_to_pg.convertFieldValuesToAttributes(tuple, attrs);
+        ret->ret_val = tc_to_pg.addQosItem(attrs);
         return ret;
     }
 
-    shared_ptr<SetQosResult> setPfcPrio2Pg(PfcPrioToPgHandler& pfcPrioToPg, KeyOpFieldsValuesTuple& tuple)
+    shared_ptr<SetQosResult> setPfcPrio2Pg(PfcPrioToPgHandler& pfc_prio_to_pg, KeyOpFieldsValuesTuple& tuple)
     {
         assert(sai_qos_map_api == nullptr);
 
@@ -219,12 +219,12 @@ struct QosMapHandlerTest : public TestBase {
         });
 
         vector<sai_attribute_t> attrs;
-        pfcPrioToPg.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = pfcPrioToPg.addQosItem(attrs);
+        pfc_prio_to_pg.convertFieldValuesToAttributes(tuple, attrs);
+        ret->ret_val = pfc_prio_to_pg.addQosItem(attrs);
         return ret;
     }
 
-    shared_ptr<SetQosResult> setPfc2Queue(PfcToQueueHandler& pfcToQueue, KeyOpFieldsValuesTuple& tuple)
+    shared_ptr<SetQosResult> setPfc2Queue(PfcToQueueHandler& pfc_to_queue, KeyOpFieldsValuesTuple& tuple)
     {
         assert(sai_qos_map_api == nullptr);
 
@@ -245,12 +245,12 @@ struct QosMapHandlerTest : public TestBase {
         });
 
         vector<sai_attribute_t> attrs;
-        pfcToQueue.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = pfcToQueue.addQosItem(attrs);
+        pfc_to_queue.convertFieldValuesToAttributes(tuple, attrs);
+        ret->ret_val = pfc_to_queue.addQosItem(attrs);
         return ret;
     }
 
-    shared_ptr<SetQosResult> addWredProfile(WredMapHandler& wredMap, KeyOpFieldsValuesTuple& tuple)
+    shared_ptr<SetQosResult> addWredProfile(WredMapHandler& wred_map, KeyOpFieldsValuesTuple& tuple)
     {
         assert(sai_wred_api == nullptr);
 
@@ -271,12 +271,12 @@ struct QosMapHandlerTest : public TestBase {
         });
 
         vector<sai_attribute_t> attrs;
-        wredMap.convertFieldValuesToAttributes(tuple, attrs);
-        ret->ret_val = wredMap.addQosItem(attrs);
+        wred_map.convertFieldValuesToAttributes(tuple, attrs);
+        ret->ret_val = wred_map.addQosItem(attrs);
         return ret;
     }
 
-    // shared_ptr<SetQosResult> deleteWredProfile(WredMapHandler& wredMap, KeyOpFieldsValuesTuple& tuple)
+    // shared_ptr<SetQosResult> deleteWredProfile(WredMapHandler& wred_map, KeyOpFieldsValuesTuple& tuple)
     // {
     //     assert(sai_wred_api == nullptr);
 
@@ -306,21 +306,21 @@ struct QosMapHandlerTest : public TestBase {
     //     });
 
     //     vector<sai_attribute_t> attrs;
-    //     wredMap.convertFieldValuesToAttributes(tuple, attrs);
-    //     wredMap.addQosItem(attrs);
+    //     wred_map.convertFieldValuesToAttributes(tuple, attrs);
+    //     wred_map.addQosItem(attrs);
 
-    //     ret->ret_val = wredMap.removeQosItem(ret->sai_object_id);
+    //     ret->ret_val = wred_map.removeQosItem(ret->sai_object_id);
     //     return ret;
     // }
 };
 
 TEST_F(QosMapHandlerTest, Dscp_To_Tc_Map)
 {
-    DscpToTcMapHandler dscpToTcMapHandler;
+    DscpToTcMapHandler dscp_to_tc_map_handler;
     KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND,
         { { "1", "0" }, { "2", "0" }, { "3", "3" } });
 
-    auto res = setDscp2Tc(dscpToTcMapHandler, dscp_to_tc_tuple);
+    auto res = setDscp2Tc(dscp_to_tc_map_handler, dscp_to_tc_tuple);
 
     ASSERT_TRUE(res->ret_val == true);
 
@@ -339,11 +339,11 @@ TEST_F(QosMapHandlerTest, Dscp_To_Tc_Map)
 
 TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
 {
-    TcToQueueMapHandler tcToQueueMapHandler;
+    TcToQueueMapHandler tc_to_queue_map_handler;
     KeyOpFieldsValuesTuple tc_to_queue_tuple(CFG_TC_TO_QUEUE_MAP_TABLE_NAME, SET_COMMAND,
         { { "0", "0" }, { "1", "1" }, { "3", "3" } });
 
-    auto res = setTc2Queue(tcToQueueMapHandler, tc_to_queue_tuple);
+    auto res = setTc2Queue(tc_to_queue_map_handler, tc_to_queue_tuple);
 
     ASSERT_TRUE(res->ret_val == true);
 
@@ -362,11 +362,11 @@ TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
 
 TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
 {
-    TcToPgHandler tcToPgHandler;
+    TcToPgHandler tc_to_pg_handler;
     KeyOpFieldsValuesTuple tc_to_pg_tuple(CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME, SET_COMMAND,
         { { "0", "0" }, { "1", "1" }, { "3", "3" } });
 
-    auto res = setTc2Pg(tcToPgHandler, tc_to_pg_tuple);
+    auto res = setTc2Pg(tc_to_pg_handler, tc_to_pg_tuple);
 
     ASSERT_TRUE(res->ret_val == true);
 
@@ -385,11 +385,11 @@ TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
 
 TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
 {
-    PfcPrioToPgHandler pfcPrioToPgHandler;
+    PfcPrioToPgHandler pfc_prio_to_pg_handler;
     KeyOpFieldsValuesTuple pfc_prio_to_pg_tuple(CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME, SET_COMMAND,
         { { "0", "0" }, { "1", "1" }, { "3", "3" } });
 
-    auto res = setPfcPrio2Pg(pfcPrioToPgHandler, pfc_prio_to_pg_tuple);
+    auto res = setPfcPrio2Pg(pfc_prio_to_pg_handler, pfc_prio_to_pg_tuple);
 
     ASSERT_TRUE(res->ret_val == true);
 
@@ -408,11 +408,11 @@ TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
 
 TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
 {
-    PfcToQueueHandler pfcToQueueHandler;
+    PfcToQueueHandler pfc_to_queue_handler;
     KeyOpFieldsValuesTuple pfc_to_queue_tuple(CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME, SET_COMMAND,
         { { "0", "0" }, { "1", "1" }, { "3", "3" } });
 
-    auto res = setPfc2Queue(pfcToQueueHandler, pfc_to_queue_tuple);
+    auto res = setPfc2Queue(pfc_to_queue_handler, pfc_to_queue_tuple);
 
     ASSERT_TRUE(res->ret_val == true);
 
@@ -431,7 +431,7 @@ TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
 
 TEST_F(QosMapHandlerTest, Add_Wred_Profile)
 {
-    WredMapHandler wredMapHandler;
+    WredMapHandler wred_map_handler;
     KeyOpFieldsValuesTuple wred_profile_tuple(CFG_WRED_PROFILE_TABLE_NAME, SET_COMMAND,
         { { "wred_yellow_enable", "true" },
             { "wred_red_enable", "true" },
@@ -443,7 +443,7 @@ TEST_F(QosMapHandlerTest, Add_Wred_Profile)
             { "green_max_threshold", "312000" },
             { "green_min_threshold", "104000" } });
 
-    auto res = addWredProfile(wredMapHandler, wred_profile_tuple);
+    auto res = addWredProfile(wred_map_handler, wred_profile_tuple);
 
     ASSERT_TRUE(res->ret_val == true);
 
@@ -467,7 +467,7 @@ TEST_F(QosMapHandlerTest, Add_Wred_Profile)
 
 // TEST_F(QosMapHandlerTest, DeleteWredProfile)
 // {
-//     WredMapHandler wredMapHandler;
+//     WredMapHandler wred_map_handler;
 //     KeyOpFieldsValuesTuple wred_profile_tuple(CFG_WRED_PROFILE_TABLE_NAME, SET_COMMAND,
 //         { { "wred_yellow_enable", "true" },
 //             { "wred_red_enable", "true" },
@@ -479,40 +479,40 @@ TEST_F(QosMapHandlerTest, Add_Wred_Profile)
 //             { "green_max_threshold", "312000" },
 //             { "green_min_threshold", "104000" } });
 
-//     auto res = deleteWredProfile(wredMapHandler, wred_profile_tuple);
+//     auto res = deleteWredProfile(wred_map_handler, wred_profile_tuple);
 
 //     ASSERT_TRUE(res->ret_val == true);
 // }
 
 struct MockQosOrch {
-    QosOrch* m_qosOrch;
+    QosOrch* m_qos_orch;
     swss::DBConnector* config_db;
 
-    MockQosOrch(QosOrch* qosOrch, swss::DBConnector* config_db)
-        : m_qosOrch(qosOrch)
+    MockQosOrch(QosOrch* qos_orch, swss::DBConnector* config_db)
+        : m_qos_orch(qos_orch)
         , config_db(config_db)
     {
     }
 
     operator const QosOrch*() const
     {
-        return m_qosOrch;
+        return m_qos_orch;
     }
 
     type_map& getTypeMap()
     {
         //SWSS_LOG_ENTER();
-        return m_qosOrch->m_qos_maps;
+        return m_qos_orch->m_qos_maps;
     }
 
     void doQosMapTask(const deque<KeyOpFieldsValuesTuple>& entries, const string& tableName)
     {
         auto consumer = unique_ptr<Consumer>(new Consumer(
-            new swss::ConsumerStateTable(config_db, tableName, 1, 1), m_qosOrch, tableName));
+            new swss::ConsumerStateTable(config_db, tableName, 1, 1), m_qos_orch, tableName));
 
         consumerAddToSync(consumer.get(), entries);
 
-        static_cast<Orch*>(m_qosOrch)->doTask(*consumer);
+        static_cast<Orch*>(m_qos_orch)->doTask(*consumer);
     }
 };
 
@@ -672,7 +672,7 @@ struct QosOrchTest : public TestBase {
         return make_shared<MockQosOrch>(qos_orch, m_config_db.get());
     }
 
-    shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t objecttype, const string& qos_table_name, const vector<FieldValueTuple>& values)
+    shared_ptr<SaiAttributeList> getQosMapAttributeList(sai_object_type_t object_type, const string& qos_table_name, const vector<FieldValueTuple>& values)
     {
         vector<swss::FieldValueTuple> fields;
 
@@ -684,7 +684,7 @@ struct QosOrchTest : public TestBase {
             fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", convertValuesToQosMapListStr(qos_table_name, values) });
         }
 
-        return shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
+        return shared_ptr<SaiAttributeList>(new SaiAttributeList(object_type, fields, false));
     }
 
     string convertValuesToQosMapListStr(const string& qos_table_name, const vector<FieldValueTuple>& values)
@@ -715,7 +715,7 @@ struct QosOrchTest : public TestBase {
 
     bool Validate(MockQosOrch* orch, const string& table_name, const vector<FieldValueTuple>& values)
     {
-        const sai_object_type_t objecttype = SAI_OBJECT_TYPE_QOS_MAP;
+        const sai_object_type_t object_type = SAI_OBJECT_TYPE_QOS_MAP;
 
         auto qos_maps = orch->getTypeMap();
         auto qos_map = qos_maps.find(table_name);
@@ -728,21 +728,21 @@ struct QosOrchTest : public TestBase {
             return false;
         }
 
-        auto exp_attr_list = getQosMapAttributeList(objecttype, table_name, values);
-        if (!ValidateQosMap(objecttype, obj_map.second, *exp_attr_list.get())) {
+        auto exp_attr_list = getQosMapAttributeList(object_type, table_name, values);
+        if (!ValidateQosMap(object_type, obj_map.second, *exp_attr_list.get())) {
             return false;
         }
 
         return true;
     }
 
-    bool ValidateQosMap(sai_object_type_t objecttype, sai_object_id_t object_id, SaiAttributeList& exp_attrlist)
+    bool ValidateQosMap(sai_object_type_t object_type, sai_object_id_t object_id, SaiAttributeList& exp_attrlist)
     {
         vector<sai_attribute_t> act_attr;
 
         for (int i = 0; i < exp_attrlist.get_attr_count(); ++i) {
             const auto attr = exp_attrlist.get_attr_list()[i];
-            auto meta = sai_metadata_get_attr_metadata(objecttype, attr.id);
+            auto meta = sai_metadata_get_attr_metadata(object_type, attr.id);
 
             if (meta == nullptr) {
                 return false;
@@ -772,7 +772,7 @@ struct QosOrchTest : public TestBase {
             return false;
         }
 
-        auto b_attr_eq = AttrListEq(objecttype, act_attr, exp_attrlist);
+        auto b_attr_eq = AttrListEq(object_type, act_attr, exp_attrlist);
         if (!b_attr_eq) {
             return false;
         }
