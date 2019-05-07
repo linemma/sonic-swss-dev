@@ -1,16 +1,16 @@
-@@ -218,6 +218,8 @@
+@@ -220,6 +220,8 @@
  
      vector<sai_object_id_t> m_inPorts;
      vector<sai_object_id_t> m_outPorts;
 +	
 +	friend class Portal;
- };
  
- class AclRuleL3: public AclRule
-@@ -413,6 +415,8 @@
-     static bool m_bCollectCounters;
-     static swss::DBConnector m_db;
-     static swss::Table m_countersTable;
+ private:
+     bool m_createCounter;
+@@ -438,6 +440,8 @@
+ 
+     string m_mirrorTableId;
+     string m_mirrorV6TableId;
 +	
 +	friend class Portal;
  };
