@@ -17,23 +17,47 @@ namespace nsQosOrchTest {
 
 using namespace std;
 
-class ConsumerExtend_Dont_Use : public Consumer {
-public:
-    ConsumerExtend_Dont_Use(ConsumerTableBase* select, Orch* orch, const string& name)
-        : Consumer(select, orch, name)
-    {
+static size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
+{
+    /* Nothing popped */
+    if (entries.empty()) {
+        return 0;
     }
 
-    size_t addToSync(deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        Consumer::addToSync(entries);
-    }
+    for (auto& entry : entries) {
+        string key = kfvKey(entry);
+        string op = kfvOp(entry);
 
-    void clear()
-    {
-        Consumer::m_toSync.clear();
+        /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
+        if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
+            consumer->m_toSync[key] = entry;
+        }
+        /* If an old task is still there, we combine the old task with new task */
+        else {
+            KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
+
+            auto new_values = kfvFieldsValues(entry);
+            auto existing_values = kfvFieldsValues(existing_data);
+
+            for (auto it : new_values) {
+                string field = fvField(it);
+                string value = fvValue(it);
+
+                auto iu = existing_values.begin();
+                while (iu != existing_values.end()) {
+                    string ofield = fvField(*iu);
+                    if (field == ofield)
+                        iu = existing_values.erase(iu);
+                    else
+                        iu++;
+                }
+                existing_values.push_back(FieldValueTuple(field, value));
+            }
+            consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
+        }
     }
-};
+    return entries.size();
+}
 
 struct TestBase : public ::testing::Test {
 
@@ -480,48 +504,6 @@ struct MockQosOrch {
         return m_qosOrch;
     }
 
-    size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
-    {
-        /* Nothing popped */
-        if (entries.empty()) {
-            return 0;
-        }
-
-        for (auto& entry : entries) {
-            string key = kfvKey(entry);
-            string op = kfvOp(entry);
-
-            /* If a new task comes or if a DEL task comes, we directly put it into getConsumerTable().m_toSync map */
-            if (consumer->m_toSync.find(key) == consumer->m_toSync.end() || op == DEL_COMMAND) {
-                consumer->m_toSync[key] = entry;
-            }
-            /* If an old task is still there, we combine the old task with new task */
-            else {
-                KeyOpFieldsValuesTuple existing_data = consumer->m_toSync[key];
-
-                auto new_values = kfvFieldsValues(entry);
-                auto existing_values = kfvFieldsValues(existing_data);
-
-                for (auto it : new_values) {
-                    string field = fvField(it);
-                    string value = fvValue(it);
-
-                    auto iu = existing_values.begin();
-                    while (iu != existing_values.end()) {
-                        string ofield = fvField(*iu);
-                        if (field == ofield)
-                            iu = existing_values.erase(iu);
-                        else
-                            iu++;
-                    }
-                    existing_values.push_back(FieldValueTuple(field, value));
-                }
-                consumer->m_toSync[key] = KeyOpFieldsValuesTuple(key, op, existing_values);
-            }
-        }
-        return entries.size();
-    }
-
     type_map& getTypeMap()
     {
         //SWSS_LOG_ENTER();
@@ -650,17 +632,12 @@ struct QosOrchTest : public TestBase {
         assert(gPortsOrch == nullptr);
         gPortsOrch = new PortsOrch(m_app_db.get(), ports_tables);
 
-        auto consumerStateTable = new ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1); // free by consumerStateTable
-        auto consumerExt = make_shared<ConsumerExtend_Dont_Use>(consumerStateTable, gPortsOrch, APP_PORT_TABLE_NAME);
+        auto consumer = unique_ptr<Consumer>(new Consumer(
+            new swss::ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1), gPortsOrch, APP_PORT_TABLE_NAME));
 
-        auto setData = deque<KeyOpFieldsValuesTuple>(
-            { { "PortInitDone",
-                EMPTY_PREFIX,
-                { { "", "" } } } });
-        consumerExt->addToSync(setData);
+        consumerAddToSync(consumer.get(), { { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
 
-        Consumer* consumer = consumerExt.get();
-        static_cast<Orch*>(gPortsOrch)->doTask(*consumer);
+        static_cast<Orch*>(gPortsOrch)->doTask(*consumer.get());
     }
 
     void TearDown() override
