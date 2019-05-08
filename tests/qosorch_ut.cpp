@@ -6,32 +6,38 @@
 
 namespace json {
 
-    class Object : public json::Value {
-    public:
-        Object() : Value(json::object()) {
-        }
+class Object : public json::Value {
+public:
+    Object()
+        : Value(json::object())
+    {
+    }
 
-        Object(std::initializer_list< std::pair<const char*, Value> > l)
-        : Object() {
-            for (auto p: l) {
-                this->operator[](p.first) = p.second;
-            }
+    Object(std::initializer_list<std::pair<const char*, Value>> l)
+        : Object()
+    {
+        for (auto p : l) {
+            this->operator[](p.first) = p.second;
         }
-    };
+    }
+};
 
-    class Array : public json::Value {
-    public:
-        Array() : Value(json::array()) {
-        }
+class Array : public json::Value {
+public:
+    Array()
+        : Value(json::array())
+    {
+    }
 
-        Array(std::initializer_list< Value > l)
-        : Array() {
-            int i = 0;
-            for (auto p: l) {
-                set_at(i++, p);
-            }
+    Array(std::initializer_list<Value> l)
+        : Array()
+    {
+        int i = 0;
+        for (auto p : l) {
+            set_at(i++, p);
         }
-    };
+    }
+};
 }
 
 extern sai_object_id_t gSwitchId;
@@ -356,72 +362,72 @@ TEST_F(QosMapHandlerTest, Dscp_To_Tc_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list {
-        {"count", json::Value(3)},
-        {"list", json::Array {
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(1)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+    json::Object map_to_value_list{
+        { "count", json::Value(3) },
+        { "list", json::Array{
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(1) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(2)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(2) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(3)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(3)},
-                }},
-            },
-        }}
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(3) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(3) },
+                                     } },
+                      },
+                  } }
     };
     // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
     //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
@@ -436,7 +442,7 @@ TEST_F(QosMapHandlerTest, Dscp_To_Tc_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
@@ -449,72 +455,72 @@ TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list {
-        {"count", json::Value(3)},
-        {"list", json::Array {
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+    json::Object map_to_value_list{
+        { "count", json::Value(3) },
+        { "list", json::Array{
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(1)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(1)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(1) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(1) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(3)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(3)},
-                    {"tc", json::Value(0)},
-                }},
-            },
-        }}
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(3) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(3) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
+                  } }
     };
     // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" },
     //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
@@ -529,7 +535,7 @@ TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
@@ -542,72 +548,72 @@ TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list {
-        {"count", json::Value(3)},
-        {"list", json::Array {
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+    json::Object map_to_value_list{
+        { "count", json::Value(3) },
+        { "list", json::Array{
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(1)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(1)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(1) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(1) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(3)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(3)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
-        }}
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(3) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(3) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
+                  } }
     };
     // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_PRIORITY_GROUP" },
     //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
@@ -617,12 +623,12 @@ TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
     //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":1,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
     //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3},\
     //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" },
+    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_PRIORITY_GROUP" },
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
@@ -635,72 +641,72 @@ TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list {
-        {"count", json::Value(3)},
-        {"list", json::Array {
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+    json::Object map_to_value_list{
+        { "count", json::Value(3) },
+        { "list", json::Array{
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(1)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(1)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(1) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(1) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(3)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(3)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
-        }}
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(3) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(3) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
+                  } }
     };
     // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_PRIORITY_GROUP" },
     //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
@@ -710,12 +716,12 @@ TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
     //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":1,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
     //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":3,\"qidx\":0,\"tc\":0},\
     //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":0,\"tc\":0}}]}" } });
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" },
+    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_PRIORITY_GROUP" },
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
@@ -728,72 +734,72 @@ TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list {
-        {"count", json::Value(3)},
-        {"list", json::Array {
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+    json::Object map_to_value_list{
+        { "count", json::Value(3) },
+        { "list", json::Array{
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(0) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(0) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(1)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(1)},
-                    {"tc", json::Value(0)},
-                }},
-            },
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(1) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(1) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
 
-            json::Object {
-                {"key", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_RED")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(3)},
-                    {"qidx", json::Value(0)},
-                    {"tc", json::Value(0)},
-                }},
-                {"value", json::Object {
-                    {"color", json::Value("SAI_PACKET_COLOR_GREEN")},
-                    {"dot1p", json::Value(0)},
-                    {"dscp", json::Value(0)},
-                    {"pg", json::Value(0)},
-                    {"prio", json::Value(0)},
-                    {"qidx", json::Value(3)},
-                    {"tc", json::Value(0)},
-                }},
-            },
-        }}
+                      json::Object{
+                          { "key", json::Object{
+                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                       { "dot1p", json::Value(0) },
+                                       { "dscp", json::Value(0) },
+                                       { "pg", json::Value(0) },
+                                       { "prio", json::Value(3) },
+                                       { "qidx", json::Value(0) },
+                                       { "tc", json::Value(0) },
+                                   } },
+                          { "value", json::Object{
+                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
+                                         { "dot1p", json::Value(0) },
+                                         { "dscp", json::Value(0) },
+                                         { "pg", json::Value(0) },
+                                         { "prio", json::Value(0) },
+                                         { "qidx", json::Value(3) },
+                                         { "tc", json::Value(0) },
+                                     } },
+                      },
+                  } }
     };
     // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_QUEUE" },
     //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
@@ -803,12 +809,12 @@ TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
     //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":1,\"tc\":0}},{\
     //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":3,\"qidx\":0,\"tc\":0},\
     //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
-    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" },
+    auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_QUEUE" },
         { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Add_Wred_Profile)
@@ -844,7 +850,7 @@ TEST_F(QosMapHandlerTest, Add_Wred_Profile)
         { "SAI_WRED_ATTR_RED_DROP_PROBABILITY", "100" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_WRED, v, false);
 
-    ASSERT_TRUE(Check::AttrListEq_Miss_objecttype_Dont_Use(res->attr_list, attr_list));
+    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_WRED, res->attr_list, attr_list));
 }
 
 // TEST_F(QosMapHandlerTest, DeleteWredProfile)
