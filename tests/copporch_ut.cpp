@@ -238,10 +238,10 @@ struct CoppTest : public CoppTestBase {
         return make_shared<CoppOrchHandler>(m_app_db.get());
     }
 
-    vector<string> getTrapTypeList(const vector<FieldValueTuple>& ruleAttr)
+    vector<string> getTrapTypeList(const vector<FieldValueTuple>& rule_values)
     {
         vector<string> types;
-        for (auto it : ruleAttr) {
+        for (auto it : rule_values) {
             if (kfvKey(it) == copp_trap_id_list) {
                 types = tokenize(fvValue(it), list_item_delimiter);
             }
