@@ -1,5 +1,7 @@
 #include "converter.h"
 #include "ut_helper.h"
+#include <iterator>
+#include <sstream>
 
 extern sai_object_id_t gSwitchId;
 
@@ -384,24 +386,23 @@ struct AclOrchTest : public AclTest {
 
         deque<KeyOpFieldsValuesTuple> port_init_tuple;
         for (auto i = 0; i < port_count; i++) {
-            string lan_map_str = "";
-            sai_uint32_t lanes[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+            vector<sai_uint32_t> lanes(8, 0);
             attr.id = SAI_PORT_ATTR_HW_LANE_LIST;
-            attr.value.u32list.count = 8;
-            attr.value.u32list.list = lanes;
+            attr.value.u32list.count = lanes.size();
+            attr.value.u32list.list = lanes.data();
 
             status = sai_port_api->get_port_attribute(port_list[i], 1, &attr);
             ASSERT_EQ(status, SAI_STATUS_SUCCESS);
 
-            for (auto j = 0; j < attr.value.u32list.count; j++) {
-                if (j != 0) {
-                    lan_map_str += ",";
-                }
-                lan_map_str += to_string(attr.value.u32list.list[j]);
+            ostringstream lan_map_oss;
+            lanes.resize(attr.value.u32list.count);
+            if (!lanes.empty()) {
+                copy(lanes.begin(), lanes.end() - 1, ostream_iterator<sai_uint32_t>(lan_map_oss, ","));
+                lan_map_oss << lanes.back();
             }
 
             port_init_tuple.push_back(
-                { to_string(i), SET_COMMAND, { { "lanes", lan_map_str }, { "admin_status", "up" }, { "speed", "1000" } } });
+                { to_string(i), SET_COMMAND, { { "lanes", lan_map_oss.str() }, { "admin_status", "up" }, { "speed", "1000" } } });
         }
         port_init_tuple.push_back({ "PortConfigDone", SET_COMMAND, { { "count", to_string(port_count) } } });
         port_init_tuple.push_back({ "PortInitDone", EMPTY_PREFIX, { { "", "" } } });
@@ -460,7 +461,6 @@ struct AclOrchTest : public AclTest {
         fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ETHER_TYPE", "true" });
         fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_ACL_IP_TYPE", "true" });
         fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_IP_PROTOCOL", "true" });
-
         fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_SRC_PORT", "true" });
         fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_L4_DST_PORT", "true" });
         fields.push_back({ "SAI_ACL_TABLE_ATTR_FIELD_TCP_FLAGS", "true" });
@@ -506,23 +506,27 @@ struct AclOrchTest : public AclTest {
 
         const auto& rule_actions = Portal::AclRuleInternal::getActions(&acl_rule);
         auto actionIt = rule_actions.find(SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION);
-        assert(actionIt != rule_actions.end());
-        assert(actionIt->second.aclaction.enable == true);
-        fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION",
-            to_string(actionIt->second.aclaction.parameter.s32) });
+        if (actionIt == rule_actions.end() || actionIt->second.aclaction.enable != true) {
+            ADD_FAILURE() << "Can't get action in ACL rule";
+        } else {
+            fields.push_back({ "SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION",
+                to_string(actionIt->second.aclaction.parameter.s32) });
+        }
 
         // SAI_ACL_ENTRY_ATTR_FIELD_*
         const auto& rule_matches = Portal::AclRuleInternal::getMatches(&acl_rule);
         for (auto matchIt = rule_matches.begin(); matchIt != rule_matches.end(); ++matchIt) {
             // matchIt = map<sai_acl_entry_attr_t (enum), sai_attribute_value_t (union)>
             auto meta = sai_metadata_get_attr_metadata(objecttype, matchIt->first);
-            assert(meta != nullptr);
+            if (actionIt == rule_actions.end() || actionIt->second.aclaction.enable != true) {
+                ADD_FAILURE() << "Can't get meta for attrid:" << matchIt->first;
+            } else {
+                sai_attribute_t saiAttribute = { matchIt->first, matchIt->second };
+                saiAttribute.value.aclfield.enable = true; // TODO: check why m_matches didn't set this ?
+                auto attrValString = sai_serialize_attr_value(*meta, saiAttribute, false);
 
-            sai_attribute_t saiAttribute = { matchIt->first, matchIt->second };
-            saiAttribute.value.aclfield.enable = true; // TODO: check why m_matches didn't set this ?
-            auto attrValString = sai_serialize_attr_value(*meta, saiAttribute, false);
-
-            fields.push_back({ meta->attridname, attrValString });
+                fields.push_back({ meta->attridname, attrValString });
+            }
         }
 
         return shared_ptr<SaiAttributeList>(new SaiAttributeList(objecttype, fields, false));
@@ -645,15 +649,103 @@ struct AclOrchTest : public AclTest {
     bool validateResourceCountWithCrm(const AclOrch* aclOrch, CrmOrch* crmOrch)
     {
         auto resourceMap = Portal::CrmOrchInternal::getResourceMap(crmOrch);
-        auto ifpPortKey = Portal::CrmOrchInternal::getCrmAclKey(crmOrch, SAI_ACL_STAGE_INGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
-        auto efpPortKey = Portal::CrmOrchInternal::getCrmAclKey(crmOrch, SAI_ACL_STAGE_EGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
+        auto ifp_port_key = Portal::CrmOrchInternal::getCrmAclKey(crmOrch, SAI_ACL_STAGE_INGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
+        auto efp_port_key = Portal::CrmOrchInternal::getCrmAclKey(crmOrch, SAI_ACL_STAGE_EGRESS, SAI_ACL_BIND_POINT_TYPE_PORT);
 
-        auto ifpPortAclTableCount = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[ifpPortKey].usedCounter;
-        auto efpPortAclTableCount = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[efpPortKey].usedCounter;
+        /* Verify Acl Table
+         */
+        auto aclTables = Portal::AclOrchInternal::getAclTables(aclOrch);
+        auto ifp_port_acl_table_cnt = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[ifp_port_key].usedCounter;
+        auto efp_port_acl_table_cnt = resourceMap.at(CrmResourceType::CRM_ACL_TABLE).countersMap[efp_port_key].usedCounter;
+        if (ifp_port_acl_table_cnt + efp_port_acl_table_cnt != aclTables.size()) {
+            return false;
+        }
 
-        return ifpPortAclTableCount + efpPortAclTableCount == Portal::AclOrchInternal::getAclTables(aclOrch).size();
+        /* Verify Acl Rules
+         */
+        for (auto it : aclTables) {
+            auto acl_table_rule_cnt = it.second.rules.size();
+            auto acl_table_key = Portal::CrmOrchInternal::getCrmAclTableKey(crmOrch, it.first);
+
+            if (acl_table_rule_cnt) {
+                auto crm_acl_table_oid = resourceMap.at(CrmResourceType::CRM_ACL_ENTRY).countersMap[acl_table_key].id;
+                if (crm_acl_table_oid != it.second.getOid()) {
+                    return false;
+                }
+            } else {
+                auto crm_acl_entry_cnt = resourceMap.at(CrmResourceType::CRM_ACL_ENTRY).countersMap[acl_table_key].usedCounter;
+                if (crm_acl_entry_cnt != acl_table_rule_cnt) {
+                    return false;
+                }
+            }
+        }
+
+        /* Verify Acl Table group
+         */
+        set<string> ingressAcltablePortSet;
+        set<string> egressAcltablePortSet;
+        for (auto it : aclTables) {
+            if (it.second.stage == ACL_STAGE_INGRESS) {
+                ingressAcltablePortSet.insert(it.second.portSet.begin(), it.second.portSet.end());
+            } else {
+                egressAcltablePortSet.insert(it.second.portSet.begin(), it.second.portSet.end());
+            }
+        }
+
+        uint32_t ingress_binding_port_cnt = 0;
+        for (auto it : ingressAcltablePortSet) {
+            Port port;
+            if (gPortsOrch->getPort(it, port)) {
+
+                if (port.m_ingress_acl_table_group_id == 0) {
+                    return false;
+                }
+
+                switch (port.m_type) {
+                case Port::PHY:
+                    ingress_binding_port_cnt++;
+                    break;
+
+                default:
+                    // do nothing
+                    break;
+                }
+            }
+        }
+        auto ifpPortGroupCount = resourceMap.at(CrmResourceType::CRM_ACL_GROUP).countersMap[ifp_port_key].usedCounter;
+        if (ingress_binding_port_cnt && ingress_binding_port_cnt != ifpPortGroupCount) {
+            // Unbind ACL table won't remove ACL table group
+            return false;
+        }
+
+        uint32_t egress_binding_port_cnt = 0;
+        for (auto it : egressAcltablePortSet) {
+            Port port;
+            if (gPortsOrch->getPort(it, port)) {
+                if (port.m_egress_acl_table_group_id == 0) {
+                    return false;
+                }
+
+                switch (port.m_type) {
+                case Port::PHY:
+                    egress_binding_port_cnt++;
+                    break;
+
+                default:
+                    // do nothing
+                    break;
+                }
+            }
+        }
+        auto efpPortGroupCount = resourceMap.at(CrmResourceType::CRM_ACL_GROUP).countersMap[efp_port_key].usedCounter;
+        if (egress_binding_port_cnt && egress_binding_port_cnt != efpPortGroupCount) {
+            // Unbind ACL table won't remove ACL table group
+            return false;
+        }
 
         // TODO: add rule check
+
+        return true;
     }
 
     // leakage check
@@ -728,6 +820,38 @@ struct AclOrchTest : public AclTest {
                     return false;
                 }
             } else if (fv.first == TABLE_PORTS) {
+                vector<string> table_ports;
+                string str = fv.second;
+                size_t pos = 0;
+                while ((pos = str.find(",")) != std::string::npos) {
+                    table_ports.push_back(str.substr(0, pos));
+                    str.erase(0, pos + 1);
+                }
+                if (str.size()) {
+                    table_ports.push_back(str);
+                }
+
+                for (auto alias : table_ports) {
+                    Port port;
+                    if (gPortsOrch->getPort(alias, port)) {
+                        if (acl_table.portSet.find(alias) == acl_table.pendingPortSet.end()) {
+                            return false;
+                        }
+
+                        sai_object_id_t bind_port_id;
+                        if (!gPortsOrch->getAclBindPortId(alias, bind_port_id)) {
+                            return false;
+                        }
+
+                        if (acl_table.ports.find(bind_port_id) == acl_table.ports.end()) {
+                            return false;
+                        }
+                    } else {
+                        if (acl_table.pendingPortSet.find(alias) == acl_table.pendingPortSet.end()) {
+                            return false;
+                        }
+                    }
+                }
             }
         }
 
@@ -770,9 +894,10 @@ struct AclOrchTest : public AclTest {
 
     bool validateAclRuleMatch(const AclRule& acl_rule, const string& attr_name, const string& attr_value)
     {
+        // TODO: un-comment the MATCH_* while support validate function
         static const acl_rule_attr_lookup_t aclMatchLookup = {
-            { MATCH_IN_PORTS, SAI_ACL_ENTRY_ATTR_FIELD_IN_PORTS },
-            { MATCH_OUT_PORTS, SAI_ACL_ENTRY_ATTR_FIELD_OUT_PORTS },
+            //{ MATCH_IN_PORTS, SAI_ACL_ENTRY_ATTR_FIELD_IN_PORTS },
+            //{ MATCH_OUT_PORTS, SAI_ACL_ENTRY_ATTR_FIELD_OUT_PORTS },
             { MATCH_SRC_IP, SAI_ACL_ENTRY_ATTR_FIELD_SRC_IP },
             { MATCH_DST_IP, SAI_ACL_ENTRY_ATTR_FIELD_DST_IP },
             { MATCH_SRC_IPV6, SAI_ACL_ENTRY_ATTR_FIELD_SRC_IPV6 },
@@ -783,15 +908,15 @@ struct AclOrchTest : public AclTest {
             { MATCH_IP_PROTOCOL, SAI_ACL_ENTRY_ATTR_FIELD_IP_PROTOCOL },
             { MATCH_TCP_FLAGS, SAI_ACL_ENTRY_ATTR_FIELD_TCP_FLAGS },
             { MATCH_IP_TYPE, SAI_ACL_ENTRY_ATTR_FIELD_ACL_IP_TYPE },
-            { MATCH_DSCP, SAI_ACL_ENTRY_ATTR_FIELD_DSCP },
-            { MATCH_TC, SAI_ACL_ENTRY_ATTR_FIELD_TC },
-            { MATCH_L4_SRC_PORT_RANGE, (sai_acl_entry_attr_t)SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE },
-            { MATCH_L4_DST_PORT_RANGE, (sai_acl_entry_attr_t)SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE },
-            { MATCH_TUNNEL_VNI, SAI_ACL_ENTRY_ATTR_FIELD_TUNNEL_VNI },
-            { MATCH_INNER_ETHER_TYPE, SAI_ACL_ENTRY_ATTR_FIELD_INNER_ETHER_TYPE },
-            { MATCH_INNER_IP_PROTOCOL, SAI_ACL_ENTRY_ATTR_FIELD_INNER_IP_PROTOCOL },
-            { MATCH_INNER_L4_SRC_PORT, SAI_ACL_ENTRY_ATTR_FIELD_INNER_L4_SRC_PORT },
-            { MATCH_INNER_L4_DST_PORT, SAI_ACL_ENTRY_ATTR_FIELD_INNER_L4_DST_PORT }
+            //{ MATCH_DSCP, SAI_ACL_ENTRY_ATTR_FIELD_DSCP },
+            //{ MATCH_TC, SAI_ACL_ENTRY_ATTR_FIELD_TC },
+            //{ MATCH_L4_SRC_PORT_RANGE, (sai_acl_entry_attr_t)SAI_ACL_RANGE_TYPE_L4_SRC_PORT_RANGE },
+            //{ MATCH_L4_DST_PORT_RANGE, (sai_acl_entry_attr_t)SAI_ACL_RANGE_TYPE_L4_DST_PORT_RANGE },
+            //{ MATCH_TUNNEL_VNI, SAI_ACL_ENTRY_ATTR_FIELD_TUNNEL_VNI },
+            //{ MATCH_INNER_ETHER_TYPE, SAI_ACL_ENTRY_ATTR_FIELD_INNER_ETHER_TYPE },
+            //{ MATCH_INNER_IP_PROTOCOL, SAI_ACL_ENTRY_ATTR_FIELD_INNER_IP_PROTOCOL },
+            //{ MATCH_INNER_L4_SRC_PORT, SAI_ACL_ENTRY_ATTR_FIELD_INNER_L4_SRC_PORT },
+            //{ MATCH_INNER_L4_DST_PORT, SAI_ACL_ENTRY_ATTR_FIELD_INNER_L4_DST_PORT }
         };
         auto itAclMatchLookup = aclMatchLookup.find(attr_name);
         if (itAclMatchLookup == aclMatchLookup.end()) {
@@ -882,24 +1007,31 @@ struct AclOrchTest : public AclTest {
             auto attr_name = fv.first;
             auto attr_value = fv.second;
 
-            static vector<string> match_attr_field = {
-                MATCH_SRC_IP,
-                MATCH_DST_IP,
-                MATCH_SRC_IPV6,
-                MATCH_DST_IPV6,
-                MATCH_ETHER_TYPE,
-                MATCH_IP_PROTOCOL,
-                MATCH_IP_TYPE,
-                MATCH_L4_SRC_PORT,
-                MATCH_L4_DST_PORT,
-                MATCH_TCP_FLAGS
+            auto is_action_attribute = [](string name) {
+                return name == ACTION_PACKET_ACTION;
             };
 
-            if (attr_name == ACTION_PACKET_ACTION) {
+            auto is_match_attribute = [](string name) {
+                static set<string> match_attrs = {
+                    MATCH_SRC_IP,
+                    MATCH_DST_IP,
+                    MATCH_SRC_IPV6,
+                    MATCH_DST_IPV6,
+                    MATCH_ETHER_TYPE,
+                    MATCH_IP_PROTOCOL,
+                    MATCH_IP_TYPE,
+                    MATCH_L4_SRC_PORT,
+                    MATCH_L4_DST_PORT,
+                    MATCH_TCP_FLAGS
+                };
+                return match_attrs.end() != match_attrs.find(name);
+            };
+
+            if (is_action_attribute(attr_name)) {
                 if (!validateAclRuleAction(acl_rule, attr_name, attr_value)) {
                     return false;
                 }
-            } else if (match_attr_field.end() != find(match_attr_field.begin(), match_attr_field.end(), attr_name)) {
+            } else if (is_match_attribute(attr_name)) {
                 if (!validateAclRuleMatch(acl_rule, attr_name, attr_value)) {
                     return false;
                 }
