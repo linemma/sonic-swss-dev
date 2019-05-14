@@ -1,0 +1,59 @@
+{
+    "version": "0.2.1",
+    "defaults": {},
+    "configurations": [
+        {
+            "type": "cppdbg",
+            "name": "D:\\New_Folder\\sonic-swss-dev",
+            "project": "",
+            "cwd": "/build.swss.wsl",
+            "program": "/build.swss.wsl/syncd-tests",
+            "MIMode": "gdb",
+            "externalConsole": true,
+            "pipeTransport": {
+                //"pipeProgram": "docker",
+                "pipeProgram": "D:\\New_Folder\\OpenSSH\\ssh.exe",
+                "pipeArgs": [
+                    //"exec",
+                    //"-it",
+                    //"sonic-swss-dev_dev-image_1",
+                    //"/bin/bash"
+                    "root@localhost"
+                ],
+                "debuggerPath": "source /build.swss.wsl/packages/.env; /build.swss.wsl/redis/start_redis.sh; /usr/bin/gdb"
+            },
+            "setupCommands": [
+                {
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Redirect to tty",
+                    "text": "tty /dev/pts/0"
+                },
+                {
+                    "description": "set verbose on",
+                    "text": "set verbose on"
+                }
+            ],
+            "logging": {
+                "exceptions": true,
+                "moduleLoad": true,
+                "programOutput": true,
+                "engineLogging": true,
+                "trace": true
+            },
+            "sourceFileMap": {
+                "/sonic-swss-dev/": "D:\\New_Folder\\sonic-swss-dev",
+                "/usr": "E:\\Docker\\rootfs\\usr",
+                "/build/gcc-7-F15og8/gcc-7-7.4.0/build/x86_64-linux-gnu/libstdc++-v3": "E:\\gcc-gcc-7_3_0-release\\libstdc++-v3",
+                "/mnt/c": "c:\\",
+                //"/usr": "\"C:\\Users\\yehjunying\\AppData\\Local\\Microsoft\\Linux\\HeaderCache\\1.0\\-1613324263",
+                //"/usr": "${env.LOCALAPPDATA}\\Packages\\CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc\\LocalState\\rootfs\\usr",
+                "/mnt/d": "d:\\",
+                "/mnt/e": "e:\\",
+                "/mnt/f": "f:\\"
+            }
+        }
+    ]
+}

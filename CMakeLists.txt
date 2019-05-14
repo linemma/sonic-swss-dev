@@ -23,9 +23,9 @@ message(STATUS "GTEST_LIBRARIES: " ${GTEST_LIBRARIES})
 message(STATUS "======================================")
 
 ## Add coverage test flag
-include(CodeCoverage)
-APPEND_COVERAGE_COMPILER_FLAGS()
-include(CTest)
+#include(CodeCoverage)
+#APPEND_COVERAGE_COMPILER_FLAGS()
+#include(CTest)
 
 ## Add definitions
 add_definitions(-std=c++11)
@@ -44,7 +44,8 @@ message(STATUS "build path: " ${BUILD_PATH})
 include_directories(${SRC_PATH}
                     ${SWSS_PATH}/orchagent
                     ${BUILD_PATH}/install/include
-                    ${SWSSCOMM_PATH}/common
+                    ${BUILD_PATH}/install/include/swss
+                    #${SWSSCOMM_PATH}/common
                     ${SAIREDIS_PATH}
                     ${SAIREDIS_PATH}/meta
                     ${SAIREDIS_PATH}/SAI/inc
@@ -185,19 +186,90 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_BINARY_DIR}/tests)
 target_link_libraries(${PROJECT_NAME} ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} pthread hiredis swsscommon saimeta saimetadata orchagent saivs sairedis)
 
-## make test_coverage ###########################################
-set(COVERAGE_LCOV_EXCLUDES
-    "*/c++/*"
-    "*/gtest/*"
-    "*/sonic-swss-dev/main.cpp"
-    "*/sonic-swss-common/common/*"
-    "*/sonic-swss-dev/tests/*"
+add_executable(syncd-tests
+    syncd-tests/main.cpp
+
+    syncd-tests/syncd_tests.cpp
+
+    syncd-tests/sai_redis_metadata.cpp
+    syncd-tests/sai_vs_metadata.cpp
+
+	# ${SAIREDIS_PATH}/syncd/syncd.cpp
+    syncd-tests/mock_syncd.cpp
+	# ${SAIREDIS_PATH}/syncd/syncd_saiswitch.cpp
+    syncd-tests/mock_syncd_saiswitch.cpp
+	# ${SAIREDIS_PATH}/syncd/syncd_hard_reinit.cpp
+    syncd-tests/mock_syncd_hard_reinit.cpp
+	# ${SAIREDIS_PATH}/syncd/syncd_notifications.cpp
+    syncd-tests/mock_syncd_notifications.cpp
+	# ${SAIREDIS_PATH}/syncd/syncd_applyview.cpp
+    syncd-tests/mock_syncd_applyview.cpp
+	# ${SAIREDIS_PATH}/syncd/syncd_flex_counter.cpp
+    syncd-tests/mock_syncd_flex_counter.cpp
+
+    tests/fake_main.DEPRECATED.cpp
+
+    ${SWSS_PATH}/orchagent/orchdaemon.cpp
+    ${SWSS_PATH}/orchagent/orch.cpp
+    ${SWSS_PATH}/orchagent/notifications.cpp 
+    ${SWSS_PATH}/orchagent/routeorch.cpp
+    ${SWSS_PATH}/orchagent/neighorch.cpp
+    ${SWSS_PATH}/orchagent/intfsorch.cpp
+    ${SWSS_PATH}/orchagent/portsorch.cpp
+    ${SWSS_PATH}/orchagent/copporch.cpp
+    ${SWSS_PATH}/orchagent/tunneldecaporch.cpp
+    ${SWSS_PATH}/orchagent/qosorch.cpp
+    ${SWSS_PATH}/orchagent/bufferorch.cpp
+    ${SWSS_PATH}/orchagent/mirrororch.cpp
+    ${SWSS_PATH}/orchagent/fdborch.cpp
+    ${SWSS_PATH}/orchagent/aclorch.cpp
+    # ${SWSS_PATH}/orchagent/saihelper.cpp
+    syncd-tests/mock_saihelper.cpp
+    ${SWSS_PATH}/orchagent/switchorch.cpp
+    ${SWSS_PATH}/orchagent/pfcwdorch.cpp
+    ${SWSS_PATH}/orchagent/pfcactionhandler.cpp
+    ${SWSS_PATH}/orchagent/crmorch.cpp
+    ${SWSS_PATH}/orchagent/request_parser.cpp
+    ${SWSS_PATH}/orchagent/vrforch.cpp
+    ${SWSS_PATH}/orchagent/countercheckorch.cpp
+    ${SWSS_PATH}/orchagent/vxlanorch.cpp
+    ${SWSS_PATH}/orchagent/vnetorch.cpp
+    ${SWSS_PATH}/orchagent/dtelorch.cpp
+    ${SWSS_PATH}/orchagent/flexcounterorch.cpp
+    ${SWSS_PATH}/orchagent/watermarkorch.cpp
 )
 
-add_test(tests.out tests.out)
-SETUP_TARGET_FOR_COVERAGE_LCOV(
-    NAME test_coverage
-    EXECUTABLE ctest
-    DEPENDENCIES ${PROJECT_NAME}
-    LCOV_ARGS
+target_include_directories(syncd-tests PRIVATE 
+    ${PROJECT_BINARY_DIR}/tests
+    ${SWSS_PATH}/orchagent
+    ${SAIREDIS_PATH}/SAI/inc
+    ${SAIREDIS_PATH}/SAI/meta
+    ${SAIREDIS_PATH}/lib/inc
+    ${SAIREDIS_PATH}/syncd
+    ${BUILD_PATH}/install/include
 )
+
+target_link_libraries(syncd-tests ${GTEST_LIBRARIES} pthread nl-3 nl-genl-3 nl-route-3 hiredis swsscommon saimeta saimetadata)
+
+add_executable(cv-tests
+    syncd-tests/condition_variable_test.cpp
+)
+
+target_link_libraries(cv-tests pthread)
+
+## make test_coverage ###########################################
+#set(COVERAGE_LCOV_EXCLUDES
+#    "*/c++/*"
+#    "*/gtest/*"
+#    "*/sonic-swss-dev/main.cpp"
+#    "*/sonic-swss-common/common/*"
+#    "*/sonic-swss-dev/tests/*"
+#)
+#
+#add_test(tests.out tests.out)
+#SETUP_TARGET_FOR_COVERAGE_LCOV(
+#    NAME test_coverage
+#    EXECUTABLE ctest
+#    DEPENDENCIES ${PROJECT_NAME}
+#    LCOV_ARGS
+#)

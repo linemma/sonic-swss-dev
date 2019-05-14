@@ -1,0 +1,122 @@
+{
+  "version": "0.2.1",
+    "tasks": [
+        {
+            "taskName": "build",
+            "appliesTo": "**",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "build"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "build-swss-tests",
+            "appliesTo": "**",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "build-swss-tests"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "run-swss-tests",
+            "appliesTo": "**",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "run-swss-tests"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "0: Build Image",
+            "appliesTo": "Dockerfile",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "docker-build"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "1: Show Image",
+            "appliesTo": "Dockerfile",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "docker-image-list"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "2: Remove Image",
+            "appliesTo": "Dockerfile",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "docker-image-remove"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "a: Compose Up",
+            "appliesTo": "Dockerfile",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "docker-run-container"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "b: Compose Down",
+            "appliesTo": "Dockerfile",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "docker-stop-container"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "hello",
+            "appliesTo": "*.cpp",
+            "type": "default",
+            "command": "ubuntu.exe",
+            "args": [
+                "run",
+                "cd /mnt/e/build.swss.wsl && pwd"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        }
+    ]
+}
