@@ -2,7 +2,7 @@
   "version": "0.2.1",
     "tasks": [
         {
-            "taskName": "build",
+            "taskName": "Build",
             "appliesTo": "**",
             "type": "default",
             "command": "${env.COMSPEC}",
@@ -15,7 +15,20 @@
             }
         },
         {
-            "taskName": "build-swss-tests",
+            "taskName": "Run Tests",
+            "appliesTo": "**",
+            "type": "default",
+            "command": "${env.COMSPEC}",
+            "args": [
+                "tasks.vs.bat",
+                "run-tests"
+            ],
+            "envVars": {
+                "VSCMD_START_DIR": "\"${workspaceRoot}\""
+            }
+        },
+        {
+            "taskName": "Build SWSS Tests",
             "appliesTo": "**",
             "type": "default",
             "command": "${env.COMSPEC}",
@@ -28,7 +41,7 @@
             }
         },
         {
-            "taskName": "run-swss-tests",
+            "taskName": "Run SWSS Tests",
             "appliesTo": "**",
             "type": "default",
             "command": "${env.COMSPEC}",
@@ -80,26 +93,26 @@
             }
         },
         {
-            "taskName": "a: Compose Up",
+            "taskName": "Docker Compose Up",
             "appliesTo": "Dockerfile",
             "type": "default",
             "command": "${env.COMSPEC}",
             "args": [
                 "tasks.vs.bat",
-                "docker-run-container"
+                "docker-compose-up"
             ],
             "envVars": {
                 "VSCMD_START_DIR": "\"${workspaceRoot}\""
             }
         },
         {
-            "taskName": "b: Compose Down",
+            "taskName": "Docker Compose Down",
             "appliesTo": "Dockerfile",
             "type": "default",
             "command": "${env.COMSPEC}",
             "args": [
                 "tasks.vs.bat",
-                "docker-stop-container"
+                "docker-compose-down"
             ],
             "envVars": {
                 "VSCMD_START_DIR": "\"${workspaceRoot}\""
