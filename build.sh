@@ -58,16 +58,6 @@ apply_patch() {
 
     sed -i 's|string str = counterIdsToStr(c_portStatIds, &sai_serialize_port_stat);|string str = counterIdsToStr(c_portStatIds, static_cast<string (*)(const sai_port_stat_t)>(\&sai_serialize_port_stat));|g' "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp"
     sed -i 's|string str = counterIdsToStr(c_queueStatIds, sai_serialize_queue_stat);|string str = counterIdsToStr(c_queueStatIds, static_cast<string (*)(const sai_queue_stat_t)>(\&sai_serialize_queue_stat));|g' "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.cpp"
-
-    # original cmd: `patch -N (acl/crm/pfcwd)orch.h < swss-(acl/crm)orch.diff`
-    patch -N "${SRC_PATH}/sonic-swss/orchagent/aclorch.h" < "${SRC_PATH}/patch/swss-aclorch.diff"
-    rm aclorch.h.rej
-    patch -N "${SRC_PATH}/sonic-swss/orchagent/crmorch.h" < "${SRC_PATH}/patch/swss-crmorch.diff"
-    rm crmorch.h.rej
-    patch -N "${SRC_PATH}/sonic-swss/orchagent/pfcwdorch.h" < "${SRC_PATH}/patch/swss-pfcwdorch.diff"
-    rm pfcwdorch.h.rej
-    patch -N "${SRC_PATH}/sonic-swss/orchagent/copporch.h" < "${SRC_PATH}/patch/swss-copporch.diff"
-    rm copporch.h.rej
 }
 
 download_source_code() {
