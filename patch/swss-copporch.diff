@@ -1,9 +1,0 @@
-@@ -55,6 +55,8 @@
-     sai_object_id_t getPolicer(string trap_group_name);
- 
-     virtual void doTask(Consumer& consumer);
-+	
-+	friend class Portal;
- };
- #endif /* SWSS_COPPORCH_H */
- 
