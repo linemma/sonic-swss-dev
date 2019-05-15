@@ -23,9 +23,9 @@ message(STATUS "GTEST_LIBRARIES: " ${GTEST_LIBRARIES})
 message(STATUS "======================================")
 
 ## Add coverage test flag
-#include(CodeCoverage)
-#APPEND_COVERAGE_COMPILER_FLAGS()
-#include(CTest)
+include(CodeCoverage)
+APPEND_COVERAGE_COMPILER_FLAGS()
+include(CTest)
 
 ## Add definitions
 add_definitions(-std=c++11)
@@ -138,7 +138,7 @@ target_include_directories(orchagent PUBLIC
 )
 
 target_link_libraries(orchagent
-    swsscommon sairedis saimetadata
+    swsscommon sairedis saimetadata jansson
 )
 
 #################################################################
@@ -258,18 +258,18 @@ add_executable(cv-tests
 target_link_libraries(cv-tests pthread)
 
 ## make test_coverage ###########################################
-#set(COVERAGE_LCOV_EXCLUDES
-#    "*/c++/*"
-#    "*/gtest/*"
-#    "*/sonic-swss-dev/main.cpp"
-#    "*/sonic-swss-common/common/*"
-#    "*/sonic-swss-dev/tests/*"
-#)
-#
-#add_test(tests.out tests.out)
-#SETUP_TARGET_FOR_COVERAGE_LCOV(
-#    NAME test_coverage
-#    EXECUTABLE ctest
-#    DEPENDENCIES ${PROJECT_NAME}
-#    LCOV_ARGS
-#)
+set(COVERAGE_LCOV_EXCLUDES
+    "*/c++/*"
+    "*/gtest/*"
+    "*/sonic-swss-dev/main.cpp"
+    "*/sonic-swss-common/common/*"
+    "*/sonic-swss-dev/tests/*"
+)
+
+add_test(tests.out tests.out)
+SETUP_TARGET_FOR_COVERAGE_LCOV(
+    NAME test_coverage
+    EXECUTABLE ctest
+    DEPENDENCIES ${PROJECT_NAME}
+    LCOV_ARGS
+)

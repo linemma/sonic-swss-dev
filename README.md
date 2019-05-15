@@ -22,3 +22,7 @@ bash -x <build-dir>/redis/start_redis.sh
 
 ## Stop the redis-server after you don't need it.
 bash -x redis/stop_redis.sh
+
+# Generate code coverage
+cd <build-dir>
+make test_coverage
