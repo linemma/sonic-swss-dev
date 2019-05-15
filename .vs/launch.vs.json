@@ -46,7 +46,7 @@
             "sourceFileMap": {
                 "/sonic-swss-dev/": "D:\\New_Folder\\sonic-swss-dev",
                 "/usr": "E:\\Docker\\rootfs\\usr",
-                "/build/gcc-7-F15og8/gcc-7-7.4.0/build/x86_64-linux-gnu/libstdc++-v3": "E:\\gcc-gcc-7_3_0-release\\libstdc++-v3",
+                "/build/gcc-7-F15og8/gcc-7-7.4.0/build/x86_64-linux-gnu/libstdc++-v3": "E:\\gcc-gcc-7_4_0-release\\libstdc++-v3",
                 "/mnt/c": "c:\\",
                 //"/usr": "\"C:\\Users\\yehjunying\\AppData\\Local\\Microsoft\\Linux\\HeaderCache\\1.0\\-1613324263",
                 //"/usr": "${env.LOCALAPPDATA}\\Packages\\CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc\\LocalState\\rootfs\\usr",

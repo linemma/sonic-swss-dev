@@ -68,12 +68,15 @@ docker-compose down
 goto :eof
 
 :DockerCopyDebugFiles
-mkdir -p E:\Docker\rootfs\usr
-
-rem scp -r root@localhost:/usr/include /mnt/e/Docker/rootfs/usr
-
-rem setup ssh
+rem == setup ssh === (by manual)
 rem ssh root@localhost
 rem type C:\Users\yehjunying\.ssh\id_rsa.pub | ssh root@localhost "cat >> .ssh/authorized_keys"
+
+mkdir -p E:\Docker\rootfs\usr
+scp -r root@localhost:/usr/include E:\Docker\rootfs\usr
+
+cd /d E:\
+git clone https://gnu.googlesource.com/gcc gcc-gcc-7_4_0-release
+git checkout gcc-7_4_0-release
 
 goto :eof
