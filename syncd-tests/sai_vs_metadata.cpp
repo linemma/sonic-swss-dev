@@ -150,7 +150,6 @@
 #include "vslib/src/sai_vs_switch.cpp"
 #include "vslib/src/sai_vs_tam.cpp"
 #include "vslib/src/sai_vs_tunnel.cpp"
-#include "vslib/src/sai_vs_uburst.cpp"
 #include "vslib/src/sai_vs_udf.cpp"
 #include "vslib/src/sai_vs_virtual_router.cpp"
 #include "vslib/src/sai_vs_vlan.cpp"

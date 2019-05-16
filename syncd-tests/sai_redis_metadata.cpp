@@ -48,7 +48,6 @@
 #include "lib/src/sai_redis_switch.cpp"
 #include "lib/src/sai_redis_tam.cpp"
 #include "lib/src/sai_redis_tunnel.cpp"
-#include "lib/src/sai_redis_uburst.cpp"
 #include "lib/src/sai_redis_udf.cpp"
 #include "lib/src/sai_redis_virtual_router.cpp"
 #include "lib/src/sai_redis_vlan.cpp"
