@@ -6,10 +6,6 @@ services:
       - default
     ports: #(HOST:CONTAINER)
       - "22:22"
-      - "1370:137/udp"
-      - "1380:138/udp"
-      - "1390:139/tcp"
-      - "4450:445/tcp"
     privileged: true
     volumes: #(HOST:CONTAINER)
       - ".:/sonic-swss-dev"
