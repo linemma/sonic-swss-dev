@@ -1,44 +1,7 @@
+#include "json.hpp"
 #include "ut_helper.h"
 
 #include "orchdaemon.h"
-
-#include "jansson.hpp"
-
-namespace json {
-
-class Object : public json::Value {
-public:
-    Object()
-        : Value(json::object())
-    {
-    }
-
-    Object(std::initializer_list<std::pair<const char*, Value>> l)
-        : Object()
-    {
-        for (auto p : l) {
-            this->operator[](p.first) = p.second;
-        }
-    }
-};
-
-class Array : public json::Value {
-public:
-    Array()
-        : Value(json::array())
-    {
-    }
-
-    Array(std::initializer_list<Value> l)
-        : Array()
-    {
-        int i = 0;
-        for (auto p : l) {
-            set_at(i++, p);
-        }
-    }
-};
-}
 
 extern sai_object_id_t gSwitchId;
 
@@ -54,6 +17,7 @@ extern sai_bridge_api_t* sai_bridge_api;
 namespace nsQosOrchTest {
 
 using namespace std;
+using json = nlohmann::json;
 
 size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>& entries)
 {
@@ -312,83 +276,66 @@ TEST_F(QosMapHandlerTest, Dscp_To_Tc_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list{
-        { "count", json::Value(3) },
-        { "list", json::Array{
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(1) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(2) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(3) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(3) },
-                                     } },
-                      },
-                  } }
+    json map_to_value_list = {
+        { "count", 3 },
+        { "list", json::array({ { { "key", {
+                                               { "color", "SAI_PACKET_COLOR_GREEN" },
+                                               { "dot1p", 0 },
+                                               { "dscp", 1 },
+                                               { "pg", 0 },
+                                               { "prio", 0 },
+                                               { "qidx", 0 },
+                                               { "tc", 0 },
+                                           } },
+                                    { "value", {
+                                                   { "color", "SAI_PACKET_COLOR_GREEN" },
+                                                   { "dot1p", 0 },
+                                                   { "dscp", 0 },
+                                                   { "pg", 0 },
+                                                   { "prio", 0 },
+                                                   { "qidx", 0 },
+                                                   { "tc", 0 },
+                                               } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 2 },
+                                     { "pg", 0 },
+                                     { "prio", 0 },
+                                     { "qidx", 0 },
+                                     { "tc", 0 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 0 },
+                                         { "prio", 0 },
+                                         { "qidx", 0 },
+                                         { "tc", 0 },
+                                     } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 3 },
+                                     { "pg", 0 },
+                                     { "prio", 0 },
+                                     { "qidx", 0 },
+                                     { "tc", 0 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 0 },
+                                         { "prio", 0 },
+                                         { "qidx", 0 },
+                                         { "tc", 3 },
+                                     } } } }) },
     };
-    // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
-    //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":1,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //      \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":2,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":3,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3}}]}" } });
+
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_DSCP_TO_TC" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
+        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.dump() } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
@@ -405,83 +352,66 @@ TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list{
-        { "count", json::Value(3) },
-        { "list", json::Array{
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(1) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(1) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(3) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(3) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-                  } }
+    json map_to_value_list = {
+        { "count", 3 },
+        { "list", json::array({ { { "key", {
+                                               { "color", "SAI_PACKET_COLOR_GREEN" },
+                                               { "dot1p", 0 },
+                                               { "dscp", 0 },
+                                               { "pg", 0 },
+                                               { "prio", 0 },
+                                               { "qidx", 0 },
+                                               { "tc", 0 },
+                                           } },
+                                    { "value", {
+                                                   { "color", "SAI_PACKET_COLOR_GREEN" },
+                                                   { "dot1p", 0 },
+                                                   { "dscp", 0 },
+                                                   { "pg", 0 },
+                                                   { "prio", 0 },
+                                                   { "qidx", 0 },
+                                                   { "tc", 0 },
+                                               } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 0 },
+                                     { "qidx", 0 },
+                                     { "tc", 1 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 0 },
+                                         { "prio", 0 },
+                                         { "qidx", 1 },
+                                         { "tc", 0 },
+                                     } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 0 },
+                                     { "qidx", 0 },
+                                     { "tc", 3 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 0 },
+                                         { "prio", 0 },
+                                         { "qidx", 3 },
+                                         { "tc", 0 },
+                                     } } } }) },
     };
-    // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" },
-    //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":1,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
+
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
+        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.dump() } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
@@ -498,83 +428,66 @@ TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list{
-        { "count", json::Value(3) },
-        { "list", json::Array{
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(1) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(1) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(3) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(3) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-                  } }
+    json map_to_value_list = {
+        { "count", 3 },
+        { "list", json::array({ { { "key", {
+                                               { "color", "SAI_PACKET_COLOR_GREEN" },
+                                               { "dot1p", 0 },
+                                               { "dscp", 0 },
+                                               { "pg", 0 },
+                                               { "prio", 0 },
+                                               { "qidx", 0 },
+                                               { "tc", 0 },
+                                           } },
+                                    { "value", {
+                                                   { "color", "SAI_PACKET_COLOR_GREEN" },
+                                                   { "dot1p", 0 },
+                                                   { "dscp", 0 },
+                                                   { "pg", 0 },
+                                                   { "prio", 0 },
+                                                   { "qidx", 0 },
+                                                   { "tc", 0 },
+                                               } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 0 },
+                                     { "qidx", 0 },
+                                     { "tc", 1 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 1 },
+                                         { "prio", 0 },
+                                         { "qidx", 0 },
+                                         { "tc", 0 },
+                                     } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 0 },
+                                     { "qidx", 0 },
+                                     { "tc", 3 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 3 },
+                                         { "prio", 0 },
+                                         { "qidx", 0 },
+                                         { "tc", 0 },
+                                     } } } }) },
     };
-    // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_PRIORITY_GROUP" },
-    //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":1},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":1,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":3},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
+
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_PRIORITY_GROUP" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
+        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.dump() } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
@@ -591,83 +504,66 @@ TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list{
-        { "count", json::Value(3) },
-        { "list", json::Array{
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(1) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(1) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(3) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(3) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-                  } }
+    json map_to_value_list = {
+        { "count", 3 },
+        { "list", json::array({ { { "key", {
+                                               { "color", "SAI_PACKET_COLOR_GREEN" },
+                                               { "dot1p", 0 },
+                                               { "dscp", 0 },
+                                               { "pg", 0 },
+                                               { "prio", 0 },
+                                               { "qidx", 0 },
+                                               { "tc", 0 },
+                                           } },
+                                    { "value", {
+                                                   { "color", "SAI_PACKET_COLOR_GREEN" },
+                                                   { "dot1p", 0 },
+                                                   { "dscp", 0 },
+                                                   { "pg", 0 },
+                                                   { "prio", 0 },
+                                                   { "qidx", 0 },
+                                                   { "tc", 0 },
+                                               } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 1 },
+                                     { "qidx", 0 },
+                                     { "tc", 0 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 1 },
+                                         { "prio", 0 },
+                                         { "qidx", 0 },
+                                         { "tc", 0 },
+                                     } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 3 },
+                                     { "qidx", 0 },
+                                     { "tc", 0 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 3 },
+                                         { "prio", 0 },
+                                         { "qidx", 0 },
+                                         { "tc", 0 },
+                                     } } } }) },
     };
-    // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_PRIORITY_GROUP" },
-    //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":1,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":1,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":3,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":3,\"prio\":0,\"qidx\":0,\"tc\":0}}]}" } });
+
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_PRIORITY_GROUP" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
+        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.dump() } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
@@ -684,83 +580,66 @@ TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
 
     ASSERT_TRUE(res->ret_val == true);
 
-    json::Object map_to_value_list{
-        { "count", json::Value(3) },
-        { "list", json::Array{
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(0) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(0) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(1) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(1) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-
-                      json::Object{
-                          { "key", json::Object{
-                                       { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                       { "dot1p", json::Value(0) },
-                                       { "dscp", json::Value(0) },
-                                       { "pg", json::Value(0) },
-                                       { "prio", json::Value(3) },
-                                       { "qidx", json::Value(0) },
-                                       { "tc", json::Value(0) },
-                                   } },
-                          { "value", json::Object{
-                                         { "color", json::Value("SAI_PACKET_COLOR_GREEN") },
-                                         { "dot1p", json::Value(0) },
-                                         { "dscp", json::Value(0) },
-                                         { "pg", json::Value(0) },
-                                         { "prio", json::Value(0) },
-                                         { "qidx", json::Value(3) },
-                                         { "tc", json::Value(0) },
-                                     } },
-                      },
-                  } }
+    json map_to_value_list = {
+        { "count", 3 },
+        { "list", json::array({ { { "key", {
+                                               { "color", "SAI_PACKET_COLOR_GREEN" },
+                                               { "dot1p", 0 },
+                                               { "dscp", 0 },
+                                               { "pg", 0 },
+                                               { "prio", 0 },
+                                               { "qidx", 0 },
+                                               { "tc", 0 },
+                                           } },
+                                    { "value", {
+                                                   { "color", "SAI_PACKET_COLOR_GREEN" },
+                                                   { "dot1p", 0 },
+                                                   { "dscp", 0 },
+                                                   { "pg", 0 },
+                                                   { "prio", 0 },
+                                                   { "qidx", 0 },
+                                                   { "tc", 0 },
+                                               } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 1 },
+                                     { "qidx", 0 },
+                                     { "tc", 0 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 0 },
+                                         { "prio", 0 },
+                                         { "qidx", 1 },
+                                         { "tc", 0 },
+                                     } } },
+                      { { "key", {
+                                     { "color", "SAI_PACKET_COLOR_GREEN" },
+                                     { "dot1p", 0 },
+                                     { "dscp", 0 },
+                                     { "pg", 0 },
+                                     { "prio", 3 },
+                                     { "qidx", 0 },
+                                     { "tc", 0 },
+                                 } },
+                          { "value", {
+                                         { "color", "SAI_PACKET_COLOR_GREEN" },
+                                         { "dot1p", 0 },
+                                         { "dscp", 0 },
+                                         { "pg", 0 },
+                                         { "prio", 0 },
+                                         { "qidx", 3 },
+                                         { "tc", 0 },
+                                     } } } }) },
     };
-    // auto v = vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_QUEUE" },
-    //     { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", "{\"count\":3,\"list\":[{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":0,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":1,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":1,\"tc\":0}},{\
-    //     \"key\":{\"color\":\"SAI_PACKET_COLOR_RED\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":3,\"qidx\":0,\"tc\":0},\
-    //     \"value\":{\"color\":\"SAI_PACKET_COLOR_GREEN\",\"dot1p\":0,\"dscp\":0,\"pg\":0,\"prio\":0,\"qidx\":3,\"tc\":0}}]}" } });
+
     auto v = std::vector<swss::FieldValueTuple>({ { "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_QUEUE" },
-        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.save_string(JSON_COMPACT) } });
+        { "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", map_to_value_list.dump() } });
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
