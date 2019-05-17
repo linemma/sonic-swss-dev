@@ -98,57 +98,7 @@ size_t consumerAddToSync(Consumer* consumer, const deque<KeyOpFieldsValuesTuple>
 }
 
 struct TestBase : public ::testing::Test {
-
-    bool AttrListEq(sai_object_type_t object_type, const vector<sai_attribute_t>& act_attr_list, /*const*/ SaiAttributeList& exp_attr_list)
-    {
-        if (act_attr_list.size() != exp_attr_list.get_attr_count()) {
-            return false;
-        }
-
-        auto l = exp_attr_list.get_attr_list();
-        for (int i = 0; i < exp_attr_list.get_attr_count(); ++i) {
-            sai_attr_id_t id = exp_attr_list.get_attr_list()[i].id;
-            auto meta = sai_metadata_get_attr_metadata(object_type, id);
-
-            assert(meta != nullptr);
-
-            char act_buf[0x4000];
-            char exp_buf[0x4000];
-
-            int act_len;
-            int exp_len;
-
-            if (meta->attrvaluetype != _sai_attr_value_type_t::SAI_ATTR_VALUE_TYPE_QOS_MAP_LIST) {
-                act_len = sai_serialize_attribute_value(act_buf, meta, &act_attr_list[i].value);
-                exp_len = sai_serialize_attribute_value(exp_buf, meta, &exp_attr_list.get_attr_list()[i].value);
-            } else {
-                act_len = sai_serialize_qos_map_list(act_buf, &act_attr_list[i].value.qosmap);
-                exp_len = sai_serialize_qos_map_list(exp_buf, &exp_attr_list.get_attr_list()[i].value.qosmap);
-            }
-
-            // auto act = sai_serialize_attr_value(*meta, act_attr_list[i].value, false);
-            // auto exp = sai_serialize_attr_value(*meta, &exp_attr_list.get_attr_list()[i].value, false);
-
-            assert(act_len < sizeof(act_buf));
-            assert(exp_len < sizeof(exp_buf));
-
-            if (act_len != exp_len) {
-                cout << "AttrListEq failed\n";
-                cout << "Actual:   " << act_buf << "\n";
-                cout << "Expected: " << exp_buf << "\n";
-                return false;
-            }
-
-            if (strcmp(act_buf, exp_buf) != 0) {
-                cout << "AttrListEq failed\n";
-                cout << "Actual:   " << act_buf << "\n";
-                cout << "Expected: " << exp_buf << "\n";
-                return false;
-            }
-        }
-
-        return true;
-    }
+    //Already remote the AttrListEq(). 
 };
 
 struct QosMapHandlerTest : public TestBase {
@@ -442,7 +392,7 @@ TEST_F(QosMapHandlerTest, Dscp_To_Tc_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
@@ -535,7 +485,7 @@ TEST_F(QosMapHandlerTest, Tc_To_Queue_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
@@ -628,7 +578,7 @@ TEST_F(QosMapHandlerTest, Tc_To_Pg_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
@@ -721,7 +671,7 @@ TEST_F(QosMapHandlerTest, Pfc_Prio_To_Pg_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
@@ -814,7 +764,7 @@ TEST_F(QosMapHandlerTest, Pfc_To_Queue_Map)
 
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_QOS_MAP, v, false);
 
-    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq(SAI_OBJECT_TYPE_QOS_MAP, res->attr_list, attr_list));
 }
 
 TEST_F(QosMapHandlerTest, Add_Wred_Profile)
@@ -850,7 +800,7 @@ TEST_F(QosMapHandlerTest, Add_Wred_Profile)
         { "SAI_WRED_ATTR_RED_DROP_PROBABILITY", "100" } });
     SaiAttributeList attr_list(SAI_OBJECT_TYPE_WRED, v, false);
 
-    ASSERT_TRUE(AttrListEq(SAI_OBJECT_TYPE_WRED, res->attr_list, attr_list));
+    ASSERT_TRUE(Check::AttrListEq(SAI_OBJECT_TYPE_WRED, res->attr_list, attr_list));
 }
 
 // TEST_F(QosMapHandlerTest, DeleteWredProfile)
@@ -887,7 +837,7 @@ struct MockQosOrch {
         return m_qos_orch;
     }
 
-    type_map& getTypeMap()
+    const type_map& getTypeMap()
     {
         //SWSS_LOG_ENTER();
         return m_qos_orch->m_qos_maps;
@@ -1070,6 +1020,15 @@ struct QosOrchTest : public TestBase {
         } else if (qos_table_name == CFG_TC_TO_QUEUE_MAP_TABLE_NAME) {
             fields.push_back({ "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_QUEUE" });
             fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", convertValuesToQosMapListStr(qos_table_name, values) });
+        } else if (qos_table_name == CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME) {
+            fields.push_back({ "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_TC_TO_PRIORITY_GROUP" });
+            fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", convertValuesToQosMapListStr(qos_table_name, values) });
+        } else if (qos_table_name == CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME) {
+            fields.push_back({ "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_QUEUE" });
+            fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", convertValuesToQosMapListStr(qos_table_name, values) });
+        } else if (qos_table_name == CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME) {
+            fields.push_back({ "SAI_QOS_MAP_ATTR_TYPE", "SAI_QOS_MAP_TYPE_PFC_PRIORITY_TO_PRIORITY_GROUP" });
+            fields.push_back({ "SAI_QOS_MAP_ATTR_MAP_TO_VALUE_LIST", convertValuesToQosMapListStr(qos_table_name, values) });
         }
 
         return shared_ptr<SaiAttributeList>(new SaiAttributeList(object_type, fields, false));
@@ -1094,30 +1053,48 @@ struct QosOrchTest : public TestBase {
                 attr.value.qosmap.list[ind].key.tc = (uint8_t)stoi(fvField(*i));
                 attr.value.qosmap.list[ind].value.queue_index = (uint8_t)stoi(fvValue(*i));
             }
+        } else if (qos_table_name == CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME) {
+            for (auto i = values.begin(); i != values.end(); i++, ind++) {
+                attr.value.qosmap.list[ind].key.tc = (uint8_t)stoi(fvField(*i));
+                attr.value.qosmap.list[ind].value.pg = (uint8_t)stoi(fvValue(*i));
+            }
+        } else if (qos_table_name == CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME) {
+            for (auto i = values.begin(); i != values.end(); i++, ind++) {
+                attr.value.qosmap.list[ind].key.prio = (uint8_t)stoi(fvField(*i));
+                attr.value.qosmap.list[ind].value.queue_index = (uint8_t)stoi(fvValue(*i));
         }
+        } else if (qos_table_name == CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME) {
+            for (auto i = values.begin(); i != values.end(); i++, ind++) {
+                attr.value.qosmap.list[ind].key.prio = (uint8_t)stoi(fvField(*i));
+                attr.value.qosmap.list[ind].value.pg = (uint8_t)stoi(fvValue(*i));
+            }
+        }
+        
 
         meta = sai_metadata_get_attr_metadata(SAI_OBJECT_TYPE_QOS_MAP, attr.id);
+        string QosMapListStr = sai_serialize_attr_value(*meta, attr);  //store the str for return.
+        delete[] attr.value.qosmap.list; //delete the space created at Line1093 before return.
 
-        return sai_serialize_attr_value(*meta, attr);
+        return QosMapListStr;
     }
 
-    bool Validate(MockQosOrch* orch, const string& table_name, const vector<FieldValueTuple>& values)
+    bool Validate(MockQosOrch* orch, const string& table_name, const string& profile_name, const vector<FieldValueTuple>& values)
     {
         const sai_object_type_t object_type = SAI_OBJECT_TYPE_QOS_MAP;
 
-        auto qos_maps = orch->getTypeMap();
-        auto qos_map = qos_maps.find(table_name);
-        if (qos_map == qos_maps.end()) {
+        const auto& qos_maps = orch->getTypeMap();
+        auto qos_map_iter = qos_maps.find(table_name); //qos_map -> qos_map_iter
+        if (qos_map_iter == qos_maps.end()) {
             return false;
         }
 
-        auto obj_map = *(qos_map->second)->find(table_name);
-        if (obj_map == *(qos_map->second)->end()) {
+        auto obj_map_iter = *(qos_map_iter->second)->find(profile_name); // obj_map->obj_map_iter
+        if (obj_map_iter == *(qos_map_iter->second)->end()) {
             return false;
         }
 
         auto exp_attr_list = getQosMapAttributeList(object_type, table_name, values);
-        if (!ValidateQosMap(object_type, obj_map.second, *exp_attr_list.get())) {
+        if (!ValidateQosMap(object_type, obj_map_iter.second, *exp_attr_list.get())) {
             return false;
         }
 
@@ -1160,7 +1137,7 @@ struct QosOrchTest : public TestBase {
             return false;
         }
 
-        auto b_attr_eq = AttrListEq(object_type, act_attr, exp_attrlist);
+        auto b_attr_eq = Check::AttrListEq(object_type, act_attr, exp_attrlist);
         if (!b_attr_eq) {
             return false;
         }
@@ -1188,11 +1165,11 @@ TEST_F(QosOrchTest, Dscp_To_Tc_Map_Via_VS)
         { "51", "0" }, { "52", "0" }, { "53", "0" }, { "54", "0" }, { "55", "0" }, { "56", "0" },
         { "57", "0" }, { "58", "0" }, { "59", "0" }, { "60", "0" }, { "61", "0" }, { "62", "0" },
         { "63", "0" } };
-    KeyOpFieldsValuesTuple dscp_to_tc_tuple(CFG_DSCP_TO_TC_MAP_TABLE_NAME, SET_COMMAND, dscp_to_tc_values);
+    KeyOpFieldsValuesTuple dscp_to_tc_tuple("DscpToTcProfileName", SET_COMMAND, dscp_to_tc_values);
     deque<KeyOpFieldsValuesTuple> setData = { dscp_to_tc_tuple };
 
     orch->doQosMapTask(setData, CFG_DSCP_TO_TC_MAP_TABLE_NAME);
-    ASSERT_TRUE(Validate(orch.get(), CFG_DSCP_TO_TC_MAP_TABLE_NAME, dscp_to_tc_values));
+    ASSERT_TRUE(Validate(orch.get(), CFG_DSCP_TO_TC_MAP_TABLE_NAME, "DscpToTcProfileName", dscp_to_tc_values));
 }
 
 TEST_F(QosOrchTest, Tc_To_Queue_Map_Via_VS)
@@ -1200,10 +1177,47 @@ TEST_F(QosOrchTest, Tc_To_Queue_Map_Via_VS)
     auto orch = createQosOrch();
 
     vector<FieldValueTuple> tc_to_queue_values = { { "0", "0" }, { "1", "1" }, { "3", "3" }, { "4", "4" } };
-    KeyOpFieldsValuesTuple tc_to_queue_tuple(CFG_TC_TO_QUEUE_MAP_TABLE_NAME, SET_COMMAND, tc_to_queue_values);
+    KeyOpFieldsValuesTuple tc_to_queue_tuple("TcToQueueProfileName", SET_COMMAND, tc_to_queue_values);
     deque<KeyOpFieldsValuesTuple> setData = { tc_to_queue_tuple };
 
     orch->doQosMapTask(setData, CFG_TC_TO_QUEUE_MAP_TABLE_NAME);
-    ASSERT_TRUE(Validate(orch.get(), CFG_TC_TO_QUEUE_MAP_TABLE_NAME, tc_to_queue_values));
+    ASSERT_TRUE(Validate(orch.get(), CFG_TC_TO_QUEUE_MAP_TABLE_NAME, "TcToQueueProfileName", tc_to_queue_values));
 }
+
+TEST_F(QosOrchTest, Tc_To_Pg_Map_Via_VS)
+{
+    auto orch = createQosOrch();
+    
+    vector<FieldValueTuple> tc_to_pg_values = { { "0", "0" }, { "1", "1" }, { "3", "3" }, { "4", "4" } };
+    KeyOpFieldsValuesTuple tc_to_pg_tuple("TcToPgProfileName", SET_COMMAND, tc_to_pg_values);
+    deque<KeyOpFieldsValuesTuple> setData = { tc_to_pg_tuple };
+
+    orch->doQosMapTask(setData, CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME);
+    ASSERT_TRUE(Validate(orch.get(), CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME, "TcToPgProfileName", tc_to_pg_values));
+}
+
+TEST_F(QosOrchTest, Pfc_Priority_To_Queue_Map_Via_VS)
+{
+    auto orch = createQosOrch();
+    
+    vector<FieldValueTuple> pfc_priority_to_queue_values = { { "0", "0" }, { "1", "1" }, { "3", "3" }, { "4", "4" } };
+    KeyOpFieldsValuesTuple pfc_priority_to_queue_tuple("PfcPriorityToQueueProfileName", SET_COMMAND, pfc_priority_to_queue_values);
+    deque<KeyOpFieldsValuesTuple> setData = { pfc_priority_to_queue_tuple };
+
+    orch->doQosMapTask(setData, CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME);
+    ASSERT_TRUE(Validate(orch.get(), CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME, "PfcPriorityToQueueProfileName", pfc_priority_to_queue_values));
+}
+
+TEST_F(QosOrchTest, Pfc_Priority_To_Pg_Map_Via_VS)
+{
+    auto orch = createQosOrch();
+    
+    vector<FieldValueTuple> pfc_priority_to_pg_values = { { "0", "0" }, { "1", "1" }, { "3", "3" }, { "4", "4" } };
+    KeyOpFieldsValuesTuple pfc_priority_to_pg_tuple("PfcPriorityToPgProfileName", SET_COMMAND, pfc_priority_to_pg_values);
+    deque<KeyOpFieldsValuesTuple> setData = { pfc_priority_to_pg_tuple };
+
+    orch->doQosMapTask(setData, CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME);
+    ASSERT_TRUE(Validate(orch.get(), CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME, "PfcPriorityToPgProfileName", pfc_priority_to_pg_values));
+}
+
 }
